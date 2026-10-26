@@ -50,29 +50,42 @@ async function navigate(page, url) {
   await page.locator('#url').fill(url);
   await page.locator('#url').press('Enter');
 }
-test('store detail offers an icon and install chip, expanding only after a click', async ({
+test('store detail automatically offers installation without covering the live page', async ({
   page,
 }) => {
   await openApp(page);
   await navigate(page, 'https://chromewebstore.google.com/');
   await expect(page.locator('#bStoreInstall')).toBeHidden();
+  const originalTop = (await page.locator('#page').boundingBox()).y;
   await navigate(page, detail);
   const chip = page.locator('#bStoreInstall');
   await expect(chip).toBeVisible();
   await expect(chip.locator('img')).toBeVisible();
-  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  await expect(page.locator('#storeInstallDrop')).toBeVisible();
   expect(await page.evaluate(() => window.reviewSource)).toBeUndefined();
-  await chip.click();
   await expect(page.locator('#urlbox')).toHaveClass(/store-drop-open/);
   await expect(page.locator('#storeInstallDrop')).toContainText(
     'Free VPN for Chrome - VPN Proxy VeePN',
   );
   expect(await page.evaluate(() => window.reviewSource)).toBeUndefined();
-  const box = await page.locator('#urlbox').boundingBox(),
-    drop = await page.locator('#storeInstallDrop').boundingBox();
-  expect(Math.abs(box.x - drop.x)).toBeLessThan(2);
-  expect(Math.abs(box.width - drop.width)).toBeLessThan(2);
+  const drop = await page.locator('#storeInstallDrop').boundingBox();
+  const livePage = await page.locator('#page').boundingBox();
+  expect(livePage.y).toBeGreaterThan(originalTop + 80);
+  expect(livePage.y).toBeGreaterThanOrEqual(drop.y + drop.height);
+  await expect(page.locator('#pageShot')).toBeHidden();
   await page.locator('[data-store-close]').last().click();
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  await page.evaluate(() =>
+    window.nativeState({
+      t: 'state',
+      tab: window.nativeTab,
+      url: window.nativeURL,
+      title: 'Free VPN for Chrome - VPN Proxy VeePN - Chrome Web Store',
+      loading: false,
+      progress: 1,
+    }),
+  );
+  await expect(page.locator('#bStoreInstall')).toBeVisible();
   await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
   await chip.click();
   await page.locator('[data-store-confirm]').click();
@@ -92,7 +105,6 @@ test('store chip ignores search pages and lookalike hosts and closes when leavin
     await expect(page.locator('#bStoreInstall')).toBeHidden();
   }
   await navigate(page, detail);
-  await page.locator('#bStoreInstall').click();
   await expect(page.locator('#storeInstallDrop')).toBeVisible();
   await page.locator('#url').fill('https://example.org');
   await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
@@ -106,7 +118,6 @@ test('changing store extensions discards stale name and icon until the new detai
   await openApp(page);
   await navigate(page, detail);
   await expect(page.locator('#bStoreInstall')).toHaveAttribute('aria-label', /VeePN installieren/);
-  await page.locator('#bStoreInstall').click();
   await expect(page.locator('#storeInstallDrop')).toContainText('VeePN');
   const urban =
     'https://chromewebstore.google.com/detail/urban-vpn-proxy/eppiocemhmnlbhjplcgkofciiegomcon';
@@ -126,8 +137,9 @@ test('changing store extensions discards stale name and icon until the new detai
       progress: 1,
     });
   }, urban);
-  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
-  await expect(page.locator('#bStoreInstall')).toBeHidden();
+  await expect(page.locator('#storeInstallDrop')).toContainText('urban vpn proxy');
+  await expect(page.locator('#storeInstallDrop')).not.toContainText('VeePN');
+  await expect(page.locator('#bStoreInstall')).toBeVisible();
   await page.evaluate((url) => {
     window.customMetadata = {
       url,
@@ -139,7 +151,39 @@ test('changing store extensions discards stale name and icon until the new detai
     'aria-label',
     'Urban VPN Proxy installieren',
   );
-  await page.locator('#bStoreInstall').click();
   await expect(page.locator('#storeInstallDrop')).toContainText('Urban VPN Proxy');
   await expect(page.locator('#storeInstallDrop')).not.toContainText('VeePN');
+});
+
+test('actual native metadata script works and rejects stale SPA headings', async ({ page }) => {
+  const source = fs.readFileSync(path.join(__dirname, '../../extensions.go'), 'utf8');
+  const script = source.match(/const extensionStoreDetailsScript = `([\s\S]*?)`/)[1];
+  await page.route('https://chromewebstore.google.com/**', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: `<link rel="canonical" href="${detail}"><title>Free VPN - Chrome Web Store</title><h1>Free VPN</h1><img alt="Item logo image" src="https://lh3.googleusercontent.com/logo.png">`,
+    }),
+  );
+  await page.goto(detail);
+  const info = JSON.parse(await page.evaluate(script));
+  expect(info.name).toBe('Free VPN');
+  expect(info.icon).toContain('logo.png');
+  await page.evaluate(() => (document.querySelector('h1').textContent = 'Old extension'));
+  expect(JSON.parse(await page.evaluate(script))).toEqual({});
+});
+
+test('valid detail URL offers installation even while metadata is unavailable', async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    window.customMetadata = {};
+  });
+  await navigate(page, detail);
+  await expect(page.locator('#storeInstallDrop')).toBeVisible();
+  await expect(page.locator('#bStoreInstall')).toBeVisible();
+  await expect(page.locator('[data-store-confirm]')).toBeEnabled();
+  await page.locator('[data-store-confirm]').click();
+  await expect(page.locator('#set-extensions')).toContainText('proxy');
+  expect(await page.evaluate(() => window.reviewSource)).toBe(detail);
 });
