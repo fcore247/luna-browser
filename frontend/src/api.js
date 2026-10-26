@@ -146,3 +146,5 @@ export const extensionCancel = (id) => window.go.main.App.ExtensionCancel(id);
 export const extensionEnable = (id, on) => window.go.main.App.ExtensionEnable(id, on);
 export const extensionRemove = (id) => window.go.main.App.ExtensionRemove(id);
 export const extensionOpen = (id, tab) => window.go.main.App.ExtensionOpen(id, tab);
+
+export const extensionStoreDetails = (tab) => window.go.main.App.ExtensionStoreDetails(tab);

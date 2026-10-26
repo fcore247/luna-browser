@@ -4,9 +4,12 @@ import (
 	"browser-mac/internal/extensions"
 	"browser-mac/internal/web"
 	"context"
+	"encoding/json"
 	"errors"
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -81,3 +84,48 @@ func (a *App) initExtensions(dir string) {
 	a.extensions = manager
 	go manager.Restore()
 }
+
+// ExtensionStoreDetails reads display metadata only on an actual store detail page.
+// This never downloads or installs a package.
+func (a *App) ExtensionStoreDetails(tab int) (map[string]string, error) {
+	raw, err := web.Evaluate(tab, extensionStoreDetailsScript)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]string{}
+	if err = json.Unmarshal([]byte(raw), &result); err != nil {
+		return nil, err
+	}
+	if result["url"] == "" {
+		return map[string]string{}, nil
+	}
+	id, err := extensions.StoreID(result["url"])
+	if err != nil {
+		return map[string]string{}, nil
+	}
+	result["id"] = id
+	if len(result["name"]) > 512 {
+		result["name"] = result["name"][:512]
+	}
+	icon, parseErr := url.Parse(result["icon"])
+	if parseErr != nil || icon.Scheme != "https" || icon.User != nil || !(icon.Hostname() == "lh3.googleusercontent.com" || strings.HasSuffix(icon.Hostname(), ".googleusercontent.com")) || (icon.Port() != "" && icon.Port() != "443") {
+		result["icon"] = ""
+	}
+	return result, nil
+}
+
+const extensionStoreDetailsScript = `(function(){
+ const u=new URL(location.href);
+ if(u.protocol!=='https:'||u.host!=='chromewebstore.google.com'||!/^\/detail\/(?:[^/]+\/)?[a-p]{32}\/?$/.test(u.pathname))return '{}';
+ const canonical=document.querySelector('link[rel="canonical"]')?.href;
+ if(canonical){try{const currentID=u.pathname.match(/([a-p]{32})\/?$/)?.[1];const canonicalID=new URL(canonical).pathname.match(/([a-p]{32})\/?$/)?.[1];if(canonicalID!==currentID)return '{}';}catch{return '{}';}}
+ const heading=document.querySelector('h1');
+ if(!heading)return '{}';
+ const name=heading.textContent.trim().slice(0,256);
+ const title=document.title.replace(/\s*[-–|]\s*Chrome Web Store.*$/i,'').trim();
+ if(!name||name.toLowerCase()!==title.toLowerCase())return '{}';
+ const images=[...document.images];
+ const image=images.find(i=>/item logo image|symbolbild|logo.*(?:extension|erweiterung)/i.test(i.alt))||images.find(i=>i.alt===name)||images.find(i=>i.closest('section,header')?.contains(heading)&&/googleusercontent\.com/.test(i.src));
+ const icon=image?.src||document.querySelector('meta[property="og:image"]')?.content||'';
+ return JSON.stringify({url:location.href,name,icon});
+})()`

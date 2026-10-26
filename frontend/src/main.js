@@ -18,6 +18,10 @@ import { startBackgroundHTML, startWaves } from './start-background.js';
 import { initGestures, loadGestures, gestureState } from './gestures.js';
 import { initTabGroups } from './tab-groups.js';
 import { createSettings } from './settings.js';
+import { createExtensionsMenu } from './extensions-menu.js';
+import { createStoreInstall } from './store-install.js';
+let storeInstall = null;
+let extensionMenu = null;
 const GEAR =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2.2-1.3L14 3h-4l-.4 2.4a7 7 0 0 0-2.2 1.3l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .9.1 1.3l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2.2 1.3L10 21h4l.4-2.4a7 7 0 0 0 2.2-1.3l2.3.9 2-3.4-2-1.5c.1-.4.1-.9.1-1.3z"/></svg>';
 import { createScreenshots } from './screenshots.js';
@@ -740,6 +744,7 @@ function isBookmarked(url) {
 }
 function renderToolbar() {
   const t = cur();
+  storeInstall?.update(t);
   if (!t) return;
   $('#bBack').classList.toggle('off', !canBack(t));
   $('#bFwd').classList.toggle('off', !canFwd(t));
@@ -1169,6 +1174,8 @@ setInterval(pollUpdate, 10 * 60 * 1000);
 window.addEventListener('focus', () => setTimeout(pollUpdate, 500));
 let cmdUI = null;
 function closeOverlays() {
+  storeInstall?.close();
+  extensionMenu?.close();
   cmdUI?.closeAll();
   closeMenu();
   closeSugg();
@@ -1186,6 +1193,8 @@ function closeMenu() {
   cover(false);
 }
 function openMenu() {
+  extensionMenu?.close();
+  storeInstall?.close();
   if (menuOpen) {
     closeMenu();
     return;
@@ -1945,6 +1954,32 @@ const {
   refreshSonos,
   refreshSpotifyAccount,
 } = settings;
+extensionMenu = createExtensionsMenu({
+  cover,
+  currentTab: cur,
+  manage: () => openSettingsAt('extensions'),
+  toast,
+  closeOther: () => {
+    storeInstall?.close();
+    closeMenu();
+    closeSugg();
+  },
+});
+storeInstall = createStoreInstall({
+  currentTab: cur,
+  cover,
+  review: async (source) => {
+    openSettingsAt('extensions');
+    await settings.prepareExtension(source);
+  },
+  closeOther: () => {
+    extensionMenu.close();
+    closeMenu();
+    closeSugg();
+    cmdUI?.closeAll();
+  },
+  toast,
+});
 
 /* ---------- Lesezeichen: Dialog (hinzufügen/bearbeiten), Kontextmenü, Verwaltung ---------- */
 let bmDlg = null; // { oldUrl } beim Bearbeiten
@@ -2617,7 +2652,7 @@ document.addEventListener('click', async (ev) => {
       break;
     }
     case 'extensions':
-      openSettingsAt('extensions');
+      extensionMenu.toggle();
       break;
     case 'set-nav':
       settings.section = d.s;

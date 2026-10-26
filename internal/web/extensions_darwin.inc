@@ -54,16 +54,16 @@ void fmwExtension(const char *json, int req) {
    WKWebExtensionContext *existing=gExtensionContexts[ident];
    if ([op isEqual:@"unload"] || [op isEqual:@"remove"]) {
     NSError *error=nil;
-    if (existing && ![controller unloadExtensionContext:existing error:&error]) {extensionReply(req,nil,error.localizedDescription);return;}
-    [gExtensionContexts removeObjectForKey:ident];extensionReply(req,@"",nil);return;
+    if (existing && existing.isLoaded && ![controller unloadExtensionContext:existing error:&error]) {extensionReply(req,nil,error.localizedDescription);return;}
+    if ([op isEqual:@"remove"]) [gExtensionContexts removeObjectForKey:ident];
+    if (gExtensionAction.webExtensionContext == existing) [gExtensionAction closePopup];
+    extensionReply(req,@"",nil);return;
    }
    if ([op isEqual:@"open"]) {
-    if (!existing) {extensionReply(req,nil,@"Erweiterung ist nicht aktiv");return;}
+    if (!existing || !existing.isLoaded) {extensionReply(req,nil,@"Erweiterung ist nicht aktiv");return;}
     FMTab *tab=gTabs[@(gActive >= 0 ? gActive : gLastWebTab)];
     if (!tab) tab=gTabs[args[@"tab"]];
-    NSString *scheme=tab.view.URL.scheme.lowercaseString;
-    if (!tab || ![@[@"http",@"https"] containsObject:scheme?:@""]) {extensionReply(req,nil,@"Öffne zuerst eine Website in einem Luna-Tab. Das Erweiterungsmenü bezieht sich auf diese Website.");return;}
-    [existing userGesturePerformedInTab:tab];
+    if (tab) [existing userGesturePerformedInTab:tab];
     if (existing.webExtension.displayActionLabel || existing.webExtension.manifest[@"action"] || existing.webExtension.manifest[@"browser_action"]) {
      [existing performActionForTab:tab];extensionReply(req,@"",nil);
     } else if (existing.optionsPageURL) {
@@ -73,7 +73,12 @@ void fmwExtension(const char *json, int req) {
     return;
    }
    if (![op isEqual:@"load"]) {extensionReply(req,nil,@"Unbekannte Erweiterungsaktion");return;}
-   if (existing) {extensionReply(req,ident,nil);return;}
+   if (existing) {
+    NSError *error=nil;
+    if (!existing.isLoaded && ![controller loadExtensionContext:existing error:&error]) {extensionReply(req,nil,error.localizedDescription);return;}
+    [existing didOpenWindow:gExtensionHost];for (FMTab *tab in gTabs.allValues) [existing didOpenTab:tab];
+    extensionReply(req,ident,nil);return;
+   }
    NSURL *url=[NSURL fileURLWithPath:args[@"path"] isDirectory:YES];
    [WKWebExtension extensionWithResourceBaseURL:url completionHandler:^(WKWebExtension *extension,NSError *error){
     if (!extension) {extensionReply(req,nil,error.localizedDescription?:@"Erweiterung kann nicht geladen werden");return;}

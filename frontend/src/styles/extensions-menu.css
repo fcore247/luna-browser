@@ -1,0 +1,108 @@
+.extensions-menu {
+  position: fixed;
+  z-index: 65;
+  width: min(340px, calc(100vw - 16px));
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line3);
+  border-radius: 18px;
+  background: var(--menu);
+  color: var(--ink);
+  box-shadow: 0 14px 44px rgba(25, 35, 30, 0.24);
+}
+.extensions-menu[hidden] {
+  display: none;
+}
+.extensions-menu header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 0;
+}
+.extensions-menu h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.extensions-context {
+  margin: 4px 8px 12px;
+  font-size: 12px;
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}
+.extensions-list {
+  display: grid;
+  gap: 3px;
+}
+.extension-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+.extension-item:hover:not(:disabled),
+.extension-item:focus-visible {
+  background: var(--soft);
+  outline: 2px solid var(--line3);
+}
+.extension-item:disabled {
+  opacity: 0.5;
+}
+.extension-monogram {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--soft);
+  font-size: 16px;
+  font-weight: 750;
+}
+.extension-item > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.extension-item b {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.extension-item small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.extensions-empty {
+  padding: 10px;
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+.extensions-manage {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 13px 10px 9px;
+  border: 0;
+  border-top: 1px solid var(--line3);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.extensions-manage:hover {
+  color: var(--acc);
+}
+#bExtensions[aria-expanded='true'] {
+  background: var(--soft);
+}

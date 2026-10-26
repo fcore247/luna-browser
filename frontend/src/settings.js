@@ -324,6 +324,7 @@ export function createSettings({
 
   return {
     renderSettingsView,
+    prepareExtension: (source) => extensions.prepare(source),
     openSettings,
     keyMsg,
     testKey,

@@ -1,6 +1,10 @@
 # Chrome-Erweiterungen in Luna
 
-Über das Puzzleteil neben dem Menü oder **Einstellungen → Erweiterungen** einen Chrome-Web-Store-Link / eine Erweiterungs-ID einfügen und **Prüfen** wählen. Alternativ ein ZIP oder eine CRX3-Datei importieren. Das Manifest muss direkt im ZIP liegen.
+Das Puzzleteil neben dem Menü öffnet eine kompakte Erweiterungsliste. Ein Klick auf eine aktive Erweiterung öffnet ihr Steuerungsfenster. **Erweiterungen verwalten** öffnet die Einstellungen.
+
+Auf einer Chrome-Web-Store-Detailseite zeigt die Adressleiste neben dem Spotify-Symbol das Erweiterungsicon mit **Installieren**. Erst ein Klick klappt die Nachfrage aus. **Ja, installieren** lädt das Paket zur Berechtigungsprüfung. Auf Store-Übersichts- und Suchseiten erscheint dieser Knopf nicht.
+
+Alternativ unter **Einstellungen → Erweiterungen** einen Chrome-Web-Store-Link / eine Erweiterungs-ID einfügen und **Prüfen** wählen. Alternativ ein ZIP oder eine CRX3-Datei importieren. Das Manifest muss direkt im ZIP liegen.
 
 Luna lädt Store-Pakete über Googles HTTPS-Download, prüft die CRX3-Entwicklersignatur und die angeforderte Erweiterungs-ID und zeigt Name, Version, API-Rechte und Webseitenzugriffe an. Erst **Zugriff erlauben & installieren** aktiviert das Paket. ZIP-Dateien haben keine CRX-Signatur und sollten nur aus vertrauenswürdigen Quellen stammen.
 

@@ -1,0 +1,217 @@
+#bStoreInstall {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  border: 0;
+  border-radius: 11px;
+  padding: 6px 10px;
+  margin-left: 4px;
+  color: var(--pri-fg);
+  background: var(--pri);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#bStoreInstall[hidden] {
+  display: none;
+}
+#bStoreInstall img {
+  width: 21px;
+  height: 21px;
+  border-radius: 5px;
+  object-fit: contain;
+  background: white;
+}
+#bStoreInstall img[hidden],
+#bStoreInstall .store-icon-fallback[hidden] {
+  display: none;
+}
+#bStoreInstall:hover {
+  background: var(--pri-h);
+}
+#urlbox.store-drop-open {
+  background: var(--card);
+  border-color: var(--acc);
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+#storeInstallDrop {
+  position: fixed;
+  z-index: 70;
+  padding: 27px 28px 20px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-top: 0;
+  border-radius: 0 0 24px 24px;
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.15), transparent 55%),
+    color-mix(in srgb, var(--card) 55%, transparent);
+  backdrop-filter: blur(var(--theme-menu-blur, 18px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--theme-menu-blur, 18px)) saturate(160%);
+  color: var(--ink);
+  box-shadow:
+    inset 1px 0 rgba(255, 255, 255, 0.17),
+    inset -1px -1px rgba(255, 255, 255, 0.1),
+    0 24px 54px rgba(0, 0, 0, 0.2);
+}
+.store-install-close {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mute2);
+  cursor: pointer;
+}
+.store-install-close:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+.store-install-hero {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  padding-right: 12px;
+}
+.store-install-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 76px;
+  height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 21px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.08));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.65),
+    0 8px 22px rgba(0, 0, 0, 0.06);
+}
+.store-install-icon img {
+  width: 53px;
+  height: 53px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+.store-install-icon > span {
+  font-size: 29px;
+}
+.store-install-copy {
+  flex: 1;
+  min-width: 0;
+}
+.store-install-eyebrow {
+  color: var(--mute2);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.store-install-copy h2 {
+  margin: 5px 0 8px;
+  padding-right: 5px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.35px;
+  overflow-wrap: anywhere;
+}
+.store-install-copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--mute2);
+}
+.store-install-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 15px;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.store-install-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mute2);
+  font-size: 10px;
+}
+.store-install-note svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.store-install-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-left: auto;
+}
+.store-install-later {
+  border: 0;
+  background: transparent;
+  color: var(--mute2);
+  padding: 9px 0;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.store-install-later:hover {
+  color: var(--ink);
+}
+.store-install-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 37px;
+  border: 1px solid color-mix(in srgb, var(--pri) 55%, transparent);
+  border-radius: 24px;
+  padding: 9px 15px;
+  color: var(--pri-fg);
+  background: var(--pri);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.16),
+    0 3px 10px rgba(0, 0, 0, 0.08);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.store-install-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.2),
+    0 5px 15px rgba(0, 0, 0, 0.13);
+}
+@media (max-width: 800px) {
+  #storeInstallDrop {
+    padding: 25px 18px 16px;
+  }
+  .store-install-hero {
+    gap: 14px;
+  }
+  .store-install-icon {
+    flex-basis: 57px;
+    height: 57px;
+    border-radius: 16px;
+  }
+  .store-install-icon img {
+    width: 40px;
+    height: 40px;
+  }
+  .store-install-copy h2 {
+    font-size: 16px;
+  }
+}

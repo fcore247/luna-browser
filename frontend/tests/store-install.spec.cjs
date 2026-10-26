@@ -1,0 +1,145 @@
+const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
+const detail =
+  'https://chromewebstore.google.com/detail/free-vpn-for-chrome-vpn-p/majdfhpaihoncoakbjgbdhglocklcgno';
+async function openApp(page) {
+  const names = [
+    ...fs
+      .readFileSync(path.join(__dirname, '../src/api.js'), 'utf8')
+      .matchAll(/export const (\w+)/g),
+  ].map((x) => x[1]);
+  const mocks = {
+    IS_NATIVE: 'false',
+    prefs: 'async()=>({})',
+    mcpStatus: 'async()=>({enabled:false})',
+    keyStatus: 'async()=>false',
+    bookmarks: 'async()=>[]',
+    history: 'async()=>[]',
+    downloads: 'async()=>[]',
+    notes: 'async()=>[]',
+    spotifyState: 'async()=>({status:"stopped"})',
+    load: 'async(id,url)=>{window.nativeURL=url;window.nativeTab=id}',
+    onWeb: '(cb)=>{window.nativeState=cb}',
+    extensionStoreDetails:
+      'async()=>window.customMetadata||({url:window.nativeURL,name:"Free VPN for Chrome - VPN Proxy VeePN",icon:"https://lh3.googleusercontent.com/luna-test.png"})',
+    extensionsStatus: 'async()=>({supported:true,entries:[]})',
+    extensionPrepare:
+      'async(source)=>{window.reviewSource=source;return {id:"review-vpn",name:"Free VPN for Chrome - VPN Proxy VeePN",version:"5.0",permissions:["proxy","storage"]}}',
+  };
+  await page.route('**/src/api.js*', (r) =>
+    r.fulfill({
+      contentType: 'text/javascript',
+      body: names.map((n) => `export const ${n}=${mocks[n] || 'async()=>null'};`).join('\n'),
+    }),
+  );
+  await page.route('https://lh3.googleusercontent.com/luna-test.png', (r) =>
+    r.fulfill({
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvS8AAAAASUVORK5CYII=',
+        'base64',
+      ),
+    }),
+  );
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await page.goto('http://127.0.0.1:5174');
+  await page.locator('#splash.gone').waitFor({ state: 'attached' });
+}
+async function navigate(page, url) {
+  await page.locator('#url').fill(url);
+  await page.locator('#url').press('Enter');
+}
+test('store detail offers an icon and install chip, expanding only after a click', async ({
+  page,
+}) => {
+  await openApp(page);
+  await navigate(page, 'https://chromewebstore.google.com/');
+  await expect(page.locator('#bStoreInstall')).toBeHidden();
+  await navigate(page, detail);
+  const chip = page.locator('#bStoreInstall');
+  await expect(chip).toBeVisible();
+  await expect(chip.locator('img')).toBeVisible();
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  expect(await page.evaluate(() => window.reviewSource)).toBeUndefined();
+  await chip.click();
+  await expect(page.locator('#urlbox')).toHaveClass(/store-drop-open/);
+  await expect(page.locator('#storeInstallDrop')).toContainText(
+    'Free VPN for Chrome - VPN Proxy VeePN',
+  );
+  expect(await page.evaluate(() => window.reviewSource)).toBeUndefined();
+  const box = await page.locator('#urlbox').boundingBox(),
+    drop = await page.locator('#storeInstallDrop').boundingBox();
+  expect(Math.abs(box.x - drop.x)).toBeLessThan(2);
+  expect(Math.abs(box.width - drop.width)).toBeLessThan(2);
+  await page.locator('[data-store-close]').last().click();
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  await chip.click();
+  await page.locator('[data-store-confirm]').click();
+  await expect(page.locator('#set-extensions')).toContainText('proxy');
+  expect(await page.evaluate(() => window.reviewSource)).toBe(detail);
+});
+test('store chip ignores search pages and lookalike hosts and closes when leaving detail', async ({
+  page,
+}) => {
+  await openApp(page);
+  for (const url of [
+    'https://chromewebstore.google.com/search/vpn',
+    'https://chromewebstore.google.com.evil.invalid/detail/vpn/majdfhpaihoncoakbjgbdhglocklcgno',
+    'http://chromewebstore.google.com/detail/vpn/majdfhpaihoncoakbjgbdhglocklcgno',
+  ]) {
+    await navigate(page, url);
+    await expect(page.locator('#bStoreInstall')).toBeHidden();
+  }
+  await navigate(page, detail);
+  await page.locator('#bStoreInstall').click();
+  await expect(page.locator('#storeInstallDrop')).toBeVisible();
+  await page.locator('#url').fill('https://example.org');
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  await page.locator('#url').press('Enter');
+  await expect(page.locator('#bStoreInstall')).toBeHidden();
+});
+
+test('changing store extensions discards stale name and icon until the new detail is ready', async ({
+  page,
+}) => {
+  await openApp(page);
+  await navigate(page, detail);
+  await expect(page.locator('#bStoreInstall')).toHaveAttribute('aria-label', /VeePN installieren/);
+  await page.locator('#bStoreInstall').click();
+  await expect(page.locator('#storeInstallDrop')).toContainText('VeePN');
+  const urban =
+    'https://chromewebstore.google.com/detail/urban-vpn-proxy/eppiocemhmnlbhjplcgkofciiegomcon';
+  await page.evaluate((url) => {
+    window.nativeURL = url;
+    window.customMetadata = {
+      url,
+      name: 'Free VPN for Chrome - VPN Proxy VeePN',
+      icon: 'https://lh3.googleusercontent.com/old.png',
+    };
+    window.nativeState({
+      t: 'state',
+      tab: window.nativeTab,
+      url,
+      title: 'Urban VPN Proxy - Chrome Web Store',
+      loading: false,
+      progress: 1,
+    });
+  }, urban);
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  await expect(page.locator('#bStoreInstall')).toBeHidden();
+  await page.evaluate((url) => {
+    window.customMetadata = {
+      url,
+      name: 'Urban VPN Proxy',
+      icon: 'https://lh3.googleusercontent.com/luna-test.png',
+    };
+  }, urban);
+  await expect(page.locator('#bStoreInstall')).toHaveAttribute(
+    'aria-label',
+    'Urban VPN Proxy installieren',
+  );
+  await page.locator('#bStoreInstall').click();
+  await expect(page.locator('#storeInstallDrop')).toContainText('Urban VPN Proxy');
+  await expect(page.locator('#storeInstallDrop')).not.toContainText('VeePN');
+});

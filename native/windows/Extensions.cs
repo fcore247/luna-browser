@@ -1,10 +1,14 @@
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 namespace Luna.Windows;
 sealed partial class Host
 {
     WebView2? extensionView;
+    Form? extensionPopup;
+    [StructLayout(LayoutKind.Sequential)] struct ExtensionRect { public int Left,Top,Right,Bottom; }
+    [DllImport("user32.dll",EntryPoint="GetWindowRect")] static extern bool ExtensionWindowRect(IntPtr window,out ExtensionRect rect);
     readonly Dictionary<string, string> extensionIDs = new();
     async Task<CoreWebView2Profile> ExtensionProfile()
     {
@@ -43,9 +47,16 @@ sealed partial class Host
             if (string.IsNullOrEmpty(page) && root.TryGetProperty("options_page",out var legacy)) page=legacy.GetString();
             if (string.IsNullOrEmpty(page)) throw new InvalidOperationException("Diese Erweiterung arbeitet im Hintergrund und hat kein Menü.");
             if (page.StartsWith('/') || page.Contains(":") || page.Contains("..") || page.Contains('\\')) throw new InvalidOperationException("Ungültige Erweiterungsseite.");
-            var form = new Form { Text="Luna · Erweiterung", Width=460, Height=620, StartPosition=FormStartPosition.CenterParent };
+            extensionPopup?.Close();
+            var bounds = parent != IntPtr.Zero && ExtensionWindowRect(parent, out var windowRect) ? Rectangle.FromLTRB(windowRect.Left,windowRect.Top,windowRect.Right,windowRect.Bottom) : Screen.PrimaryScreen!.WorkingArea;
+            var area = Screen.FromRectangle(bounds).WorkingArea;
+            var form = new Form { Text="Luna · Erweiterung", ClientSize=new Size(400,480), FormBorderStyle=FormBorderStyle.FixedToolWindow, ShowInTaskbar=false, StartPosition=FormStartPosition.Manual };
+            form.Location=new Point(Math.Clamp(bounds.Right-form.Width-24,area.Left,Math.Max(area.Left,area.Right-form.Width)),Math.Clamp(bounds.Top+90,area.Top,Math.Max(area.Top,area.Bottom-form.Height)));
+            extensionPopup=form;
             var view = new WebView2 { Dock=DockStyle.Fill }; form.Controls.Add(view);
-            form.FormClosed += (_,_) => view.Dispose(); form.Show();
+            form.FormClosed += (_,_) => {view.Dispose();if(extensionPopup==form)extensionPopup=null;};
+            form.Deactivate += (_,_) => form.Close();
+            form.Show();
             await view.EnsureCoreWebView2Async(environment);
             view.CoreWebView2.Navigate("chrome-extension://"+runtimeID+"/"+page);
             return "";

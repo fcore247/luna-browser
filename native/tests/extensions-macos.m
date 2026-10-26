@@ -14,13 +14,17 @@ static void call(NSString *op,NSString *path) {
 }
 static NSString *marker(void) {
  if (!gTabs[@1]) { pump(.1); return @""; }
- __block BOOL done=NO;__block NSString *value=nil;[gTabs[@1].view evaluateJavaScript:@"document.body?.dataset.lunaExtension || ''" completionHandler:^(id result,NSError *error){value=[result isKindOfClass:NSString.class]?result:@"";done=YES;}];while(!done)pump(.02);return value;
+ __block BOOL done=NO;__block NSString *value=nil;[gTabs[@1].view evaluateJavaScript:@"document.body?.dataset.lunaExtension || ''" completionHandler:^(id result,NSError *error){value=[result isKindOfClass:NSString.class]?result:@"";done=YES;}];NSDate *deadline=[NSDate dateWithTimeIntervalSinceNow:3];while(!done && deadline.timeIntervalSinceNow>0)pump(.02);return value?:@"";
 }
 int main(int argc,const char **argv) { @autoreleasepool {
  check(argc==3,@"Usage: extensions-macos packageDir httpURL");results=[NSMutableDictionary new];[NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
  NSWindow *window=[[NSWindow alloc]initWithContentRect:NSMakeRect(50,50,800,600) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];WKWebView *ui=[[WKWebView alloc]initWithFrame:window.contentView.bounds];[window.contentView addSubview:ui];[window makeKeyAndOrderFront:nil];
  NSString *path=[NSString stringWithUTF8String:argv[1]],*url=[NSString stringWithUTF8String:argv[2]];
- call(@"supported",path);call(@"load",path);fmwLoad(1,url.UTF8String);fmwShow(1);
+ call(@"supported",path);call(@"load",path);
+ call(@"open",path);pump(.3);
+ check([gExtensionContexts[@"abcdef0123456789abcdef0123456789"] actionForTab:nil].popupWebView != nil,@"Default extension control did not open without a website");
+ [gExtensionAction closePopup];
+ fmwLoad(1,url.UTF8String);fmwShow(1);
  NSDate *end=[NSDate dateWithTimeIntervalSinceNow:20];while(!marker().length&&end.timeIntervalSinceNow>0)pump(.1);check(marker().intValue>=1,@"Extension did not inject or chrome.storage.local failed");
  int first=marker().intValue;
  fmwShow(-1);pump(.1);call(@"open",path);
@@ -32,7 +36,11 @@ int main(int argc,const char **argv) { @autoreleasepool {
   NSDate *wait=[NSDate dateWithTimeIntervalSinceNow:2];while(!done && wait.timeIntervalSinceNow>0)pump(.02);pump(.1);
  }
  check([target containsString:@"127.0.0.1"],@"Popup lost the last active webpage while Luna settings are visible");[gExtensionAction closePopup];
- call(@"unload",path);fmwHistory(1,2);pump(2);check(marker().length==0,@"Disabled extension still injected");
- call(@"load",path);fmwHistory(1,2);end=[NSDate dateWithTimeIntervalSinceNow:20];while(marker().intValue<=first&&end.timeIntervalSinceNow>0)pump(.1);check(marker().intValue>first,@"Extension storage did not persist after reactivation");
+ call(@"unload",path);fmwLoad(1,[[url stringByAppendingString:@"?phase=disabled"] UTF8String]);pump(.1);
+ end=[NSDate dateWithTimeIntervalSinceNow:15];while ((gTabs[@1].view.loading || ![gTabs[@1].view.URL.query isEqual:@"phase=disabled"]) && end.timeIntervalSinceNow>0)pump(.1);
+ check([gTabs[@1].view.URL.query isEqual:@"phase=disabled"] && marker().length==0,@"Disabled extension still injected");
+ call(@"load",path);fmwLoad(1,[[url stringByAppendingString:@"?phase=reenabled"] UTF8String]);pump(.1);
+ end=[NSDate dateWithTimeIntervalSinceNow:20];while((gTabs[@1].view.loading || ![gTabs[@1].view.URL.query isEqual:@"phase=reenabled"] || marker().intValue<=first)&&end.timeIntervalSinceNow>0)pump(.1);
+ check([gTabs[@1].view.URL.query isEqual:@"phase=reenabled"] && marker().intValue>first,@"Extension storage did not persist after reactivation");
  call(@"unload",path);printf("MACOS_EXTENSIONS_PASSED (injection, isolated storage, disable, re-enable, persistence)\n");
  }return 0;}

@@ -65,6 +65,7 @@ export function createExtensions({ render, toast, targetTab }) {
   });
   return {
     html: () => extensionsHTML(state, pending, busy, message),
+    prepare: (source) => perform('prepare', null, null, source),
     refresh: () => refresh().catch((e) => toast(String(e))),
   };
 }

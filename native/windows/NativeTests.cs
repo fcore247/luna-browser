@@ -83,6 +83,9 @@ static class NativeTests
             await call("load",new{tab=1,url});
             var end=DateTime.UtcNow.AddSeconds(15);while(await Marker()==0&&DateTime.UtcNow<end)await Task.Delay(100);
             var first=await Marker();Assert(first>0,"Extension injection or chrome.storage.local failed");
+            await call("extension-open",args);
+            var popup=Application.OpenForms.Cast<Form>().FirstOrDefault(f=>f.Text=="Luna · Erweiterung");
+            Assert(popup!=null && popup.Visible,"Extension control window did not open");popup!.Close();
             await call("extension-unload",args);await call("load",new{tab=1,url});await Task.Delay(1500);
             Assert(await Marker()==0,"Disabled extension still injected");
             await call("extension-load",args);await call("load",new{tab=1,url});
