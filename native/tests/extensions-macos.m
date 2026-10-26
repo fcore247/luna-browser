@@ -1,6 +1,7 @@
 #import "../../internal/web/web_darwin.m"
 static NSMutableDictionary *results;
 void goWebEvent(char *json) {}
+void goCredSubmit(int tab, char *origin, char *user, char *pass) {}
 void goSnapshotDone(int req,char *value) { results[@(req)] = [NSString stringWithUTF8String:value]; }
 static void pump(double seconds) { NSDate *end=[NSDate dateWithTimeIntervalSinceNow:seconds];while (end.timeIntervalSinceNow>0) [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.02]]; }
 static void check(BOOL condition,NSString *reason) { if (!condition) {fprintf(stderr,"FAILED: %s\n",reason.UTF8String);exit(1);} }

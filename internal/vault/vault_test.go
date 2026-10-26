@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -55,9 +56,12 @@ func TestPasswordsAreEncryptedAndNeverListed(t *testing.T) {
 	if strings.Contains(string(raw), "geheim-123") {
 		t.Fatal("password is stored in clear text")
 	}
-	info, _ := os.Stat(filepath.Join(dir, "logins.json"))
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("vault file mode = %v", info.Mode().Perm())
+	// Unix permission bits do not exist on Windows (the profile folder is private there anyway).
+	if runtime.GOOS != "windows" {
+		info, _ := os.Stat(filepath.Join(dir, "logins.json"))
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("vault file mode = %v", info.Mode().Perm())
+		}
 	}
 	for _, e := range append(v.All(), v.List("https://schule.example.org/anything")...) {
 		if e.Origin != "https://schule.example.org" || e.Username != "max" {
