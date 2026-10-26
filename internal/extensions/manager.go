@@ -30,14 +30,17 @@ var validID = regexp.MustCompile(`^[a-p]{32}$`)
 var tokenID = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type Entry struct {
-	Icon        string   `json:"icon,omitempty"`
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Version     string   `json:"version"`
-	Permissions []string `json:"permissions"`
-	Enabled     bool     `json:"enabled"`
-	RuntimeID   string   `json:"runtimeID,omitempty"`
-	Error       string   `json:"error,omitempty"`
+	CompatibilityLevel string   `json:"compatibilityLevel,omitempty"`
+	Compatibility      string   `json:"compatibility,omitempty"`
+	Unsupported        bool     `json:"unsupported,omitempty"`
+	Icon               string   `json:"icon,omitempty"`
+	ID                 string   `json:"id"`
+	Name               string   `json:"name"`
+	Version            string   `json:"version"`
+	Permissions        []string `json:"permissions"`
+	Enabled            bool     `json:"enabled"`
+	RuntimeID          string   `json:"runtimeID,omitempty"`
+	Error              string   `json:"error,omitempty"`
 }
 type Manifest struct {
 	Name            string            `json:"name"`

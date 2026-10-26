@@ -42,5 +42,21 @@ int main(int argc,const char **argv) { @autoreleasepool {
  call(@"load",path);fmwLoad(1,[[url stringByAppendingString:@"?phase=reenabled"] UTF8String]);pump(.1);
  end=[NSDate dateWithTimeIntervalSinceNow:20];while((gTabs[@1].view.loading || ![gTabs[@1].view.URL.query isEqual:@"phase=reenabled"] || marker().intValue<=first)&&end.timeIntervalSinceNow>0)pump(.1);
  check([gTabs[@1].view.URL.query isEqual:@"phase=reenabled"] && marker().intValue>first,@"Extension storage did not persist after reactivation");
- call(@"unload",path);printf("MACOS_EXTENSIONS_PASSED (injection, isolated storage, disable, re-enable, persistence)\n");
+ call(@"unload",path);
+ call(@"remove",path);
+ // A Chromium proxy extension must get an actionable error, never an empty popup.
+ NSString *proxyPath=[NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
+ check([[NSFileManager defaultManager] copyItemAtPath:path toPath:proxyPath error:nil],@"Could not prepare proxy fixture");
+ NSString *manifestPath=[proxyPath stringByAppendingPathComponent:@"manifest.json"];
+ NSMutableDictionary *manifest=[[NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:manifestPath] options:NSJSONReadingMutableContainers error:nil] mutableCopy];
+ manifest[@"permissions"]=@[@"storage",@"proxy"];
+ [[NSJSONSerialization dataWithJSONObject:manifest options:0 error:nil] writeToFile:manifestPath atomically:YES];
+ call(@"load",proxyPath);
+ fmwExtension("{\"op\":\"open\",\"args\":{\"id\":\"abcdef0123456789abcdef0123456789\"}}",1000);
+ end=[NSDate dateWithTimeIntervalSinceNow:5];while(!results[@1000]&&end.timeIntervalSinceNow>0)pump(.05);
+ NSDictionary *blocked=[NSJSONSerialization JSONObjectWithData:[results[@1000] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+ check([blocked[@"error"] containsString:@"Chrome-Proxy"],@"Unsupported proxy popup was not explained");
+ check(gExtensionAction == nil,@"Unsupported proxy opened a blank popup");
+ call(@"unload",proxyPath);[[NSFileManager defaultManager]removeItemAtPath:proxyPath error:nil];
+ printf("MACOS_EXTENSIONS_PASSED (injection, isolated storage, disable, re-enable, persistence)\n");
  }return 0;}

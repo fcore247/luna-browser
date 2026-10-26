@@ -45,6 +45,12 @@ export function createStoreInstall({ currentTab, closeOther, toast }) {
       panel && !operation && next && (details?.name !== next.name || details?.icon !== next.icon);
     if (refresh) close();
     details = next;
+    if (panel && next && operation) {
+      panel.querySelector('.store-install-icon').innerHTML = next.icon
+        ? `<img src="${esc(next.icon)}" alt="">`
+        : '<span aria-hidden="true">＋</span>';
+      if (!operation.pending) panel.querySelector('h2').textContent = next.name;
+    }
     anchor.hidden = !details;
     const image = anchor.querySelector('img'),
       fallback = anchor.querySelector('.store-icon-fallback');
@@ -169,7 +175,14 @@ export function createStoreInstall({ currentTab, closeOther, toast }) {
         close();
         return;
       }
+      if (operation?.phase === 'ready') {
+        if (operation.pending.unsupported) return;
+        operation.phase = 'review';
+        paintOperation();
+        return;
+      }
       if (operation?.phase === 'review') {
+        if (operation.pending.unsupported) return;
         const task = operation;
         task.phase = 'installing';
         paintOperation();
@@ -191,51 +204,91 @@ export function createStoreInstall({ currentTab, closeOther, toast }) {
         return;
       }
       if (operation && operation.phase !== 'error') return;
-      const task = { phase: 'preparing', identity: identity() };
-      operation = task;
-      paintOperation();
-      try {
-        const pending = await api.extensionPrepare(chosen.url);
-        if (operation !== task || identity() !== task.identity) {
-          if (pending?.id) await api.extensionCancel(pending.id);
-          return;
-        }
-        if (!pending?.id) {
-          operation = null;
-          close();
-          return;
-        }
-        task.pending = pending;
-        task.phase = 'review';
-        paintOperation();
-      } catch (error) {
-        if (operation === task) {
-          task.phase = 'error';
-          task.error = String(error?.message || error);
-          paintOperation();
-        }
-      }
+      beginCheck(chosen);
     });
+    if (!operation) beginCheck(chosen);
   }
+  async function beginCheck(chosen) {
+    const task = { phase: 'checking', identity: identity() };
+    operation = task;
+    paintOperation();
+    try {
+      const pending = await api.extensionPrepare(chosen.url);
+      if (operation !== task || identity() !== task.identity) {
+        if (pending?.id) await api.extensionCancel(pending.id);
+        return;
+      }
+      if (!pending?.id) throw new Error('Die Kompatibilität konnte nicht geprüft werden.');
+      task.pending = pending;
+      task.phase = 'ready';
+      paintOperation();
+    } catch (error) {
+      if (operation === task) {
+        task.phase = 'error';
+        task.error = String(error?.message || error);
+        paintOperation();
+      }
+    }
+  }
+
   function paintOperation() {
     if (!panel || !operation) return;
     const task = operation,
-      busy = task.phase === 'preparing' || task.phase === 'installing';
+      busy = task.phase === 'checking' || task.phase === 'installing';
     const button = panel.querySelector('[data-store-confirm]');
-    button.disabled = busy;
-    button.textContent =
-      task.phase === 'review'
-        ? 'Zugriff erlauben & installieren'
-        : task.phase === 'installing'
-          ? 'Wird installiert …'
-          : task.phase === 'error'
-            ? 'Erneut versuchen'
-            : 'Wird vorbereitet …';
+    button.disabled = busy || !!task.pending?.unsupported;
+    button.textContent = task.pending?.unsupported
+      ? 'Nicht kompatibel'
+      : task.phase === 'ready'
+        ? 'Berechtigungen prüfen'
+        : task.phase === 'review'
+          ? 'Zugriff erlauben & installieren'
+          : task.phase === 'installing'
+            ? 'Wird installiert …'
+            : task.phase === 'error'
+              ? 'Erneut versuchen'
+              : 'Kompatibilität wird geprüft …';
     const copy = panel.querySelector('.store-install-copy');
     copy.querySelector('p').textContent =
-      task.phase === 'review'
-        ? 'Diese Berechtigungen werden benötigt. Möchtest du sie erlauben?'
-        : task.error || 'Luna bereitet die Erweiterung direkt hier für dich vor.';
+      task.error ||
+      (task.pending
+        ? task.pending.compatibility ||
+          (task.phase === 'review'
+            ? 'Diese Berechtigungen werden benötigt. Möchtest du sie erlauben?'
+            : 'Das Manifest wurde geprüft. Es sind keine bekannten Kompatibilitätsprobleme aufgefallen.')
+        : 'Luna lädt das Paket zur Prüfung. Es wird noch nichts installiert oder ausgeführt.');
+    copy.querySelector('.store-compatibility')?.remove();
+    const badge = document.createElement('span');
+    badge.className = 'store-compatibility';
+    badge.setAttribute('role', 'status');
+    badge.setAttribute('aria-live', 'polite');
+    const level =
+      task.pending?.compatibilityLevel ||
+      (task.pending?.unsupported
+        ? 'unsupported'
+        : task.pending?.compatibility
+          ? 'limited'
+          : task.pending
+            ? 'clear'
+            : 'checking');
+    badge.dataset.level = task.phase === 'error' ? 'unknown' : level;
+    badge.textContent =
+      task.phase === 'error'
+        ? 'Prüfung nicht möglich'
+        : task.pending
+          ? {
+              clear: 'Keine bekannten Probleme',
+              limited: 'Eingeschränkt kompatibel',
+              unsupported: 'Nicht kompatibel',
+            }[level] || 'Kompatibilität unbekannt'
+          : 'Kompatibilität wird geprüft';
+    copy.querySelector('h2').after(badge);
+    if (task.pending) {
+      copy.querySelector('h2').textContent = task.pending.name;
+      if (task.pending.icon)
+        panel.querySelector('.store-install-icon').innerHTML =
+          `<img src="${esc(task.pending.icon)}" alt="">`;
+    }
     copy.querySelector('.store-permissions')?.remove();
     if (task.phase === 'review') {
       copy.querySelector('h2').textContent = task.pending.name;
@@ -246,10 +299,11 @@ export function createStoreInstall({ currentTab, closeOther, toast }) {
         '<li>Keine zusätzlichen Rechte</li>';
       copy.append(list);
     }
-    panel.querySelector('.store-install-note').textContent =
-      task.phase === 'review'
-        ? 'Nur installieren, wenn du der Erweiterung vertraust.'
-        : 'Der Store bleibt bedienbar';
+    panel.querySelector('.store-install-note').textContent = task.pending
+      ? 'Manifest geprüft · Laufzeitfehler bleiben möglich'
+      : task.phase === 'error'
+        ? 'Erneut prüfen oder später versuchen'
+        : 'Prüfung ohne Installation';
   }
   anchor.addEventListener('click', () => {
     if (panel) return close(true, true);

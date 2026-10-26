@@ -242,3 +242,30 @@
   cursor: wait;
   transform: none;
 }
+.store-compatibility {
+  display: table;
+  margin: 8px 0;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--soft);
+  color: var(--mute2);
+}
+.store-compatibility[data-level='clear'] {
+  background: color-mix(in srgb, #4c9763 12%, var(--card));
+  color: var(--ink);
+  border-color: color-mix(in srgb, #4c9763 35%, var(--line));
+}
+.store-compatibility[data-level='limited'],
+.store-compatibility[data-level='unknown'] {
+  background: color-mix(in srgb, #bf922f 13%, var(--card));
+  color: var(--ink);
+  border-color: color-mix(in srgb, #bf922f 40%, var(--line));
+}
+.store-compatibility[data-level='unsupported'] {
+  background: color-mix(in srgb, #bb5757 12%, var(--card));
+  color: var(--ink);
+  border-color: color-mix(in srgb, #bb5757 40%, var(--line));
+}

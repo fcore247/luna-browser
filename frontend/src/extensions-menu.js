@@ -43,7 +43,7 @@ export function createExtensionsMenu({ cover, currentTab, manage, toast, closeOt
     } catch {}
     panel.innerHTML = `<header><h2>Erweiterungen</h2><button type="button" class="ib" data-ext-close aria-label="Erweiterungsliste schließen">×</button></header>
       <p class="extensions-context">${esc(host || 'Deine Erweiterungen und ihre Steuerung')}</p>
-      <div class="extensions-list">${entries.map((e) => `<button type="button" class="extension-item" data-ext-open="${esc(e.id)}" ${!e.enabled || e.error ? 'disabled' : ''}><span class="extension-monogram" aria-hidden="true">${extensionIcon(e)}</span><span><b>${esc(e.name)}</b><small>${esc(e.error || (e.enabled ? 'Steuerung öffnen' : 'Deaktiviert'))}</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="extensions-empty">Noch keine Erweiterungen installiert.</p>'}</div>
+      <div class="extensions-list">${entries.map((e) => `<button type="button" class="extension-item" data-ext-open="${esc(e.id)}" ${!e.enabled || e.error || e.unsupported ? 'disabled' : ''}><span class="extension-monogram" aria-hidden="true">${extensionIcon(e)}</span><span><b>${esc(e.name)}</b><small>${esc(e.compatibility || e.error || (e.enabled ? 'Steuerung öffnen' : 'Deaktiviert'))}</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="extensions-empty">Noch keine Erweiterungen installiert.</p>'}</div>
       <button type="button" class="extensions-manage" data-ext-manage>Erweiterungen verwalten <span aria-hidden="true">↗</span></button>`;
     position();
   }

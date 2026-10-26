@@ -378,3 +378,29 @@
   color: var(--mute2);
   opacity: 0.7;
 }
+.ext-compatibility {
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--acc) 7%, var(--card));
+  border-left: 2px solid var(--acc);
+  border-radius: 3px 10px 10px 3px;
+  color: var(--mute2);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.ext-level {
+  display: table;
+  padding: 6px 10px;
+  margin-top: 15px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ext-level[data-level='unsupported'] {
+  border-color: #bb575780;
+}
+.ext-level[data-level='limited'] {
+  border-color: #bf922f80;
+}

@@ -9,6 +9,7 @@ import (
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -22,6 +23,9 @@ func (a *App) ExtensionsStatus() map[string]any {
 	entries := []extensions.Entry{}
 	if a.extensions != nil {
 		entries = a.extensions.List()
+		for i := range entries {
+			entries[i] = extensions.Compatibility(entries[i], runtime.GOOS)
+		}
 	}
 	return map[string]any{"supported": err == nil, "message": message, "entries": entries}
 }
@@ -40,11 +44,13 @@ func (a *App) ExtensionPrepare(source string) (extensions.Entry, error) {
 		if p == "" {
 			return extensions.Entry{}, nil
 		}
-		return a.extensions.PrepareFile(p)
+		entry, err := a.extensions.PrepareFile(p)
+		return extensions.Compatibility(entry, runtime.GOOS), err
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, 65*time.Second)
 	defer cancel()
-	return a.extensions.PrepareStore(ctx, source)
+	entry, err := a.extensions.PrepareStore(ctx, source)
+	return extensions.Compatibility(entry, runtime.GOOS), err
 }
 func (a *App) ExtensionInstall(id string) (extensions.Entry, error) {
 	if a.extensions == nil {

@@ -28,7 +28,7 @@ async function openApp(page) {
     extensionCancel: 'async(id)=>{window.cancelToken=id}',
     extensionStoreLookup: 'async()=>window.officialMetadata||null',
     extensionPrepare:
-      'async(source)=>{window.reviewSource=source;return {id:"review-vpn",name:"Free VPN for Chrome - VPN Proxy VeePN",version:"5.0",permissions:["proxy","storage"]}}',
+      'async(source)=>{window.reviewSource=source;window.prepareCalls=(window.prepareCalls||0)+1;if(window.prepareFails)throw new Error("Store nicht erreichbar");if(window.prepareDelay)await new Promise(r=>setTimeout(r,window.prepareDelay));return window.preparedEntry||{id:"review-vpn",name:source.includes("eppiocem")?"Urban VPN Proxy":"Free VPN for Chrome - VPN Proxy VeePN",version:"5.0",permissions:["proxy","storage"],compatibilityLevel:"clear"}}',
   };
   await page.route('**/src/api.js*', (r) =>
     r.fulfill({
@@ -65,12 +65,12 @@ test('store detail automatically offers installation without covering the live p
   await expect(chip).toBeVisible();
   await expect(chip.locator('img')).toBeVisible();
   await expect(page.locator('#storeInstallDrop')).toBeVisible();
-  expect(await page.evaluate(() => window.reviewSource)).toBeUndefined();
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
   await expect(page.locator('#urlbox')).toHaveClass(/store-drop-open/);
   await expect(page.locator('#storeInstallDrop')).toContainText(
     'Free VPN for Chrome - VPN Proxy VeePN',
   );
-  expect(await page.evaluate(() => window.reviewSource)).toBeUndefined();
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
   const drop = await page.locator('#storeInstallDrop').boundingBox();
   const livePage = await page.locator('#page').boundingBox();
   expect(livePage.y).toBeGreaterThan(originalTop + 80);
@@ -145,7 +145,7 @@ test('changing store extensions discards stale name and icon until the new detai
       progress: 1,
     });
   }, urban);
-  await expect(page.locator('#storeInstallDrop')).toContainText('urban vpn proxy');
+  await expect(page.locator('#storeInstallDrop')).toContainText(/urban vpn proxy/i);
   await expect(page.locator('#storeInstallDrop')).not.toContainText('VeePN');
   await expect(page.locator('#bStoreInstall')).toBeVisible();
   await page.evaluate((url) => {
@@ -215,7 +215,10 @@ test('official icon survives missing live page metadata and review cancels on na
     { url: detail, icon },
   );
   await navigate(page, detail);
-  await expect(page.locator('#storeInstallDrop h2')).toHaveText('Verified store name');
+  await expect(page.locator('#bStoreInstall')).toHaveAttribute(
+    'aria-label',
+    'Verified store name installieren',
+  );
   await expect(page.locator('#bStoreInstall img')).toHaveAttribute('src', icon);
   await expect
     .poll(() =>
@@ -226,5 +229,60 @@ test('official icon survives missing live page metadata and review cancels on na
   await expect(page.locator('.store-permissions')).toContainText('proxy');
   await navigate(page, 'https://example.org');
   await expect.poll(() => page.evaluate(() => window.cancelToken)).toBe('review-vpn');
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
+});
+
+test('store preflight displays all compatibility levels before installation', async ({ page }) => {
+  await openApp(page);
+  for (const [level, label, warning] of [
+    ['unsupported', 'Nicht kompatibel', 'Chrome-Proxy-Funktionen fehlen.'],
+    ['limited', 'Eingeschränkt kompatibel', 'Chrome-Anmeldung fehlt.'],
+    ['clear', 'Keine bekannten Probleme', ''],
+  ]) {
+    await navigate(page, 'https://example.org');
+    await page.evaluate(
+      ({ level, warning }) => {
+        window.preparedEntry = {
+          id: 'preflight-' + level,
+          name: 'Prüfbeispiel',
+          version: '1',
+          permissions: ['storage'],
+          compatibilityLevel: level,
+          unsupported: level === 'unsupported',
+          compatibility: warning,
+        };
+      },
+      { level, warning },
+    );
+    await navigate(page, detail);
+    await expect(page.locator('.store-compatibility')).toHaveText(label);
+    expect(await page.evaluate(() => window.installToken)).toBeUndefined();
+    await expect(page.locator('#settingsView')).toBeHidden();
+    if (warning) await expect(page.locator('#storeInstallDrop')).toContainText(warning);
+    if (level === 'unsupported') {
+      await expect(page.locator('[data-store-confirm]')).toBeDisabled();
+    } else {
+      await expect(page.locator('[data-store-confirm]')).toHaveText('Berechtigungen prüfen');
+      await page.locator('[data-store-confirm]').click();
+      await expect(page.locator('.store-permissions')).toContainText('storage');
+      expect(await page.evaluate(() => window.installToken)).toBeUndefined();
+    }
+  }
+});
+
+test('failed preflight offers retry and cannot silently install', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    window.prepareFails = true;
+  });
+  await navigate(page, detail);
+  await expect(page.locator('.store-compatibility')).toHaveText('Prüfung nicht möglich');
+  await expect(page.locator('#storeInstallDrop')).toContainText('Store nicht erreichbar');
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
+  await page.evaluate(() => {
+    window.prepareFails = false;
+  });
+  await page.locator('[data-store-confirm]').click();
+  await expect(page.locator('.store-compatibility')).toHaveText('Keine bekannten Probleme');
   expect(await page.evaluate(() => window.installToken)).toBeUndefined();
 });

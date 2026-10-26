@@ -56,11 +56,22 @@ void fmwExtension(const char *json, int req) {
     NSError *error=nil;
     if (existing && existing.isLoaded && ![controller unloadExtensionContext:existing error:&error]) {extensionReply(req,nil,error.localizedDescription);return;}
     if ([op isEqual:@"remove"]) [gExtensionContexts removeObjectForKey:ident];
-    if (gExtensionAction.webExtensionContext == existing) [gExtensionAction closePopup];
+    if (gExtensionAction.webExtensionContext == existing) { [gExtensionAction closePopup]; gExtensionAction=nil; }
     extensionReply(req,@"",nil);return;
    }
    if ([op isEqual:@"open"]) {
     if (!existing || !existing.isLoaded) {extensionReply(req,nil,@"Erweiterung ist nicht aktiv");return;}
+    // Loading an extension does not imply its Chromium-only APIs are available.
+    if ([existing.webExtension.manifest[@"permissions"] containsObject:@"proxy"]) {
+     [gExtensionAction closePopup];gExtensionAction=nil;
+     extensionReply(req,nil,@"Diese VPN-Erweiterung benötigt Chrome-Proxy-Funktionen, die Luna auf dem Mac derzeit nicht unterstützt. Deshalb kann ihr Steuerungsfenster nicht starten.");return;
+    }
+    for (NSError *error in existing.errors) {
+     if ([error.domain isEqual:WKWebExtensionContextErrorDomain] && error.code == WKWebExtensionContextErrorBackgroundContentFailedToLoad) {
+      [gExtensionAction closePopup];gExtensionAction=nil;gExtensionAction=nil;
+      extensionReply(req,nil,@"Der Hintergrunddienst dieser Erweiterung ist abgestürzt. Möglicherweise benötigt sie Browserfunktionen, die Luna noch nicht unterstützt.");return;
+     }
+    }
     FMTab *tab=gTabs[@(gActive >= 0 ? gActive : gLastWebTab)];
     if (!tab) tab=gTabs[args[@"tab"]];
     if (tab) [existing userGesturePerformedInTab:tab];

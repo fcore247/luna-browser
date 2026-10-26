@@ -324,7 +324,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 
 @end
 
-#include "extensions_darwin.inc"
+#include "extensions_darwin.h"
 
 @implementation FMGestureHandler
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
