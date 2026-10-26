@@ -147,6 +147,7 @@ test('save errors retain input; later resumes without completion', async ({ page
   await expect(page.locator('#setupKey')).toHaveValue('bad-test-key');
   await page.getByRole('button', { name: 'Später fortsetzen' }).click();
   expect(await page.evaluate(() => window.preferences.onboardingComplete)).toBeUndefined();
+  expect(await page.evaluate(() => window.preferences.onboardingDeferred)).toBe(true);
   await page.evaluate(() => window.wizard.start());
   await expect(page.locator('#setupKey')).toHaveValue('');
 });

@@ -14,6 +14,8 @@ func TestStore(t *testing.T) {
 	if err := s.Set("k", "geheim-äöü"); err != nil {
 		t.Fatal(err)
 	}
+	// A freshly constructed store models a rebuilt/restarted local app.
+	s = New(s.Dir)
 	if v, ok, _ := s.Get("k"); !ok || v != "geheim-äöü" {
 		t.Fatalf("%q", v)
 	}

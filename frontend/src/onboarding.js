@@ -341,6 +341,7 @@ export function createOnboarding({ onFinish, refreshSearch }) {
         localStorage.removeItem(PROGRESS_KEY);
       } catch {}
     }
+    if (!complete) await api.setPref('onboardingDeferred', true);
     active = false;
     braveWatchdog.stop();
     drafts.clear();

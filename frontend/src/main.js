@@ -159,6 +159,7 @@ const S = {
   hasKey: false,
   googleSearch: false,
   onboardingComplete: false,
+  onboardingDeferred: false,
   autoNextAlways: false,
   restore: false,
   gesture: true,
@@ -2753,7 +2754,7 @@ let splashDismissal = null;
 const startupWatchdog = createLoadWatchdog(
   Math.max(0, 10000 - (performance.now() - splashT0)),
   () => {
-    if (!splashing || S.onboardingComplete) return;
+    if (!splashing || S.onboardingComplete || S.onboardingDeferred) return;
     showSlowSetup({
       hideNative() {
         api.show(-1);
@@ -2816,7 +2817,8 @@ onboarding = createOnboarding({
         S.autoNextAlways = !!p.spotifyAutoNextAlways;
         S.googleSearch = !!p.googleSearch;
         S.onboardingComplete = !!p.onboardingComplete;
-        if (S.onboardingComplete) startupWatchdog.stop();
+        S.onboardingDeferred = !!p.onboardingDeferred;
+        if (S.onboardingComplete || S.onboardingDeferred) startupWatchdog.stop();
         return [
           await api.keyStatus(),
           !!p.restoreSession,
@@ -2869,7 +2871,8 @@ onboarding = createOnboarding({
     console.error(e);
   }
   await dismissSplash();
-  if (IS_NATIVE && !S.onboardingComplete) onboarding.start().catch((e) => toast(String(e)));
+  if (IS_NATIVE && !S.onboardingComplete && !S.onboardingDeferred)
+    onboarding.start().catch((e) => toast(String(e)));
 })();
 
 document.addEventListener('change', (ev) => {

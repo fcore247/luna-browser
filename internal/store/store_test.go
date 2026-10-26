@@ -99,11 +99,12 @@ func TestOnboardingPreferencesSurviveRestart(t *testing.T) {
 	}
 	s.SetPref("googleSearch", true)
 	s.SetPref("onboardingComplete", true)
+	s.SetPref("onboardingDeferred", true)
 	reopened, err := New(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reopened.Prefs()["googleSearch"] || !reopened.Prefs()["onboardingComplete"] {
+	if !reopened.Prefs()["googleSearch"] || !reopened.Prefs()["onboardingComplete"] || !reopened.Prefs()["onboardingDeferred"] {
 		t.Fatal("setup choices lost after restart")
 	}
 	reopened.SetPref("googleSearch", false)
