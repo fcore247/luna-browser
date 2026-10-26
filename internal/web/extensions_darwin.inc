@@ -9,7 +9,7 @@ static WKWebExtensionAction *gExtensionAction API_AVAILABLE(macos(15.4));
 
 @implementation FMExtensionHost
 - (NSArray *)tabsForWebExtensionContext:(WKWebExtensionContext *)context { return [gTabs.allValues sortedArrayUsingComparator:^NSComparisonResult(FMTab *a, FMTab *b) { return a.tid < b.tid ? NSOrderedAscending : NSOrderedDescending; }] ?: @[]; }
-- (id<WKWebExtensionTab>)activeTabForWebExtensionContext:(WKWebExtensionContext *)context { return gTabs[@(gActive)]; }
+- (id<WKWebExtensionTab>)activeTabForWebExtensionContext:(WKWebExtensionContext *)context { return gTabs[@(gActive >= 0 ? gActive : gLastWebTab)]; }
 - (NSArray *)webExtensionController:(WKWebExtensionController *)controller openWindowsForExtensionContext:(WKWebExtensionContext *)context { return @[self]; }
 - (id<WKWebExtensionWindow>)webExtensionController:(WKWebExtensionController *)controller focusedWindowForExtensionContext:(WKWebExtensionContext *)context { return self; }
 - (void)webExtensionController:(WKWebExtensionController *)controller openNewTabUsingConfiguration:(WKWebExtensionTabConfiguration *)configuration forExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(id<WKWebExtensionTab>, NSError *))done {
@@ -59,8 +59,11 @@ void fmwExtension(const char *json, int req) {
    }
    if ([op isEqual:@"open"]) {
     if (!existing) {extensionReply(req,nil,@"Erweiterung ist nicht aktiv");return;}
-    FMTab *tab=gTabs[args[@"tab"]];
-    if (tab) [existing userGesturePerformedInTab:tab];
+    FMTab *tab=gTabs[@(gActive >= 0 ? gActive : gLastWebTab)];
+    if (!tab) tab=gTabs[args[@"tab"]];
+    NSString *scheme=tab.view.URL.scheme.lowercaseString;
+    if (!tab || ![@[@"http",@"https"] containsObject:scheme?:@""]) {extensionReply(req,nil,@"Öffne zuerst eine Website in einem Luna-Tab. Das Erweiterungsmenü bezieht sich auf diese Website.");return;}
+    [existing userGesturePerformedInTab:tab];
     if (existing.webExtension.displayActionLabel || existing.webExtension.manifest[@"action"] || existing.webExtension.manifest[@"browser_action"]) {
      [existing performActionForTab:tab];extensionReply(req,@"",nil);
     } else if (existing.optionsPageURL) {

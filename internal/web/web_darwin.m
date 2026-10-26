@@ -28,6 +28,7 @@ static NSMutableDictionary<NSNumber *, FMTab *> *gTabs;
 static WKWebViewConfiguration *gConfig;
 static CGRect gRect;
 static int gActive = -1;
+static int gLastWebTab = -1;
 static int gNextPopup = 100000;
 static int gDlSeq = 0;
 static char kDlId;
@@ -184,7 +185,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (NSString *)titleForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _view.title; }
 - (NSURL *)urlForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _view.URL; }
 - (BOOL)isLoadingCompleteForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return !_view.loading; }
-- (BOOL)isSelectedForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _tid == gActive; }
+- (BOOL)isSelectedForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _tid == (gActive >= 0 ? gActive : gLastWebTab); }
 - (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); }
 - (void)reloadFromOrigin:(BOOL)origin forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view reload]; done(nil); }
 
@@ -370,6 +371,7 @@ void fmwShow(int id) {
 	dispatch_async(dispatch_get_main_queue(), ^{
 		FMTab *previous = gTabs[@(gActive)];
         gActive = id;
+        if (id >= 0 && gTabs[@(id)]) gLastWebTab = id;
         if (@available(macOS 15.4, *)) if (gTabs[@(id)]) [extensionController() didActivateTab:gTabs[@(id)] previousActiveTab:previous];
 		for (FMTab *t in gTabs.allValues) t.view.hidden = (t.tid != gActive);
 	});
@@ -379,6 +381,7 @@ void fmwClose(int id) {
 		FMTab *t = gTabs[@(id)]; if (!t) return;
 		[t teardown];
 		[gTabs removeObjectForKey:@(id)];
+        if (gLastWebTab == id) gLastWebTab = -1;
 	});
 }
 void fmwFind(int id, const char *text, int forward) {
