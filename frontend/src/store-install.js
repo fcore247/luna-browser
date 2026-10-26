@@ -1,333 +1,236 @@
 import * as api from './api.js';
 import { esc } from './ui.js';
-import { personal } from './personalization.js';
 import './styles/store-install.css';
 
 export function storeExtensionID(input) {
   try {
-    const u = new URL(input);
-    if (u.protocol !== 'https:' || u.host !== 'chromewebstore.google.com') return '';
-    return u.pathname.match(/^\/detail\/(?:[^/]+\/)?([a-p]{32})\/?$/)?.[1] || '';
+    const url = new URL(input);
+    return url.protocol === 'https:' && url.host === 'chromewebstore.google.com'
+      ? url.pathname.match(/^\/detail\/(?:[^/]+\/)?([a-p]{32})\/?$/)?.[1] || ''
+      : '';
   } catch {
     return '';
   }
 }
-export function createStoreInstall({ currentTab, closeOther, toast }) {
-  const anchor = document.getElementById('bStoreInstall'),
-    urlbox = document.getElementById('urlbox');
-  let details = null,
-    key = '',
-    pendingKey = '',
-    panel = null,
-    generation = 0,
-    retries = 0,
-    retryTimer,
-    operation = null;
-  const cache = new Map();
-  const dismissed = new Set();
-  const identity = () => `${currentTab()?.id}:${storeExtensionID(currentTab()?.url)}`;
-  function close(focus = false, dismiss = false) {
-    if (operation && operation.phase !== 'installing') {
-      if (operation.pending) api.extensionCancel(operation.pending.id).catch(() => {});
-      operation = null;
-    }
-    if (!panel) return;
-    if (dismiss) dismissed.add(identity());
-    panel.remove();
-    panel = null;
-    urlbox.classList.remove('store-drop-open');
-    anchor.setAttribute('aria-expanded', 'false');
+const raster = (value) =>
+  /^data:image\/(png|jpeg|gif|webp|x-icon);base64,[A-Za-z0-9+/=]+$/.test(value || '') ? value : '';
+const levelOf = (entry) =>
+  entry?.compatibilityLevel ||
+  (entry?.unsupported
+    ? 'unsupported'
+    : entry?.compatibility
+      ? 'limited'
+      : entry
+        ? 'clear'
+        : 'checking');
+const levelLabel = (level) =>
+  ({
+    clear: 'Keine bekannten Probleme',
+    limited: 'Eingeschränkt kompatibel',
+    unsupported: 'Nicht kompatibel',
+    checking: 'Kompatibilität wird geprüft',
+    unknown: 'Prüfung nicht möglich',
+  })[level] || 'Kompatibilität unbekannt';
 
-    if (focus) anchor.focus();
+export function createStoreInstall({ currentTab, showNative, toast }) {
+  const root = document.createElement('div');
+  root.id = 'storeDetailView';
+  root.hidden = true;
+  document.getElementById('page').append(root);
+  const anchor = document.getElementById('bStoreInstall');
+  const originals = new Set(),
+    pages = new Map();
+  let state = null;
+  const identity = (tab) =>
+    tab?.mode === 'web' && storeExtensionID(tab.url)
+      ? `${tab.id}:${storeExtensionID(tab.url)}`
+      : '';
+  const owns = (tab) => !!identity(tab) && !originals.has(identity(tab));
+  const current = (task) =>
+    state === task && identity(currentTab()) === task.key && owns(currentTab());
+  function dispose() {
+    const previous = state;
+    state = null;
+    if (previous?.pending && previous.phase !== 'installing' && previous.phase !== 'installed')
+      api.extensionCancel(previous.pending.id).catch(() => {});
   }
-  function display(next) {
-    const refresh =
-      panel && !operation && next && (details?.name !== next.name || details?.icon !== next.icon);
-    if (refresh) close();
-    details = next;
-    if (panel && next && operation) {
-      panel.querySelector('.store-install-icon').innerHTML = next.icon
-        ? `<img src="${esc(next.icon)}" alt="">`
-        : '<span aria-hidden="true">＋</span>';
-      if (!operation.pending) panel.querySelector('h2').textContent = next.name;
-    }
-    anchor.hidden = !details;
-    const image = anchor.querySelector('img'),
-      fallback = anchor.querySelector('.store-icon-fallback');
-    image.hidden = !next?.icon;
-    image.src = next?.icon || '';
-    fallback.hidden = !!next?.icon;
-    anchor.title = next ? `${next.name} in Luna installieren` : '';
-    anchor.setAttribute(
-      'aria-label',
-      next ? `${next.name} installieren` : 'Erweiterung installieren',
-    );
-    if (next && !dismissed.has(identity())) open();
+  function original(task, failed = false) {
+    if (!current(task)) return;
+    originals.add(task.key);
+    dispose();
+    root.hidden = true;
+    if (failed)
+      toast('Store-Details konnten nicht geladen werden. Die Originalseite wird geöffnet.');
+    showNative(currentTab().id);
+    update(currentTab());
   }
-  async function update(tab) {
-    const id = tab?.mode === 'web' && storeExtensionID(tab.url);
-    const nextKey = id ? `${tab.id}:${id}` : '';
-    if (nextKey !== key) {
-      close();
-      if (operation?.phase === 'installing') operation = null;
-      key = nextKey;
-      generation++;
-      pendingKey = '';
-      retries = 0;
-      clearTimeout(retryTimer);
-      display(null);
-    }
-    if (!id) return;
-    // The URL establishes eligibility. Metadata only improves the presentation.
-    if (!details) {
-      const slug = new URL(tab.url).pathname.split('/').filter(Boolean);
-      const label = slug.length > 2 ? slug[1].replace(/-/g, ' ') : '';
-      display({ id, url: tab.url, name: label || 'Diese Erweiterung', icon: '' });
-    }
-    if (cache.has(nextKey)) {
-      if (details !== cache.get(nextKey)) display(cache.get(nextKey));
-      return;
-    }
-    if (pendingKey === nextKey) return;
-    pendingKey = nextKey;
-    const token = generation;
-    retries++;
+  function render() {
+    if (!state) return;
+    const task = state,
+      entry = task.pending,
+      page = task.page;
+    const name = entry?.name || page?.name || 'Erweiterung wird geladen …';
+    const icon = raster(entry?.icon) || raster(page?.icon);
+    const images = (page?.screenshots || []).map(raster).filter(Boolean);
+    const level = task.error ? 'unknown' : levelOf(entry);
+    const busy = task.phase === 'checking' || task.phase === 'installing';
+    const blocked = entry?.unsupported;
+    const title =
+      task.phase === 'installed'
+        ? 'Installiert ✓'
+        : blocked
+          ? 'Nicht kompatibel'
+          : task.phase === 'installing'
+            ? 'Wird installiert …'
+            : task.error
+              ? 'Erneut prüfen'
+              : task.phase === 'checking'
+                ? 'Wird geprüft …'
+                : task.phase === 'review'
+                  ? 'Zugriff erlauben & installieren'
+                  : 'In Luna installieren';
+    const permissions =
+      (entry?.permissions || []).map((p) => `<li>${esc(p)}</li>`).join('') ||
+      '<li>Keine zusätzlichen Rechte</li>';
+    const scroll = root.scrollTop;
+    root.innerHTML = `<main id="storeInstallDrop" class="store-detail">
+      <nav class="store-detail-nav"><span>LUNA EXTRAS <span aria-hidden="true">/</span> CHROME WEB STORE</span><button type="button" data-store-original>Original im Chrome Web Store öffnen ↗</button></nav>
+      <header class="store-detail-hero"><div class="store-detail-icon">${icon ? `<img src="${esc(icon)}" alt="">` : '<span aria-hidden="true">✧</span>'}</div><div><span class="store-detail-eyebrow">MEHR MÖGLICHKEITEN FÜR DEINEN BROWSER</span><h1>${esc(name)}</h1><p>${entry ? `Version ${esc(entry.version)} · Paket und Signatur geprüft` : 'Luna bereitet die Informationen für dich auf.'}</p></div></header>
+      <div class="store-detail-layout"><div class="store-detail-main">
+        <section class="store-gallery" aria-label="Screenshots der Erweiterung">${images.length ? `<div class="store-gallery-stage"><img src="${esc(images[task.image || 0] || images[0])}" alt="Screenshot ${(task.image || 0) + 1} von ${esc(name)}"></div><div class="store-gallery-thumbs">${images.map((src, i) => `<button type="button" data-store-image="${i}" aria-label="Screenshot ${i + 1} anzeigen" aria-pressed="${i === (task.image || 0)}"><img src="${esc(src)}" alt=""></button>`).join('')}</div>` : `<div class="store-gallery-empty"><span aria-hidden="true">✧</span><p>${page ? 'Für diese Erweiterung sind keine Vorschaubilder verfügbar.' : 'Vorschaubilder werden geladen …'}</p></div>`}</section>
+        <section class="store-description"><span class="store-detail-eyebrow">DAS KANN DIE ERWEITERUNG</span><h2>Über ${esc(name)}</h2><p>${esc(page?.description || 'Beschreibung wird aus dem Chrome Web Store geladen …')}</p></section>
+      </div><aside class="store-detail-aside">
+        <section class="store-install-card"><span class="store-detail-eyebrow">IN DEINEM LUNA</span><h2>${task.phase === 'installed' ? 'Bereit für dich.' : 'Passt sie zu dir?'}</h2><span class="store-compatibility" data-level="${esc(level)}" role="status" aria-live="polite">${esc(levelLabel(level))}</span><p class="store-check-description">${esc(task.error || entry?.compatibility || (entry ? 'Die Manifestprüfung hat keine bekannten Kompatibilitätsprobleme gefunden.' : 'Luna lädt das Paket zur Prüfung. Es wird nichts installiert oder ausgeführt.'))}</p><p class="store-check-limit">Manifestprüfung · keine Garantie für alle Funktionen</p>
+        ${task.phase === 'review' ? `<div class="store-review" role="group" aria-label="Berechtigungen bestätigen"><h3>Diese Zugriffe erlauben?</h3><ul class="store-permissions">${permissions}</ul><p>Die Erweiterung kann auf den genannten Seiten Daten lesen und ändern. Installiere sie nur, wenn du ihr vertraust.</p><button type="button" class="store-cancel" data-store-cancel>Abbrechen</button></div>` : ''}
+        <button type="button" class="store-install-primary" data-store-confirm ${busy || blocked || task.phase === 'installed' ? 'disabled' : ''}>${esc(title)}</button><p class="store-install-note">${task.phase === 'installed' ? 'Lade die betroffenen Webseiten neu, um die Erweiterung zu verwenden.' : 'Du entscheidest vor der Installation über die Berechtigungen.'}</p></section>
+        <section class="store-permissions-card"><h2>Berechtigungen</h2>${entry ? `<ul>${permissions}</ul>` : '<p>Werden aus dem geprüften Paket ermittelt …</p>'}</section>
+      </aside></div></main>`;
+    root.scrollTop = scroll;
+  }
+  async function prepare(task) {
+    task.phase = 'checking';
+    task.error = '';
+    render();
     try {
-      let official;
-      try {
-        official = await api.extensionStoreLookup(tab.url);
-      } catch {}
-      const info = official?.name ? official : await api.extensionStoreDetails(tab.id);
-      if (token !== generation || key !== nextKey || !info || storeExtensionID(info.url) !== id)
-        return;
-      const expectedName = (tab.title || '').replace(/\s*[-–|]\s*Chrome Web Store.*$/i, '').trim();
-      if (
-        !official?.name &&
-        expectedName &&
-        info.name &&
-        expectedName.toLowerCase() !== info.name.trim().toLowerCase()
-      )
-        return;
-      const icon = (() => {
-        try {
-          if (/^data:image\/(png|jpeg|gif|webp|x-icon);base64,[A-Za-z0-9+/=]+$/.test(info.icon))
-            return info.icon;
-          const u = new URL(info.icon);
-          return u.protocol === 'https:' && u.hostname.endsWith('.googleusercontent.com')
-            ? u.href
-            : '';
-        } catch {
-          return '';
-        }
-      })();
-      const entry = {
-        id,
-        url: info.url,
-        name:
-          info.name ||
-          tab.title.replace(/\s*[-–|]\s*Chrome Web Store.*$/i, '') ||
-          'Diese Erweiterung',
-        icon,
-      };
-      if (entry.icon) cache.set(nextKey, entry);
-      display(entry);
-    } catch {
-      /* Store metadata can arrive on the next navigation state event. */
-    } finally {
-      if (pendingKey === nextKey) pendingKey = '';
-      if (token === generation && key === nextKey && !cache.has(nextKey) && retries < 60) {
-        clearTimeout(retryTimer);
-        retryTimer = setTimeout(() => update(currentTab()), 350);
-      }
-    }
-  }
-  function open() {
-    if (panel || !details) return;
-    const chosen = { ...details };
-    panel = document.createElement('div');
-    panel.id = 'storeInstallDrop';
-    panel.setAttribute('role', 'region');
-    panel.setAttribute('aria-label', 'Erweiterung in Luna installieren');
-    panel.innerHTML = `<button type="button" class="store-install-close" data-store-close aria-label="Schließen"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
-      <div class="store-install-hero"><div class="store-install-icon">${chosen.icon ? `<img src="${esc(chosen.icon)}" alt="">` : '<span aria-hidden="true">＋</span>'}</div><div class="store-install-copy"><span class="store-install-eyebrow">DEIN NÄCHSTES EXTRA</span><h2>${esc(chosen.name)}</h2><p>Interessiert dich diese Erweiterung? Luna kann sie für dich installieren.</p></div></div>
-      <div class="store-install-footer"><span class="store-install-note"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m10 2 6 2.5V10c0 4-6 7-6 7s-6-3-6-7V4.5L10 2Z"/><path d="m7 9 2 2 4-4"/></svg>Berechtigungen zuerst prüfen</span><div class="store-install-actions"><button type="button" class="store-install-later" data-store-close>Nicht jetzt</button><button type="button" class="store-install-primary" data-store-confirm>In Luna installieren<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5"/></svg></button></div></div>`;
-    panel.style.setProperty(
-      '--theme-menu-blur',
-      Math.max(0, Math.min(32, Number(personal().menuBlur) || 0)) + 'px',
-    );
-    document.getElementById('progress').after(panel);
-    urlbox.classList.add('store-drop-open');
-    anchor.setAttribute('aria-expanded', 'true');
-
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
-      panel.animate(
-        [
-          { opacity: 0, clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-8px)' },
-          { opacity: 1, clipPath: 'inset(0)', transform: 'none' },
-        ],
-        { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' },
-      );
-    paintOperation();
-    panel.addEventListener('click', async (e) => {
-      if (e.target.closest('[data-store-close]')) return close(true, true);
-      if (!e.target.closest('[data-store-confirm]')) return;
-      if (currentTab()?.mode !== 'web' || storeExtensionID(currentTab().url) !== chosen.id) {
-        close();
-        return;
-      }
-      if (operation?.phase === 'ready') {
-        if (operation.pending.unsupported) return;
-        operation.phase = 'review';
-        paintOperation();
-        return;
-      }
-      if (operation?.phase === 'review') {
-        if (operation.pending.unsupported) return;
-        const task = operation;
-        task.phase = 'installing';
-        paintOperation();
-        try {
-          await api.extensionInstall(task.pending.id);
-          if (operation === task) {
-            operation = null;
-            close(false, true);
-          }
-          toast(`${task.pending.name} wurde installiert. Lade die Webseite neu.`);
-          window.dispatchEvent(new Event('luna-extensions-changed'));
-        } catch (error) {
-          if (operation === task) {
-            task.phase = 'error';
-            task.error = String(error?.message || error);
-            paintOperation();
-          }
-        }
-        return;
-      }
-      if (operation && operation.phase !== 'error') return;
-      beginCheck(chosen);
-    });
-    if (!operation) beginCheck(chosen);
-  }
-  async function beginCheck(chosen) {
-    const task = { phase: 'checking', identity: identity() };
-    operation = task;
-    paintOperation();
-    try {
-      const pending = await api.extensionPrepare(chosen.url);
-      if (operation !== task || identity() !== task.identity) {
+      const pending = await api.extensionPrepare(task.url);
+      if (!current(task)) {
         if (pending?.id) await api.extensionCancel(pending.id);
         return;
       }
       if (!pending?.id) throw new Error('Die Kompatibilität konnte nicht geprüft werden.');
       task.pending = pending;
       task.phase = 'ready';
-      paintOperation();
+      render();
     } catch (error) {
-      if (operation === task) {
+      if (current(task)) {
         task.phase = 'error';
         task.error = String(error?.message || error);
-        paintOperation();
+        render();
       }
     }
   }
-
-  function paintOperation() {
-    if (!panel || !operation) return;
-    const task = operation,
-      busy = task.phase === 'checking' || task.phase === 'installing';
-    const button = panel.querySelector('[data-store-confirm]');
-    button.disabled = busy || !!task.pending?.unsupported;
-    button.textContent = task.pending?.unsupported
-      ? 'Nicht kompatibel'
-      : task.phase === 'ready'
-        ? 'Berechtigungen prüfen'
-        : task.phase === 'review'
-          ? 'Zugriff erlauben & installieren'
-          : task.phase === 'installing'
-            ? 'Wird installiert …'
-            : task.phase === 'error'
-              ? 'Erneut versuchen'
-              : 'Kompatibilität wird geprüft …';
-    const copy = panel.querySelector('.store-install-copy');
-    copy.querySelector('p').textContent =
-      task.error ||
-      (task.pending
-        ? task.pending.compatibility ||
-          (task.phase === 'review'
-            ? 'Diese Berechtigungen werden benötigt. Möchtest du sie erlauben?'
-            : 'Das Manifest wurde geprüft. Es sind keine bekannten Kompatibilitätsprobleme aufgefallen.')
-        : 'Luna lädt das Paket zur Prüfung. Es wird noch nichts installiert oder ausgeführt.');
-    copy.querySelector('.store-compatibility')?.remove();
-    const badge = document.createElement('span');
-    badge.className = 'store-compatibility';
-    badge.setAttribute('role', 'status');
-    badge.setAttribute('aria-live', 'polite');
-    const level =
-      task.pending?.compatibilityLevel ||
-      (task.pending?.unsupported
-        ? 'unsupported'
-        : task.pending?.compatibility
-          ? 'limited'
-          : task.pending
-            ? 'clear'
-            : 'checking');
-    badge.dataset.level = task.phase === 'error' ? 'unknown' : level;
-    badge.textContent =
-      task.phase === 'error'
-        ? 'Prüfung nicht möglich'
-        : task.pending
-          ? {
-              clear: 'Keine bekannten Probleme',
-              limited: 'Eingeschränkt kompatibel',
-              unsupported: 'Nicht kompatibel',
-            }[level] || 'Kompatibilität unbekannt'
-          : 'Kompatibilität wird geprüft';
-    copy.querySelector('h2').after(badge);
-    if (task.pending) {
-      copy.querySelector('h2').textContent = task.pending.name;
-      if (task.pending.icon)
-        panel.querySelector('.store-install-icon').innerHTML =
-          `<img src="${esc(task.pending.icon)}" alt="">`;
+  async function loadPage(task) {
+    try {
+      const page = pages.get(task.id) || (await api.extensionStorePage(task.url));
+      if (!current(task)) return;
+      if (!page?.name || !page.description || page.id !== task.id)
+        throw new Error('Ungültige Store-Details');
+      if (pages.size > 8) pages.delete(pages.keys().next().value);
+      pages.set(task.id, page);
+      task.page = page;
+      render();
+    } catch {
+      original(task, true);
     }
-    copy.querySelector('.store-permissions')?.remove();
-    if (task.phase === 'review') {
-      copy.querySelector('h2').textContent = task.pending.name;
-      const list = document.createElement('ul');
-      list.className = 'store-permissions';
-      list.innerHTML =
-        (task.pending.permissions || []).map((p) => `<li>${esc(p)}</li>`).join('') ||
-        '<li>Keine zusätzlichen Rechte</li>';
-      copy.append(list);
-    }
-    panel.querySelector('.store-install-note').textContent = task.pending
-      ? 'Manifest geprüft · Laufzeitfehler bleiben möglich'
-      : task.phase === 'error'
-        ? 'Erneut prüfen oder später versuchen'
-        : 'Prüfung ohne Installation';
   }
-  anchor.addEventListener('click', () => {
-    if (panel) return close(true, true);
-    closeOther();
-    dismissed.delete(identity());
-    open();
-  });
-  anchor.querySelector('img').addEventListener('error', () => {
-    anchor.querySelector('img').hidden = true;
-    anchor.querySelector('.store-icon-fallback').hidden = false;
-  });
-  document.addEventListener('keydown', (e) => {
-    if (panel && e.key === 'Escape') {
-      e.preventDefault();
-      close(true, true);
+  function update(tab) {
+    const key = identity(tab);
+    anchor.hidden = !key || owns(tab);
+    anchor.setAttribute('aria-expanded', 'false');
+    if (!owns(tab)) {
+      if (state) {
+        dispose();
+        root.hidden = true;
+        showNative(tab?.mode === 'web' ? tab.id : -1);
+      }
+      if (key) {
+        anchor.querySelector('span:last-child').textContent = 'Luna-Ansicht';
+        anchor.title = 'Erweiterung in Luna ansehen';
+      }
+      return;
+    }
+    if (state?.key === key) return;
+    dispose();
+    const task = { key, id: storeExtensionID(tab.url), url: tab.url, phase: 'checking', image: 0 };
+    state = task;
+    root.hidden = false;
+    root.scrollTop = 0;
+    showNative(-1);
+    render();
+    loadPage(task);
+    prepare(task);
+  }
+  root.addEventListener('click', async (e) => {
+    const button = e.target.closest('button');
+    if (!button || button.disabled || !state) return;
+    const task = state;
+    if (button.hasAttribute('data-store-original')) return original(task);
+    if (button.hasAttribute('data-store-image')) {
+      task.image = Number(button.dataset.storeImage);
+      render();
+      return;
+    }
+    if (button.hasAttribute('data-store-cancel')) {
+      task.phase = 'ready';
+      render();
+      return;
+    }
+    if (!button.hasAttribute('data-store-confirm') || !current(task)) return;
+    if (task.phase === 'error') {
+      if (task.pending) await api.extensionCancel(task.pending.id);
+      task.pending = null;
+      return prepare(task);
+    }
+    if (!task.pending || task.pending.unsupported) return;
+    if (task.phase === 'ready') {
+      task.phase = 'review';
+      render();
+      root.querySelector('[data-store-confirm]')?.focus();
+      return;
+    }
+    if (task.phase !== 'review') return;
+    task.phase = 'installing';
+    render();
+    try {
+      await api.extensionInstall(task.pending.id);
+      if (current(task)) {
+        task.phase = 'installed';
+        render();
+      }
+      toast(`${task.pending.name} wurde installiert. Lade die Webseite neu.`);
+      window.dispatchEvent(new Event('luna-extensions-changed'));
+    } catch (error) {
+      if (current(task)) {
+        task.phase = 'error';
+        task.error = String(error?.message || error);
+        render();
+      }
     }
   });
-  document.getElementById('url').addEventListener('input', () => close());
-  window.addEventListener('luna-personalization', () => {
-    if (panel)
-      panel.style.setProperty(
-        '--theme-menu-blur',
-        Math.max(0, Math.min(32, Number(personal().menuBlur) || 0)) + 'px',
-      );
+  anchor.addEventListener('click', () => {
+    originals.delete(identity(currentTab()));
+    update(currentTab());
   });
-  return { update, close };
+  return {
+    update,
+    owns,
+    close: () => {},
+    refresh: () => {
+      if (!owns(currentTab())) return false;
+      if (state) pages.delete(state.id);
+      dispose();
+      update(currentTab());
+      return true;
+    },
+  };
 }

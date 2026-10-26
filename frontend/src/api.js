@@ -150,3 +150,4 @@ export const extensionOpen = (id, tab) => window.go.main.App.ExtensionOpen(id, t
 export const extensionStoreDetails = (tab) => window.go.main.App.ExtensionStoreDetails(tab);
 
 export const extensionStoreLookup = (source) => window.go.main.App.ExtensionStoreLookup(source);
+export const extensionStorePage = (source) => window.go.main.App.ExtensionStorePage(source);

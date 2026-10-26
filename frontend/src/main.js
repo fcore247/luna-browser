@@ -150,7 +150,13 @@ function nativeShow(id) {
     onboarding.layout();
     return;
   }
-  if (slowSetupVisible() || isOverlayOpen() || S.cover > 0) id = -1;
+  if (
+    slowSetupVisible() ||
+    isOverlayOpen() ||
+    S.cover > 0 ||
+    (id >= 0 && storeInstall?.owns(tabById(id)))
+  )
+    id = -1;
   if (splashing) {
     pendingShow = id;
     return;
@@ -1109,7 +1115,7 @@ async function cover(on) {
     S.cover++;
     if (S.cover !== 1) return;
     const t = cur();
-    if (!t || !t.native || t.mode !== 'web') return;
+    if (!t || !t.native || t.mode !== 'web' || storeInstall?.owns(t)) return;
     let shot = '';
     try {
       shot = await api.snapshot(t.id);
@@ -1967,6 +1973,7 @@ extensionMenu = createExtensionsMenu({
 });
 storeInstall = createStoreInstall({
   currentTab: cur,
+  showNative: nativeShow,
   closeOther: () => {
     extensionMenu.close();
     closeMenu();
@@ -2148,6 +2155,7 @@ async function runCmd(c) {
       openFind();
       break;
     case 'reload':
+      if (storeInstall?.refresh()) break;
       if (t?.mode === 'web' && t.native) (t.loading ? api.stop : api.reload)(t.id);
       else if (t?.mode === 'search') {
         if (t.loading) {
@@ -3013,7 +3021,7 @@ async function runMCPCommand(name, a) {
           goForward(t);
           break;
         case 'reload':
-          if (t.mode === 'web') await api.reload(t.id);
+          if (t.mode === 'web' && !storeInstall?.refresh()) await api.reload(t.id);
           else if (t.mode === 'search') await loadEntry(t, true);
           break;
         case 'stop':
