@@ -20,6 +20,8 @@ import { initTabGroups } from './tab-groups.js';
 import { createSettings } from './settings.js';
 import { createExtensionsMenu } from './extensions-menu.js';
 import { createStoreInstall } from './store-install.js';
+import { createPersonalizedPages } from './personalized-pages.js';
+let personalizedPages = null;
 let storeInstall = null;
 let extensionMenu = null;
 const GEAR =
@@ -154,7 +156,7 @@ function nativeShow(id) {
     slowSetupVisible() ||
     isOverlayOpen() ||
     S.cover > 0 ||
-    (id >= 0 && storeInstall?.owns(tabById(id)))
+    (id >= 0 && (storeInstall?.owns(tabById(id)) || personalizedPages?.owns(tabById(id))))
   )
     id = -1;
   if (splashing) {
@@ -751,6 +753,7 @@ function isBookmarked(url) {
 function renderToolbar() {
   const t = cur();
   storeInstall?.update(t);
+  personalizedPages?.update(t);
   if (!t) return;
   $('#bBack').classList.toggle('off', !canBack(t));
   $('#bFwd').classList.toggle('off', !canFwd(t));
@@ -1115,7 +1118,8 @@ async function cover(on) {
     S.cover++;
     if (S.cover !== 1) return;
     const t = cur();
-    if (!t || !t.native || t.mode !== 'web' || storeInstall?.owns(t)) return;
+    if (!t || !t.native || t.mode !== 'web' || storeInstall?.owns(t) || personalizedPages?.owns(t))
+      return;
     let shot = '';
     try {
       shot = await api.snapshot(t.id);
@@ -1971,6 +1975,13 @@ extensionMenu = createExtensionsMenu({
     closeSugg();
   },
 });
+personalizedPages = createPersonalizedPages({
+  currentTab: cur,
+  showNative: nativeShow,
+  refreshUI: renderAll,
+  openURL: (url) => newTab(url),
+  toast,
+});
 storeInstall = createStoreInstall({
   currentTab: cur,
   showNative: nativeShow,
@@ -1983,6 +1994,20 @@ storeInstall = createStoreInstall({
   toast,
 });
 
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-personal-page]');
+  if (!button || button.disabled) return;
+  const page = personalizedPages.list().find((p) => p.id === button.dataset.id);
+  if (!page) return;
+  try {
+    if (button.dataset.personalPage === 'open') personalizedPages.open(page.id);
+    if (button.dataset.personalPage === 'toggle')
+      await api.personalizedEnable(page.id, !page.enabled);
+    if (button.dataset.personalPage === 'remove') await api.personalizedRemove(page.id);
+  } catch (error) {
+    toast(String(error?.message || error));
+  }
+});
 /* ---------- Lesezeichen: Dialog (hinzufügen/bearbeiten), Kontextmenü, Verwaltung ---------- */
 let bmDlg = null; // { oldUrl } beim Bearbeiten
 function refreshBookmarks() {
@@ -2155,6 +2180,10 @@ async function runCmd(c) {
       openFind();
       break;
     case 'reload':
+      if (personalizedPages?.owns(t)) {
+        personalizedPages.refresh();
+        break;
+      }
       if (storeInstall?.refresh()) break;
       if (t?.mode === 'web' && t.native) (t.loading ? api.stop : api.reload)(t.id);
       else if (t?.mode === 'search') {
@@ -2983,6 +3012,8 @@ function clearLegacyMCPColors() {
 clearLegacyMCPColors();
 async function runMCPCommand(name, a) {
   if (name === 'browser_state') return mcpState();
+  if (name === 'browser_design_skill') return personalizedPages.designSkill();
+  if (name === 'browser_personalized_pages') return personalizedPages.command(a, mcpTab(a.tab_id));
   if (splashing) throw Error('Luna startet noch. Bitte kurz warten.');
   switch (name) {
     case 'browser_tab': {
@@ -3021,7 +3052,8 @@ async function runMCPCommand(name, a) {
           goForward(t);
           break;
         case 'reload':
-          if (t.mode === 'web' && !storeInstall?.refresh()) await api.reload(t.id);
+          if (personalizedPages?.owns(t)) personalizedPages.refresh();
+          else if (t.mode === 'web' && !storeInstall?.refresh()) await api.reload(t.id);
           else if (t.mode === 'search') await loadEntry(t, true);
           break;
         case 'stop':
@@ -3071,6 +3103,8 @@ async function runMCPCommand(name, a) {
         await api.find(t.id, String(a.text || ''), true);
         return { ok: true };
       }
+      if (a.view === 'personalized' && personalizedPages?.owns(t))
+        return lunaPageAction(a, $('#personalizedPageView'));
       if (t.mode === 'web' && t.native) return api.mcpPage(t.id, a);
       return lunaPageAction(a, $('#page'));
     }

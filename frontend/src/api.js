@@ -151,3 +151,13 @@ export const extensionStoreDetails = (tab) => window.go.main.App.ExtensionStoreD
 
 export const extensionStoreLookup = (source) => window.go.main.App.ExtensionStoreLookup(source);
 export const extensionStorePage = (source) => window.go.main.App.ExtensionStorePage(source);
+
+export const personalizedPages = () => window.go.main.App.PersonalizedPages();
+export const personalizedSave = (recipe) =>
+  window.go.main.App.PersonalizedSave(JSON.stringify(recipe));
+export const personalizedEnable = (id, enabled) =>
+  window.go.main.App.PersonalizedEnable(id, enabled);
+export const personalizedRemove = (id) => window.go.main.App.PersonalizedRemove(id);
+export const personalizedSource = (tab, selectors = []) =>
+  window.go.main.App.PersonalizedSource(tab, selectors);
+export const onPersonalizedPages = (cb) => EventsOn('personalized-pages-changed', cb);

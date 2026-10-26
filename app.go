@@ -14,6 +14,7 @@ import (
 	"browser-mac/internal/chat"
 	"browser-mac/internal/extensions"
 	"browser-mac/internal/musicqueue"
+	"browser-mac/internal/personalpages"
 	"browser-mac/internal/search"
 	"browser-mac/internal/secret"
 	"browser-mac/internal/sonos"
@@ -26,16 +27,17 @@ import (
 
 // App bündelt alle Methoden, die das Frontend aufrufen darf (nur über frontend/src/api.js).
 type App struct {
-	extensions  *extensions.Manager
-	chat        *chat.Service
-	queueRouter musicqueue.Router
-	autoNext    *spotify.AutoNext
-	mcpServer   *browsermcp.Manager
-	mcpBridge   mcpBridge
-	ctx         context.Context
-	stopSonos   context.CancelFunc
-	st          *store.Store
-	out         chan [2]string // Ereignisse ans Frontend
+	personalized *personalpages.Manager
+	extensions   *extensions.Manager
+	chat         *chat.Service
+	queueRouter  musicqueue.Router
+	autoNext     *spotify.AutoNext
+	mcpServer    *browsermcp.Manager
+	mcpBridge    mcpBridge
+	ctx          context.Context
+	stopSonos    context.CancelFunc
+	st           *store.Store
+	out          chan [2]string // Ereignisse ans Frontend
 
 	secrets    *secret.Store
 	search     *search.Client
@@ -87,6 +89,7 @@ func (a *App) startup(ctx context.Context) {
 	a.spotifyAPI = spotifyapi.New(a.secrets)
 	configurePlatform(a)
 	a.initExtensions(dir)
+	a.personalized, _ = personalpages.New(filepath.Join(dir, "browser-mac"))
 	a.autoNext = spotify.NewAutoNext(func(status spotify.NextStatus) { b, _ := json.Marshal(status); a.emit("spotify-next", string(b)) })
 	sonosContext, stopSonos := context.WithCancel(ctx)
 	a.stopSonos = stopSonos

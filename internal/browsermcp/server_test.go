@@ -45,7 +45,7 @@ func TestMCPProtocolAndValidation(t *testing.T) {
 	}
 	defer session.Close()
 	list, err := session.ListTools(ctx, nil)
-	if err != nil || len(list.Tools) != 17 {
+	if err != nil || len(list.Tools) != 19 {
 		t.Fatalf("tools: %v %v", list, err)
 	}
 

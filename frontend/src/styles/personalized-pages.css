@@ -1,0 +1,179 @@
+#personalizedPageView {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: auto;
+  color: var(--ink);
+  background:
+    radial-gradient(
+      ellipse at 0 0,
+      color-mix(in srgb, var(--acc) 12%, transparent),
+      transparent 60%
+    ),
+    var(--panel);
+  user-select: text;
+  -webkit-user-select: text;
+}
+#personalizedPageView[hidden] {
+  display: none;
+}
+.pp-view {
+  max-width: 1180px;
+  padding: 30px 40px 65px;
+  margin: auto;
+}
+.pp-view nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--mute2);
+  font-weight: 700;
+}
+.pp-view button {
+  border: 0;
+  background: transparent;
+  color: var(--acc);
+  font: inherit;
+  font-size: 11px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.pp-view header {
+  padding: 45px 0 30px;
+}
+.pp-eyebrow {
+  font-size: 11px;
+  color: var(--mute2);
+}
+.pp-view h1 {
+  font-size: clamp(30px, 4vw, 46px);
+  letter-spacing: -1.5px;
+  margin: 8px 0 13px;
+}
+.pp-view header p {
+  color: var(--mute2);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+}
+.pp-source-state {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  font-size: 11px;
+  color: var(--mute2);
+  margin-bottom: 20px;
+}
+.pp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.pp-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  padding: 25px;
+  border-radius: 24px;
+  background:
+    linear-gradient(130deg, #ffffff22, transparent),
+    color-mix(in srgb, var(--card) 75%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    inset 0 1px #ffffff60,
+    0 8px 25px #00000004;
+}
+.pp-card-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.pp-card-label > span {
+  font-size: 21px;
+}
+.pp-card h2 {
+  font-size: 13px;
+  margin: 0;
+  color: var(--mute2);
+}
+.pp-card p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 17px 0 0;
+  overflow-wrap: anywhere;
+}
+.pp-metric > p:not(.pp-missing) {
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.8px;
+}
+.pp-card ul {
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.pp-card .pp-missing {
+  font-size: 12px;
+  color: var(--mute2);
+}
+.pp-view footer {
+  margin-top: 35px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--mute2);
+}
+.pp-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pp-settings-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 19px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+}
+.pp-settings-entry h3 {
+  font-size: 14px;
+  margin: 0 0 7px;
+}
+.pp-settings-entry p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--mute2);
+  overflow-wrap: anywhere;
+}
+.pp-settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pp-settings-intro {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--mute2);
+}
+@media (max-width: 700px) {
+  .pp-view {
+    padding: 22px;
+  }
+  .pp-settings-entry {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pp-view nav {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}

@@ -23,6 +23,16 @@ export function createSettings({
   toast,
   onSearchKeyChanged,
 }) {
+  let personalPagesList = [];
+  window.addEventListener('luna-personalized-list', () =>
+    api
+      .personalizedPages()
+      .then((p) => {
+        personalPagesList = p || [];
+        if (settingsSection === 'personalized') renderSettingsView();
+      })
+      .catch(() => {}),
+  );
   let extensionTarget = -1;
   const extensions = createExtensions({
     render: renderSettingsView,
@@ -121,10 +131,12 @@ export function createSettings({
     ['spotify', 'Spotify'],
     ['mcp', 'KI & MCP'],
     ['extensions', 'Erweiterungen'],
+    ['personalized', 'Personalisierte Seiten'],
     ['updates', 'Updates'],
     ['data', 'Daten'],
   ];
   const SET_ICONS = {
+    personalized: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M9 9v11"/>',
     extensions:
       '<path d="M8 3h4v3a2 2 0 1 0 4 0V3h4v7h-3a2 2 0 1 0 0 4h3v7H8v-3a2 2 0 1 0-4 0v3H2v-7h3a2 2 0 1 0 0-4H2V3h6z"/>',
     look: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M12 4a8 8 0 0 1 0 16"/>',
@@ -213,6 +225,7 @@ export function createSettings({
       ${chatSettingsHTML()}
       ${mcpSettingsHTML(mcpStatus)}
       ${extensions.html()}
+      <section id="set-personalized" class="sp-card"><h2>Personalisierte Seiten</h2><p class="pp-settings-intro">Deine Ansichten für echte Webseiten. Eine verbundene KI liest zuerst die Originalseite und holt Lunas Designleitfaden. Die Ansicht folgt automatisch deinem aktuellen Browserdesign; Inhalte kommen aus der geöffneten Originalseite.</p><div class="pp-settings-list">${(personalPagesList || []).map((page) => `<article class="pp-settings-entry"><div><h3>${esc(page.title)}</h3><p>${esc(page.url)}</p><p>${page.enabled ? 'Aktiv' : 'Deaktiviert'} · ${page.scope === 'site' ? 'Gesamte Website' : 'Diese Unterseite'} · ${page.fields.length} Quellfelder</p></div><div class="pp-settings-actions"><button class="btn sm" data-personal-page="open" data-id="${esc(page.id)}">Öffnen</button><button class="btn sm" data-personal-page="toggle" data-id="${esc(page.id)}">${page.enabled ? 'Deaktivieren' : 'Aktivieren'}</button><button class="btn sm" data-personal-page="remove" data-id="${esc(page.id)}">Entfernen</button></div></article>`).join('') || '<p class="muted">Noch keine personalisierten Seiten. Bitte deine KI zum Beispiel: „Baue mir eine persönliche Wetteransicht für wetteronline.de.“</p>'}</div></section>
       <section id="set-updates" class="sp-card"><h2>Updates</h2>
         <div class="swrow"><div><b>Luna Browser ${esc(updateState.version || '')}</b><span>Updates direkt aus unseren GitHub Releases.</span></div><span class="muted">${WINDOWS ? 'Windows · experimentell / instabil' : 'macOS'}</span></div>
         <div class="swrow"><div><b>Automatische Updates</b><span>Einmal täglich prüfen und Updates automatisch laden. Luna meldet sich leise mit einem Punkt am Menü, wenn eines bereit ist.</span></div><button class="btn" role="switch" aria-label="Automatische Updates" aria-checked="${!!updateState.automatic}" data-update-action="automatic" ${!updateState.ready ? 'disabled' : ''}>${updateState.automatic ? 'Ein' : 'Aus'}</button></div>
@@ -340,6 +353,14 @@ export function createSettings({
       settingsSection = value === 'chat' ? 'mcp' : value === 'input' ? 'gestures' : value;
       if (settingsSection === 'updates') refreshUpdates();
       if (settingsSection === 'extensions') extensions.refresh();
+      if (settingsSection === 'personalized')
+        api
+          .personalizedPages()
+          .then((p) => {
+            personalPagesList = p || [];
+            renderSettingsView();
+          })
+          .catch(() => {});
     },
     get mcp() {
       return mcpStatus;
