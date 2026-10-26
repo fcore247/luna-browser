@@ -494,3 +494,224 @@ test('custom forecast columns render as one table and repeating horizontal/grid 
     'https://weather.example.org/sun.png',
   );
 });
+
+test('address bar switch shows an active Luna page and toggles between Luna view and original', async ({
+  page,
+}) => {
+  await setup(page);
+  const switchButton = page.locator('#bLunaView');
+  await expect(switchButton).toBeHidden();
+  const { design, inspect, recipe } = await create(page);
+  await call(page, 'browser_personalized_pages', {
+    action: 'save',
+    recipe_json: JSON.stringify(recipe),
+    inspection_token: inspect.inspection_token,
+    design_token: design.design_token,
+  });
+  await expect(switchButton).toBeVisible();
+  await expect(switchButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#personalizedPageView')).toBeVisible();
+  await switchButton.click();
+  await expect(switchButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#personalizedPageView')).toBeHidden();
+  expect(await page.evaluate(() => window.visibleNative)).toBe(
+    await page.evaluate(() => window.nativeTab),
+  );
+  await switchButton.click();
+  await expect(switchButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#personalizedPageView')).toBeVisible();
+  await page.locator('[data-pp-original]').click();
+  await expect(switchButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(switchButton).toBeVisible();
+});
+
+test('a freshly opened Luna page shows loading skeletons instead of errors until the source delivers', async ({
+  page,
+}) => {
+  await setup(page);
+  const { design, inspect, recipe } = await create(page);
+  await call(page, 'browser_personalized_pages', {
+    action: 'save',
+    recipe_json: JSON.stringify(recipe),
+    inspection_token: inspect.inspection_token,
+    design_token: design.design_token,
+  });
+  await expect(page.locator('.pp-metric')).toContainText('18 °C');
+  await page.evaluate(() => (window.fixtureFields = { count: 0, values: [] }));
+  await page.locator('#bLunaView').click();
+  await page.locator('#bLunaView').click();
+  await expect(page.locator('.pp-skeleton')).toBeVisible();
+  await expect(page.locator('.pp-source-state')).toHaveClass(/pp-source-loading/);
+  await expect(page.locator('.pp-source-state')).not.toContainText('Quell');
+  await expect(page.locator('.pp-missing')).toHaveCount(0);
+  await page.evaluate(() => (window.fixtureFields = {}));
+  await expect(page.locator('.pp-metric')).toContainText('18 °C', { timeout: 5000 });
+  await expect(page.locator('.pp-skeleton')).toHaveCount(0);
+  await page.evaluate(() => (window.fixtureFields = { count: 0, values: [] }));
+  await page.locator('#bLunaView').click();
+  await page.locator('#bLunaView').click();
+  await expect(page.locator('.pp-missing')).toContainText('nicht gefunden', { timeout: 12000 });
+  await expect(page.locator('.pp-skeleton')).toHaveCount(0);
+});
+
+async function saveWeather(page, patch = {}) {
+  const { design, inspect, recipe } = await create(page);
+  const args = {
+    action: 'save',
+    recipe_json: JSON.stringify({ ...recipe, ...patch }),
+    inspection_token: inspect.inspection_token,
+    design_token: design.design_token,
+  };
+  return { result: await call(page, 'browser_personalized_pages', args), args, recipe };
+}
+const removeWeather = (page, id = 'weather') =>
+  call(page, 'browser_personalized_pages', { action: 'remove', id });
+const warningDialog = (page) => page.locator('.luna-notice-dialog[data-notice="warning"]');
+
+test('an existing page for the site is reported: edit with the same id or delete', async ({
+  page,
+}) => {
+  await setup(page);
+  const first = await saveWeather(page);
+  expect(first.result.error).toBe('');
+  const other = await call(page, 'browser_personalized_pages', {
+    ...first.args,
+    recipe_json: JSON.stringify({ ...first.recipe, id: 'weather-2' }),
+  });
+  expect(other.error).toContain('bereits eine personalisierte Seite');
+  expect(other.error).toContain('"weather"');
+  expect(other.error).toContain('Nutzer');
+  const preview = await call(page, 'browser_personalized_pages', {
+    ...first.args,
+    action: 'preview',
+    recipe_json: JSON.stringify({ ...first.recipe, id: 'weather-2' }),
+  });
+  expect(preview.error).toContain('bereits eine personalisierte Seite');
+  const edited = await call(page, 'browser_personalized_pages', {
+    ...first.args,
+    recipe_json: JSON.stringify({ ...first.recipe, title: 'Neu bearbeitet' }),
+  });
+  expect(edited.error).toBe('');
+  expect(edited.value.page.title).toBe('Neu bearbeitet');
+  const inspected = await call(page, 'browser_personalized_pages', { action: 'inspect' });
+  expect(inspected.value.existing_personalized_pages[0].id).toBe('weather');
+  expect(inspected.value.existing_pages_hint).toContain('Nutzer');
+});
+
+test('an agent can only delete a page after the user agrees in a blurred full-screen warning', async ({
+  page,
+}) => {
+  await setup(page);
+  await saveWeather(page);
+  let result = await removeWeather(page);
+  expect(result.error).toContain('WARTEN');
+  expect(result.error).toContain('Nutzer');
+  const dialog = warningDialog(page);
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute('data-blur', 'true');
+  await expect(dialog).toContainText('Mein Wetter');
+  await expect(dialog.locator('.luna-notice-remember')).toContainText('automatisch');
+  expect(
+    (await call(page, 'browser_personalized_pages', { action: 'list' })).value.pages,
+  ).toHaveLength(1);
+  result = await removeWeather(page);
+  expect(result.error).toContain('WARTEN');
+  await expect(warningDialog(page)).toHaveCount(1);
+  await dialog.locator('[data-choice="cancel"]').click();
+  await expect(warningDialog(page)).toHaveCount(0);
+  result = await removeWeather(page);
+  expect(result.error).toContain('abgelehnt');
+  expect(
+    (await call(page, 'browser_personalized_pages', { action: 'list' })).value.pages,
+  ).toHaveLength(1);
+});
+
+test('after the user approves, the agent deletes once and has to ask again next time', async ({
+  page,
+}) => {
+  await setup(page);
+  await saveWeather(page);
+  expect((await removeWeather(page)).error).toContain('WARTEN');
+  await warningDialog(page).locator('[data-choice="confirm"]').click();
+  await expect(warningDialog(page)).toHaveCount(0);
+  const done = await removeWeather(page);
+  expect(done.error).toBe('');
+  expect(done.value.removed).toBe(true);
+  expect(done.value.authorized_by).toBe('user');
+  expect(done.value.pages).toHaveLength(0);
+  await saveWeather(page);
+  expect((await removeWeather(page)).error).toContain('WARTEN');
+  await expect(warningDialog(page)).toBeVisible();
+});
+
+test('"my agent may do this automatically" skips the question until the setting is switched off', async ({
+  page,
+}) => {
+  await setup(page);
+  const { recipe } = await saveWeather(page);
+  expect((await removeWeather(page)).error).toContain('WARTEN');
+  await warningDialog(page).locator('.luna-notice-remember').click();
+  await warningDialog(page).locator('[data-choice="confirm"]').click();
+  await expect(warningDialog(page)).toHaveCount(0);
+  expect((await removeWeather(page)).value.removed).toBe(true);
+  await saveWeather(page);
+  const auto = await removeWeather(page);
+  expect(auto.error).toBe('');
+  expect(auto.value.authorized_by).toBe('auto_permission');
+  await expect(warningDialog(page)).toHaveCount(0);
+  await call(page, 'browser_settings', { section: 'personalized' });
+  const toggle = page.locator('[data-act="pp-agent-auto-delete"]');
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await page.evaluate((saved) => {
+    window.recipes = [saved];
+    window.changedPages?.();
+  }, recipe);
+  expect((await removeWeather(page)).error).toContain('WARTEN');
+  await expect(warningDialog(page)).toBeVisible();
+});
+
+test('a page behind a login only takes over once the source proves the user is logged in', async ({
+  page,
+}) => {
+  await setup(page);
+  const rejected = await saveWeather(page, { activate_when: '#invented' });
+  expect(rejected.result.error).toContain('activate_when');
+  const saved = await saveWeather(page, { activate_when: '#temperature' });
+  expect(saved.result.error).toBe('');
+  await expect(page.locator('#personalizedPageView')).toBeVisible();
+  // The session ends: the original login page has to be reachable again.
+  await page.evaluate(() => (window.fixtureFields = { count: 0, values: [] }));
+  await expect(page.locator('#personalizedPageView')).toBeHidden({ timeout: 9000 });
+  expect(await page.evaluate(() => window.visibleNative)).toBe(
+    await page.evaluate(() => window.nativeTab),
+  );
+  await expect(page.locator('#bLunaView')).toHaveAttribute('title', /angemeldet/);
+  // Logging in again brings the Luna view back by itself.
+  await page.evaluate(() => (window.fixtureFields = {}));
+  await expect(page.locator('#personalizedPageView')).toBeVisible({ timeout: 9000 });
+});
+
+test('saving a view for a domain that was switched off shows it again and says so', async ({
+  page,
+}) => {
+  await setup(page);
+  const first = await saveWeather(page);
+  expect(first.result.error).toBe('');
+  await page.locator('#bLunaView').click();
+  await expect(page.locator('#personalizedPageView')).toBeHidden();
+  const listed = await call(page, 'browser_personalized_pages', { action: 'list' });
+  expect(listed.value.switched_off_domains).toEqual(['weather.example.org']);
+  const edited = await call(page, 'browser_personalized_pages', {
+    ...first.args,
+    recipe_json: JSON.stringify({ ...first.recipe, title: 'Wieder da' }),
+  });
+  expect(edited.error).toBe('');
+  expect(edited.value.domain_enabled).toBe(true);
+  await expect(page.locator('#personalizedPageView')).toBeVisible();
+  await expect(page.locator('#bLunaView')).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    (await call(page, 'browser_personalized_pages', { action: 'list' })).value.switched_off_domains,
+  ).toEqual([]);
+});

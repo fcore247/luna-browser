@@ -48,10 +48,37 @@ static NSWindow *fmWindow(void) {
 static NSString *gGestureSrc;
 static int gGestureOn = 1;
 
+// Luna verlangt macOS 13 (Info.plist), die Content-World-API gibt es seit macOS 11.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+// Passwort-Tresor: Formular-Erkennung und Ausfüllen laufen in einer eigenen, vom Seitenskript getrennten
+// JavaScript-Welt. Die Seite kann die Funktionen weder überschreiben noch beobachten.
+extern void goCredSubmit(int tab, char *origin, char *user, char *pass);
+static NSString *gCredSrc;
+static WKContentWorld *credWorld(void) {
+	static WKContentWorld *world;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ world = [WKContentWorld worldWithName:@"LunaCredentials"]; });
+	return world;
+}
+@interface FMCredHandler : NSObject <WKScriptMessageHandler>
+@end
+static FMCredHandler *gCredHandler;
+static void applyCredentials(WKWebViewConfiguration *c) {
+	WKUserContentController *u = c.userContentController;
+	if (!gCredHandler) gCredHandler = [FMCredHandler new];
+	@try { [u removeScriptMessageHandlerForName:@"lunaCreds" contentWorld:credWorld()]; } @catch (id x) {}
+	[u addScriptMessageHandler:gCredHandler contentWorld:credWorld() name:@"lunaCreds"];
+	if (gCredSrc.length)
+		[u addUserScript:[[WKUserScript alloc] initWithSource:gCredSrc injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES inContentWorld:credWorld()]];
+}
+
 // Nachrichten der Mausgeste aus den Seiten (window.webkit.messageHandlers.fmGesture)
 @interface FMGestureHandler : NSObject <WKScriptMessageHandler>
 @end
 static FMGestureHandler *gGestureHandler;
+
+#pragma clang diagnostic pop
 
 static void applyGesture(WKWebViewConfiguration *c) {
 	WKUserContentController *u = c.userContentController;
@@ -63,6 +90,7 @@ static void applyGesture(WKWebViewConfiguration *c) {
 		NSString *src = [NSString stringWithFormat:@"window.__fmGesture=%d;\n%@", gGestureOn, gGestureSrc];
 		[u addUserScript:[[WKUserScript alloc] initWithSource:src injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 	}
+	applyCredentials(c);
 }
 
 static WKWebExtensionController *extensionController(void) API_AVAILABLE(macos(15.4));
@@ -325,6 +353,31 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 @end
 
 #include "extensions_darwin.h"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+@implementation FMCredHandler
+// Der Ursprung kommt aus WebKit (frameInfo.securityOrigin), nie aus dem, was die Seite behauptet.
+// Das Passwort geht nur an Go und nie über die Ereignisse an die Oberfläche.
+- (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
+	if (![msg.name isEqualToString:@"lunaCreds"] || !msg.frameInfo.isMainFrame) return;
+	NSDictionary *b = [msg.body isKindOfClass:[NSDictionary class]] ? msg.body : nil;
+	NSString *user = b[@"username"], *pass = b[@"password"];
+	if (![user isKindOfClass:[NSString class]] || ![pass isKindOfClass:[NSString class]]) return;
+	if (!pass.length || pass.length > 1024 || user.length > 320) return;
+	WKSecurityOrigin *o = msg.frameInfo.securityOrigin;
+	if (!o.protocol.length || !o.host.length) return;
+	NSString *origin = o.port > 0 ? [NSString stringWithFormat:@"%@://%@:%ld", o.protocol, o.host, (long)o.port] : [NSString stringWithFormat:@"%@://%@", o.protocol, o.host];
+	int tid = -1;
+	for (FMTab *t in gTabs.allValues) if (t.view == msg.webView) tid = t.tid;
+	if (tid < 0) return;
+	char *co = strdup(origin.lowercaseString.UTF8String), *cu = strdup(user.UTF8String), *cp = strdup(pass.UTF8String);
+	goCredSubmit(tid, co, cu, cp);
+	memset(cp, 0, strlen(cp));
+	free(co); free(cu); free(cp);
+}
+@end
+#pragma clang diagnostic pop
 
 @implementation FMGestureHandler
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
@@ -656,3 +709,44 @@ int fmwAuthenticate(const char *reason) {
 	dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
 	return result;
 }
+
+
+// Passwort-Tresor: Skript für die getrennte Welt setzen.
+void fmwConfigureCredentials(const char *src) {
+	NSString *source = src ? [NSString stringWithUTF8String:src] : @"";
+	dispatch_async(dispatch_get_main_queue(), ^{
+		gCredSrc = source;
+		if (gConfig) applyGesture(gConfig);
+	});
+}
+
+static NSString *originOfURL(NSURL *url) {
+	NSString *scheme = url.scheme.lowercaseString, *host = url.host.lowercaseString;
+	if (!scheme.length || !host.length) return @"";
+	if ([host containsString:@":"]) host = [NSString stringWithFormat:@"[%@]", host];
+	NSNumber *port = url.port;
+	BOOL isDefault = !port || ([scheme isEqualToString:@"https"] && port.intValue == 443) || ([scheme isEqualToString:@"http"] && port.intValue == 80);
+	return isDefault ? [NSString stringWithFormat:@"%@://%@", scheme, host] : [NSString stringWithFormat:@"%@://%@:%@", scheme, host, port];
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+// Füllt Anmeldedaten ein, aber nur, wenn die Seite gerade noch genau den erwarteten Ursprung hat.
+// Das Ergebnis (JSON ohne Passwort) kommt über goSnapshotDone zurück.
+void fmwFillCredential(int tabID, const char *origin, const char *user, const char *pass, int req) {
+	NSString *expect = [NSString stringWithUTF8String:origin ?: ""];
+	NSString *u = [NSString stringWithUTF8String:user ?: ""], *p = [NSString stringWithUTF8String:pass ?: ""];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		void (^finish)(NSString *) = ^(NSString *json) { char *out = strdup(json.UTF8String); goSnapshotDone(req, out); free(out); };
+		FMTab *t = gTabs[@(tabID)];
+		if (!t || t.isError) { finish(@"{\"ok\":false,\"error\":\"tab\"}"); return; }
+		if (![originOfURL(t.view.URL) isEqualToString:expect]) { finish(@"{\"ok\":false,\"error\":\"origin\"}"); return; }
+		NSData *j = [NSJSONSerialization dataWithJSONObject:@[u, p] options:0 error:nil];
+		NSString *arg = [[NSString alloc] initWithData:j encoding:NSUTF8StringEncoding];
+		NSString *src = [NSString stringWithFormat:@"(function(a){return JSON.stringify(window.__lunaFill?window.__lunaFill(a[0],a[1]):{ok:false,error:'script'})})(%@)", arg];
+		[t.view evaluateJavaScript:src inFrame:nil inContentWorld:credWorld() completionHandler:^(id r, NSError *e) {
+			finish(e || ![r isKindOfClass:[NSString class]] ? @"{\"ok\":false,\"error\":\"script\"}" : r);
+		}];
+	});
+}
+#pragma clang diagnostic pop

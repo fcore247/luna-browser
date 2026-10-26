@@ -90,3 +90,20 @@ func OnboardingClipboard(tab int, provider string, previousCount int) string {
 	}
 	return string(result)
 }
+
+// CredentialsSupported: the password vault is only wired up on macOS so far.
+const CredentialsSupported = false
+
+func SetCredentialHandler(func(tab int, origin, username, password string)) {}
+func ConfigureCredentials(string)                                           {}
+
+type FillResult struct {
+	OK       bool   `json:"ok"`
+	Username bool   `json:"username"`
+	Password bool   `json:"password"`
+	Error    string `json:"error,omitempty"`
+}
+
+func FillCredential(int, string, string, string) (FillResult, error) {
+	return FillResult{}, errors.New("Der Passwort-Tresor ist unter Windows noch nicht verfügbar.")
+}

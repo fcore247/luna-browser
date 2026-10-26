@@ -85,6 +85,8 @@ const personalizedSourceScript = `function lunaPersonalizedSource(selectors, opt
  const attrs=el=>Object.fromEntries(['alt','title','aria-label','datetime'].map(name=>[name,el.getAttribute(name)||'']));
  const text=el=>{const copy=el.cloneNode(true);copy.querySelectorAll('script,style,input,textarea,select,[contenteditable="true"],[hidden]').forEach(n=>n.remove());return ((copy.textContent||'').trim().replace(/\s+/g,' ')||el.getAttribute('alt')||el.getAttribute('aria-label')||el.getAttribute('title')||'').slice(0,4000)};
  const value=(el,format)=>format?.attribute&&format.attribute!=='text'?(el.getAttribute(format.attribute)||'').slice(0,4000):text(el);
+ // Like text(), but keeps paragraphs, line breaks and bullet points so long texts stay readable in Luna.
+ const rich=el=>{const copy=el.cloneNode(true);copy.querySelectorAll('script,style,input,textarea,select,[contenteditable="true"],[hidden]').forEach(n=>n.remove());const out=[];const walk=n=>{if(n.nodeType===3){out.push((n.nodeValue||'').replace(/\s+/g,' '));return}if(n.nodeType!==1)return;const tag=n.tagName.toLowerCase();if(tag==='br'){out.push('\u0001');return}const gap=/^(p|h[1-6]|blockquote|pre|ul|ol|table|section|article)$/.test(tag)?'\u0002':/^(li|tr|div|dd|dt|header|footer)$/.test(tag)?'\u0001':'';out.push(gap);if(tag==='li')out.push('• ');n.childNodes.forEach(walk);out.push(gap)};walk(copy);return out.join('').replace(/[ \t]*[\u0001\u0002](?:[ \t]*[\u0001\u0002])*[ \t]*/g,m=>m.includes('\u0002')?'\n\n':'\n').trim().slice(0,4000)};
  const safeURL=value=>{try{const u=new URL(value,location.href);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}};
  const unique=(selector,el)=>{try{const found=document.querySelectorAll(selector);return found.length===1&&found[0]===el}catch{return false}};
  const anchor=el=>{
@@ -104,13 +106,15 @@ const personalizedSourceScript = `function lunaPersonalizedSource(selectors, opt
     const all=[...document.querySelectorAll(selector)].filter(safe), nodes=all.slice(0,50);
     const inside=tag=>[...new Set(nodes.flatMap(el=>[...(el.matches(tag)?[el]:[]),...el.querySelectorAll(tag)]))].filter(safe).slice(0,50);
     const contexts=nodes.flatMap(el=>el.matches('ul,ol')?[...el.children].filter(safe):el.matches('table')?[...el.querySelectorAll('tr')].filter(safe):[el]).slice(0,50);
+    const kept=contexts.map((el,i)=>({i,v:value(el,config.format)})).filter(x=>x.v);
+    const wantRich=!config.format&&['text','notice','accordion'].includes(config.kind);
     const items=config.columns?.length?contexts.map(row=>({cells:config.columns.map(column=>{
       let el;try{el=column.selector===':scope'?row:row.querySelector(column.selector)}catch{return {text:'',error:'Ungültiger Spaltenselektor: '+column.selector}}
       if(!el||!safe(el))return {text:'',missing:true};
       const img=el.matches('img')?el:el.querySelector('img');const link=el.matches('a[href]')?el:el.querySelector('a[href]');
       return {text:value(el,column.format),image:img?safeURL(img.currentSrc||img.src):'',href:link?safeURL(link.href):'',attributes:attrs(el)};
     })})):[];
-    return {selector,count:all.length,values:contexts.map(el=>value(el,config.format)).filter(Boolean),nodes:nodes.slice(0,10).map(describe),links:inside('a[href]').map(el=>({href:safeURL(el.href),text:text(el)})).filter(el=>el.href),images:inside('img').map(el=>({src:safeURL(el.currentSrc||el.src),alt:el.alt||''})).filter(el=>el.src),rows:inside('tr').map(el=>[...el.querySelectorAll('th,td')].filter(safe).slice(0,12).map(text)).filter(row=>row.length),items};
+    return {selector,count:all.length,values:kept.map(x=>x.v),valueIdx:kept.map(x=>x.i),rich:wantRich?kept.map(x=>rich(contexts[x.i])):undefined,sigs:contexts.map(el=>text(el).slice(0,160)),nodes:nodes.slice(0,10).map(describe),links:inside('a[href]').map(el=>({href:safeURL(el.href),text:text(el)})).filter(el=>el.href),images:inside('img').map(el=>({src:safeURL(el.currentSrc||el.src),alt:el.alt||''})).filter(el=>el.src),rows:inside('tr').map(el=>[...el.querySelectorAll('th,td')].filter(safe).slice(0,12).map(text)).filter(row=>row.length),items};
    }catch(error){return {selector,count:0,values:[],error:String(error.message||error)}}
  })};
  let elements;
@@ -242,4 +246,64 @@ func (a *App) PersonalizedValidate(recipe string) error {
 		return err
 	}
 	return personalpages.Validate(page)
+}
+
+// Clicks one row (or a target inside it) on the source page for the Luna view. The row is found with the
+// same rules as the reader above and only clicked while it still has the text the user saw (sig).
+// Buttons, form controls and similar elements are never clicked.
+const personalizedClickScript = `function lunaPersonalizedClick(a) {
+ if(!['http:','https:'].includes(location.protocol)) return {ok:false,error:'protocol'};
+ const safe=el=>!el.closest('input,textarea,select,script,style,[contenteditable="true"],[hidden]');
+ const text=el=>{const copy=el.cloneNode(true);copy.querySelectorAll('script,style,input,textarea,select,[contenteditable="true"],[hidden]').forEach(n=>n.remove());return ((copy.textContent||'').trim().replace(/\s+/g,' ')||el.getAttribute('alt')||el.getAttribute('aria-label')||el.getAttribute('title')||'').slice(0,4000)};
+ let all;try{all=[...document.querySelectorAll(a.selector)].filter(safe).slice(0,50)}catch{return {ok:false,error:'selector'}}
+ const contexts=all.flatMap(el=>el.matches('ul,ol')?[...el.children].filter(safe):el.matches('table')?[...el.querySelectorAll('tr')].filter(safe):[el]).slice(0,50);
+ const row=contexts[a.index];
+ if(!row)return {ok:false,error:'row'};
+ if(text(row).slice(0,160)!==a.sig)return {ok:false,error:'changed'};
+ let el=row;
+ if(a.target){try{el=row.querySelector(a.target)}catch{return {ok:false,error:'target'}}if(!el||!safe(el))return {ok:false,error:'target'}}
+ const blocked='button,input,select,textarea,summary,option,[role="button"],[role="switch"],[role="checkbox"],[role="menuitem"],[type="submit"],[contenteditable],[draggable="true"],a[download],a[href^="javascript:" i]';
+ if(el.matches(blocked)||el.closest('button,[role="button"],[role="menuitem"]'))return {ok:false,error:'blocked'};
+ if(el.closest('[disabled],[aria-disabled="true"]'))return {ok:false,error:'disabled'};
+ el.scrollIntoView?.({block:'nearest'});
+ for(const type of ['pointerdown','mousedown','pointerup','mouseup'])el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,button:0}));
+ el.click();
+ return {ok:true};
+}
+`
+
+// PersonalizedClick opens one row of a repeated block on the source page. Only Luna's own view calls
+// it, after the user clicked that row.
+func (a *App) PersonalizedClick(tab int, selector string, index int, sig, target string) error {
+	if selector == "" || len(selector) > 1000 || len(target) > 1000 || len(sig) > 400 || index < 0 || index >= 50 {
+		return errors.New("Ungültige Klickanfrage")
+	}
+	arg, _ := json.Marshal(map[string]any{"selector": selector, "index": index, "sig": sig, "target": target})
+	raw, err := web.Evaluate(tab, personalizedClickScript+"\nJSON.stringify(lunaPersonalizedClick("+string(arg)+"));")
+	if err != nil {
+		return err
+	}
+	var result struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return errors.New("Die Seite hat nicht geantwortet.")
+	}
+	if result.OK {
+		return nil
+	}
+	switch result.Error {
+	case "changed":
+		return errors.New("Die Liste hat sich geändert. Luna aktualisiert sie, dann kannst du noch einmal klicken.")
+	case "row":
+		return errors.New("Diese Zeile gibt es auf der Seite nicht mehr.")
+	case "blocked":
+		return errors.New("Dieses Element klickt Luna nicht für dich an (Schaltflächen und Formularelemente sind ausgenommen).")
+	case "disabled":
+		return errors.New("Dieses Element ist auf der Seite gesperrt.")
+	case "target":
+		return errors.New("Das Klickziel in der Zeile gibt es nicht.")
+	}
+	return errors.New("Das Öffnen hat nicht geklappt.")
 }

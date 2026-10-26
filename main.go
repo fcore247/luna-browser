@@ -43,6 +43,11 @@ var gestureCore string
 //go:embed frontend/src/page-control.js
 var pageControl string
 
+// Formular-Erkennung und Ausfüllen des Passwort-Tresors (läuft in einer getrennten JavaScript-Welt der Seite).
+//
+//go:embed frontend/src/credential-capture.js
+var credentialCapture string
+
 // buildMenu: Tastenkürzel müssen im Menü liegen, damit sie auch gelten, wenn eine Webseite den Fokus hat.
 // Jeder Eintrag schickt ein "cmd"-Ereignis ans Frontend.
 func buildMenu(app *App) *menu.Menu {

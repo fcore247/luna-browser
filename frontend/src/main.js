@@ -21,7 +21,13 @@ import { createSettings } from './settings.js';
 import { createExtensionsMenu } from './extensions-menu.js';
 import { createStoreInstall } from './store-install.js';
 import { createPersonalizedPages, pageMatches } from './personalized-pages.js';
+import { createVault } from './vault-ui.js';
+import {
+  agentMayDeleteAutomatically,
+  setAgentMayDeleteAutomatically,
+} from './personalized-permissions.js';
 let personalizedPages = null;
+let vaultUI = null;
 let storeInstall = null;
 let extensionMenu = null;
 const GEAR =
@@ -755,6 +761,29 @@ function renderToolbar() {
   storeInstall?.update(t);
   personalizedPages?.update(t);
   if (!t) return;
+  vaultUI?.update(t);
+  const lunaView = $('#bLunaView');
+  // One switch for the whole domain: off hides every Luna view of it, on brings all of them back.
+  const lunaOn = !!personalizedPages?.isOn(t);
+  const lunaCount = personalizedPages?.domainCount(t) || 0;
+  let lunaHost = '';
+  try {
+    lunaHost = new URL(t.url).hostname.replace(/^www\./, '');
+  } catch {
+    /* not a web page */
+  }
+  lunaView.hidden = !personalizedPages?.available(t);
+  lunaView.setAttribute('aria-pressed', String(lunaOn));
+  lunaView.title = !personalizedPages?.domainOn(t)
+    ? `Luna-Ansichten für ${lunaHost} sind aus${lunaCount ? ` (${lunaCount} gespeichert)` : ''} · Klicken schaltet alle ein`
+    : !lunaOn
+      ? `Hier siehst du die Originalseite · Klicken schaltet alle Luna-Ansichten für ${lunaHost} ein`
+      : personalizedPages?.waiting(t)
+        ? 'Luna-Ansicht startet, sobald du angemeldet bist · Klicken schaltet alle Ansichten dieser Domain aus'
+        : personalizedPages?.owns(t)
+          ? `Luna-Ansichten für ${lunaHost} sind an (${lunaCount}) · Klicken schaltet alle aus`
+          : `Luna-Ansichten für ${lunaHost} sind an, für diese Seite gibt es keine · Klicken schaltet alle aus`;
+  lunaView.setAttribute('aria-label', lunaView.title);
   $('#bBack').classList.toggle('off', !canBack(t));
   $('#bFwd').classList.toggle('off', !canFwd(t));
   $('#bReload').innerHTML = t.loading ? ICON.stop : ICON.reload;
@@ -1990,7 +2019,9 @@ personalizedPages = createPersonalizedPages({
   refreshUI: renderAll,
   openURL: (url) => newTab(url),
   toast,
+  ask: (options) => notifications.ask(options),
 });
+vaultUI = createVault({ currentTab: cur, toast, cover, refreshUI: renderToolbar });
 storeInstall = createStoreInstall({
   currentTab: cur,
   showNative: nativeShow,
@@ -2318,6 +2349,20 @@ document.addEventListener('click', async (ev) => {
     case 'star':
       toggleBookmark();
       break;
+    case 'luna-view':
+      personalizedPages?.toggle(cur());
+      break;
+    case 'pp-agent-auto-delete': {
+      const allow = !agentMayDeleteAutomatically();
+      setAgentMayDeleteAutomatically(allow);
+      renderSettingsView();
+      toast(
+        allow
+          ? 'Dein Agent darf Ansichten jetzt ohne Nachfrage löschen.'
+          : 'Dein Agent fragt vor dem Löschen wieder nach.',
+      );
+      break;
+    }
     case 'menu':
       openMenu();
       break;

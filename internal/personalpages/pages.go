@@ -49,6 +49,22 @@ type Field struct {
 	Columns        []Column    `json:"columns,omitempty"`
 	Thresholds     []Threshold `json:"thresholds,omitempty"`
 	FirstRowHeader bool        `json:"firstRowHeader,omitempty"`
+	// Open makes the rows of a repeated block clickable: clicking a row in the Luna view clicks that
+	// row (or Target inside it) on the source page, and the page's Detail view shows what opened.
+	Open *Open `json:"open,omitempty"`
+}
+
+// Open is the click binding of a repeated block.
+type Open struct {
+	Target string `json:"target,omitempty"`
+}
+
+// Detail is shown instead of the normal fields while the source page shows an opened item
+// (for example one mail). When is a selector that exists only while an item is open.
+type Detail struct {
+	When   string  `json:"when"`
+	Title  string  `json:"title,omitempty"`
+	Fields []Field `json:"fields"`
 }
 type Page struct {
 	ID       string   `json:"id"`
@@ -59,6 +75,10 @@ type Page struct {
 	Enabled  bool     `json:"enabled"`
 	Fields   []Field  `json:"fields"`
 	Sources  []Source `json:"sources,omitempty"`
+	// ActivateWhen is a CSS selector that exists on the source page only while the user is logged in.
+	// Until it appears Luna keeps showing the original page, so the login form stays usable.
+	ActivateWhen string  `json:"activate_when,omitempty"`
+	Detail       *Detail `json:"detail,omitempty"`
 }
 type Manager struct {
 	mu    sync.Mutex
@@ -99,6 +119,9 @@ func Validate(page Page) error {
 	if page.Scope != "path" && page.Scope != "site" {
 		return errors.New("scope muss path oder site sein")
 	}
+	if len(page.ActivateWhen) > 1000 || (page.ActivateWhen != "" && strings.TrimSpace(page.ActivateWhen) == "") {
+		return errors.New("activate_when muss ein CSS-Selektor mit höchstens 1000 Zeichen sein")
+	}
 	if len(page.Fields) == 0 || len(page.Fields) > 60 {
 		return errors.New("Eine Ansicht braucht 1 bis 60 Bausteine")
 	}
@@ -114,6 +137,32 @@ func Validate(page Page) error {
 		sources[source.ID] = true
 	}
 	for _, f := range page.Fields {
+		if err := validateField(f, sources, true); err != nil {
+			return err
+		}
+	}
+	if page.Detail != nil {
+		d := page.Detail
+		if strings.TrimSpace(d.When) == "" || len(d.When) > 1000 || len(d.Title) > 150 {
+			return errors.New("detail braucht when (CSS-Selektor) und einen kurzen Titel")
+		}
+		if len(d.Fields) == 0 || len(d.Fields) > 30 {
+			return errors.New("Die Detailansicht braucht 1 bis 30 Bausteine")
+		}
+		for _, f := range d.Fields {
+			if f.Source != "" {
+				return errors.New("Die Detailansicht liest nur aus der Hauptquelle")
+			}
+			if err := validateField(f, map[string]bool{"": true}, false); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateField(f Field, sources map[string]bool, allowOpen bool) error {
+	{
 		if !sources[f.Source] {
 			return errors.New("Unbekannte Quelle für Baustein: " + f.Title)
 		}
@@ -154,7 +203,26 @@ func Validate(page Page) error {
 		if math.IsNaN(f.Max) || math.IsInf(f.Max, 0) || f.Max < 0 || f.Max > 1e12 || f.Limit < 0 || f.Limit > 50 {
 			return errors.New("Ungültige Skala oder Anzahl")
 		}
-
+		if f.Open != nil {
+			if !allowOpen {
+				return errors.New("Die Detailansicht kann keine weiteren Zeilen öffnen")
+			}
+			if f.Source != "" {
+				return errors.New("open geht nur bei Bausteinen der Hauptquelle")
+			}
+			if len(f.Open.Target) > 1000 {
+				return errors.New("Ungültiges Klickziel")
+			}
+			switch f.Kind {
+			case "list", "timeline", "cards", "grid":
+			case "table":
+				if len(f.Columns) == 0 {
+					return errors.New("Eine klickbare Tabelle braucht Spalten (columns)")
+				}
+			default:
+				return errors.New("open geht nur bei list, timeline, table, cards und grid")
+			}
+		}
 	}
 	return nil
 }

@@ -95,3 +95,65 @@ func TestRepeatedMultipleSourcesAndFormattingValidation(t *testing.T) {
 		t.Fatal("unknown source accepted")
 	}
 }
+
+func TestActivateWhenKeepsLoginPagesUsable(t *testing.T) {
+	dir := t.TempDir()
+	m, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := Page{ID: "schule", Title: "Schule", URL: "https://schule.example.org/start", Scope: "site", Enabled: true, ActivateWhen: "a[href*='logout']", Fields: []Field{{Title: "Stundenplan", Selector: "#plan", Kind: "text"}}}
+	if err = m.Save(page); err != nil {
+		t.Fatal(err)
+	}
+	if m, err = New(dir); err != nil || m.List()[0].ActivateWhen != "a[href*='logout']" {
+		t.Fatal("activate_when not restored", err)
+	}
+	for _, bad := range []string{"   ", string(make([]byte, 1001))} {
+		page.ActivateWhen = bad
+		if err := Validate(page); err == nil {
+			t.Fatalf("activate_when %q should be rejected", bad)
+		}
+	}
+	page.ActivateWhen = ""
+	if err := Validate(page); err != nil {
+		t.Fatal("pages without activate_when stay valid", err)
+	}
+}
+
+func TestInteractiveRowsAndDetailValidation(t *testing.T) {
+	page := Page{ID: "mail", Title: "Post", URL: "https://mail.example.org/inbox", Scope: "path", Enabled: true,
+		Fields: []Field{{Title: "Eingang", Selector: ".row", Kind: "list", Open: &Open{Target: "a.subject"}}},
+		Detail: &Detail{When: ".open-mail", Title: "Nachricht", Fields: []Field{{Title: "Betreff", Selector: ".subject", Kind: "metric"}, {Title: "Text", Selector: ".body", Kind: "text"}}}}
+	if err := Validate(page); err != nil {
+		t.Fatal("a valid interactive page was rejected:", err)
+	}
+	cases := map[string]func(p *Page){
+		"open on a metric":             func(p *Page) { p.Fields[0].Kind = "metric" },
+		"open on a table without cols": func(p *Page) { p.Fields[0].Kind = "table" },
+		"open on another source":       func(p *Page) { p.Sources = []Source{{ID: "s", URL: "https://x.example.org"}}; p.Fields[0].Source = "s" },
+		"too long target":              func(p *Page) { p.Fields[0].Open.Target = string(make([]byte, 1001)) },
+		"detail without when":          func(p *Page) { p.Detail.When = " " },
+		"detail without fields":        func(p *Page) { p.Detail.Fields = nil },
+		"nested open in detail":        func(p *Page) { p.Detail.Fields[0].Kind = "list"; p.Detail.Fields[0].Open = &Open{} },
+		"detail from another source":   func(p *Page) { p.Detail.Fields[0].Source = "s" },
+		"invalid detail field":         func(p *Page) { p.Detail.Fields[0].Kind = "script" },
+	}
+	for name, mutate := range cases {
+		copy := page
+		copy.Fields = append([]Field{}, page.Fields...)
+		copy.Fields[0].Open = &Open{Target: "a.subject"}
+		detail := *page.Detail
+		detail.Fields = append([]Field{}, page.Detail.Fields...)
+		copy.Detail = &detail
+		mutate(&copy)
+		if err := Validate(copy); err == nil {
+			t.Errorf("%s should be rejected", name)
+		}
+	}
+	table := page
+	table.Fields = []Field{{Title: "Eingang", Selector: "tr", Kind: "table", Columns: []Column{{Title: "Betreff", Selector: ".s"}}, Open: &Open{}}}
+	if err := Validate(table); err != nil {
+		t.Fatal("a table with columns can be opened:", err)
+	}
+}

@@ -11,6 +11,7 @@ package web
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -199,4 +200,63 @@ func OnboardingClipboard(tab int, provider string, previousCount int) string {
 	result := C.fmwOnboardingClipboard(C.int(tab), c, C.int(previousCount))
 	defer C.free(unsafe.Pointer(result))
 	return C.GoString(result)
+}
+
+// CredentialsSupported tells the UI that this platform can capture and fill logins.
+const CredentialsSupported = true
+
+var (
+	credMu      sync.Mutex
+	credHandler func(tab int, origin, username, password string)
+)
+
+// SetCredentialHandler receives login forms the user submitted. The password reaches only this
+// handler and never the event stream that goes to the UI.
+func SetCredentialHandler(f func(tab int, origin, username, password string)) {
+	credMu.Lock()
+	credHandler = f
+	credMu.Unlock()
+}
+
+//export goCredSubmit
+func goCredSubmit(tab C.int, origin, user, pass *C.char) {
+	o, u, p := C.GoString(origin), C.GoString(user), C.GoString(pass)
+	credMu.Lock()
+	f := credHandler
+	credMu.Unlock()
+	if f != nil {
+		go f(int(tab), o, u, p)
+	}
+}
+
+// ConfigureCredentials installs the form detection script in its own isolated JavaScript world.
+func ConfigureCredentials(src string) {
+	c := C.CString(src)
+	defer C.free(unsafe.Pointer(c))
+	C.fmwConfigureCredentials(c)
+}
+
+// FillResult describes what a fill attempt changed. It never contains the password.
+type FillResult struct {
+	OK       bool   `json:"ok"`
+	Username bool   `json:"username"`
+	Password bool   `json:"password"`
+	Error    string `json:"error,omitempty"`
+}
+
+// FillCredential fills the login form of a tab, but only while the tab still shows exactly origin.
+func FillCredential(tab int, origin, username, password string) (FillResult, error) {
+	o, u, p := C.CString(origin), C.CString(username), C.CString(password)
+	defer C.free(unsafe.Pointer(o))
+	defer C.free(unsafe.Pointer(u))
+	defer C.free(unsafe.Pointer(p))
+	raw, err := snapshotVia(func(req C.int) { C.fmwFillCredential(C.int(tab), o, u, p, req) })
+	if err != nil {
+		return FillResult{}, err
+	}
+	var result FillResult
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return FillResult{}, errors.New("Das Ausfüllen hat keine gültige Antwort geliefert.")
+	}
+	return result, nil
 }

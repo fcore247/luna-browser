@@ -183,3 +183,24 @@ export const personalizedInspect = (
 export const personalizedRead = (tab, fields) => window.go.main.App.PersonalizedRead(tab, fields);
 export const personalizedValidate = (recipe) =>
   window.go.main.App.PersonalizedValidate(JSON.stringify(recipe));
+
+// Passwort-Tresor. Passwörter kommen nie ins Frontend: Es gibt nur Ursprung und Benutzername.
+export const vaultStatus = nat(() => window.go.main.App.VaultStatus(), { supported: false });
+export const vaultEntries = nat((url) => window.go.main.App.VaultEntries(url), []);
+export const vaultAll = nat(() => window.go.main.App.VaultAll(), []);
+export const vaultSavePending = nat((tab) => window.go.main.App.VaultSavePending(tab), null);
+export const vaultDismissPending = nat((tab) => window.go.main.App.VaultDismissPending(tab), null);
+export const vaultFill = nat(
+  (tab, url, username) => window.go.main.App.VaultFill(tab, url, username),
+  null,
+);
+export const vaultDelete = nat(
+  (origin, username) => window.go.main.App.VaultDelete(origin, username),
+  null,
+);
+export const vaultDeleteAll = nat(() => window.go.main.App.VaultDeleteAll(), null);
+export const onVaultOffer = (cb) => EventsOn('vault-offer', (j) => cb(JSON.parse(j)));
+
+// Öffnet eine Zeile der Luna-Ansicht auf der echten Seite (nur Zeilen, nie Schaltflächen).
+export const personalizedClick = (tab, selector, index, sig, target = '') =>
+  window.go.main.App.PersonalizedClick(tab, selector, index, sig, target);

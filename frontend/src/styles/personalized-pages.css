@@ -517,3 +517,891 @@
   background: color-mix(in srgb, #bd5860 15%, var(--card));
   border: 1px solid #bd586080;
 }
+
+/* Visual polish: depth, rhythm and motion for AI-built pages */
+#personalizedPageView {
+  background:
+    radial-gradient(
+      ellipse 70% 45% at 0 0,
+      color-mix(in srgb, var(--acc) 16%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 100% 8%,
+      color-mix(in srgb, var(--acc) 9%, transparent),
+      transparent
+    ),
+    var(--panel);
+}
+.pp-view {
+  --pp-radius: 26px;
+  --pp-shadow:
+    0 1px 2px #0000000a, 0 14px 34px -14px color-mix(in srgb, var(--ink) 22%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.pp-view header {
+  padding: 38px 0 22px;
+}
+.pp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--acc) 22%, transparent);
+}
+.pp-eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+.pp-view h1 {
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 1.05;
+  letter-spacing: -2px;
+  margin: 16px 0 14px;
+  background: linear-gradient(100deg, var(--ink) 35%, var(--acc));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.pp-view header p {
+  max-width: 62ch;
+  font-size: 15px;
+}
+.pp-source-state {
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 8px 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  backdrop-filter: blur(14px);
+}
+.pp-source-state::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #39875e;
+  box-shadow: 0 0 0 4px #39875e22;
+}
+.pp-source-loading::before {
+  background: var(--acc);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 20%, transparent);
+  animation: pp-pulse 1.1s ease-in-out infinite;
+}
+.pp-source-error::before {
+  background: #bd5860;
+  box-shadow: 0 0 0 4px #bd586022;
+}
+.pp-source-state button {
+  flex: none;
+  white-space: nowrap;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--soft);
+  transition: background 0.18s;
+}
+.pp-source-state button:hover {
+  background: color-mix(in srgb, var(--acc) 18%, var(--soft));
+}
+.pp-grid {
+  gap: 20px;
+}
+.pp-card {
+  position: relative;
+  padding: 26px 26px 28px;
+  border-radius: var(--pp-radius);
+  box-shadow:
+    inset 0 1px #ffffff70,
+    var(--pp-shadow);
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.25s;
+}
+#personalizedPageView.pp-intro .pp-card {
+  animation: pp-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.pp-grid > :nth-child(2) {
+  animation-delay: 0.04s;
+}
+.pp-grid > :nth-child(3) {
+  animation-delay: 0.08s;
+}
+.pp-grid > :nth-child(4) {
+  animation-delay: 0.12s;
+}
+.pp-grid > :nth-child(5) {
+  animation-delay: 0.16s;
+}
+.pp-grid > :nth-child(6) {
+  animation-delay: 0.2s;
+}
+.pp-grid > :nth-child(n + 7) {
+  animation-delay: 0.24s;
+}
+.pp-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--acc) 35%, var(--line));
+  box-shadow:
+    inset 0 1px #ffffff80,
+    0 2px 4px #0000000a,
+    0 22px 44px -16px color-mix(in srgb, var(--acc) 38%, transparent);
+}
+.pp-card-label {
+  gap: 11px;
+}
+.pp-card-label > span {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  font-size: 19px;
+  background: color-mix(in srgb, var(--acc) 13%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--acc) 18%, transparent);
+}
+.pp-card h2 {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pp-metric > p:not(.pp-missing) {
+  font-size: clamp(28px, 3.4vw, 44px);
+  letter-spacing: -1.4px;
+  margin-top: 20px;
+}
+.pp-hero {
+  overflow: hidden;
+  padding: 38px;
+  background:
+    radial-gradient(
+      ellipse 60% 120% at 100% 0,
+      color-mix(in srgb, var(--acc) 26%, transparent),
+      transparent
+    ),
+    linear-gradient(120deg, color-mix(in srgb, var(--acc) 12%, var(--card)), var(--card));
+}
+.pp-hero .pp-card-label > span {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  font-size: 30px;
+}
+.pp-hero > p:not(.pp-missing) {
+  font-size: clamp(48px, 8vw, 92px);
+  letter-spacing: -4px;
+  line-height: 1.05;
+  margin-top: 18px;
+  background: linear-gradient(110deg, var(--ink) 40%, var(--acc));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.pp-section-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 26px 0 2px !important;
+}
+.pp-section-heading h2 {
+  font-size: 24px;
+  letter-spacing: -0.7px;
+}
+.pp-section-heading h2::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 0.9em;
+  margin-right: 11px;
+  border-radius: 3px;
+  vertical-align: -0.1em;
+  background: var(--acc);
+}
+.pp-tabs {
+  position: sticky;
+  top: 10px;
+  z-index: 2;
+  padding: 5px;
+  gap: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--pp-shadow);
+}
+.pp-tabs button {
+  padding: 9px 20px;
+  border-radius: 999px;
+  color: var(--mute2);
+  font-weight: 600;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.pp-tabs button:hover {
+  color: var(--ink);
+}
+.pp-tabs button[aria-pressed='true'] {
+  color: var(--pri-fg);
+}
+.pp-tone-positive,
+.pp-tone-warning,
+.pp-tone-critical {
+  --pp-tone: var(--acc);
+  border-inline-start-width: 1px;
+  border-color: color-mix(in srgb, var(--pp-tone) 45%, var(--line));
+  background:
+    linear-gradient(130deg, color-mix(in srgb, var(--pp-tone) 14%, transparent), transparent 70%),
+    color-mix(in srgb, var(--card) 75%, transparent);
+}
+.pp-tone-positive {
+  --pp-tone: #39875e;
+}
+.pp-tone-warning {
+  --pp-tone: #b9852e;
+}
+.pp-tone-critical {
+  --pp-tone: #bd5860;
+}
+.pp-tone-positive .pp-card-label > span,
+.pp-tone-warning .pp-card-label > span,
+.pp-tone-critical .pp-card-label > span {
+  background: color-mix(in srgb, var(--pp-tone) 18%, var(--card));
+  border-color: color-mix(in srgb, var(--pp-tone) 40%, transparent);
+}
+.pp-badges span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  font-weight: 550;
+}
+.pp-badges span::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+.pp-gauge-ring {
+  width: 160px;
+  background: conic-gradient(from 0deg, var(--acc) var(--pp-value), var(--soft) 0);
+  filter: drop-shadow(0 10px 18px color-mix(in srgb, var(--acc) 28%, transparent));
+}
+.pp-gauge-ring::before {
+  inset: 14px;
+}
+.pp-gauge-ring span {
+  font-size: 28px;
+  letter-spacing: -1px;
+}
+.pp-card progress {
+  height: 12px;
+}
+.pp-card progress::-webkit-progress-value {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--acc) 55%, var(--soft)), var(--acc));
+}
+.pp-bar-track {
+  height: 11px;
+}
+.pp-bar-track i {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--acc) 55%, var(--soft)), var(--acc));
+  transform-origin: left;
+  animation: pp-grow 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.pp-line-chart {
+  max-height: 240px;
+}
+.pp-line-grid path {
+  stroke: var(--line);
+  stroke-dasharray: 3 4;
+}
+.pp-line-area {
+  fill: color-mix(in srgb, var(--acc) 16%, transparent);
+  stroke: none;
+}
+.pp-line-chart polyline {
+  stroke-width: 3;
+}
+.pp-line-chart circle {
+  fill: var(--card);
+  stroke: var(--acc);
+  stroke-width: 2;
+}
+.pp-line-chart circle.pp-line-peak {
+  fill: var(--acc);
+  stroke: var(--card);
+  filter: drop-shadow(0 3px 6px color-mix(in srgb, var(--acc) 50%, transparent));
+}
+.pp-card .pp-chart-values li {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--soft);
+}
+.pp-table-scroll {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+}
+.pp-table-scroll table {
+  font-size: 13px;
+}
+.pp-table-scroll th {
+  position: sticky;
+  top: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mute2);
+}
+.pp-table-scroll th,
+.pp-table-scroll td {
+  padding: 13px 16px;
+}
+.pp-table-scroll tbody tr {
+  transition: background 0.15s;
+}
+.pp-table-scroll tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--soft) 55%, transparent);
+}
+.pp-table-scroll tbody tr:hover {
+  background: color-mix(in srgb, var(--acc) 11%, transparent);
+}
+.pp-table-scroll tbody tr:last-child td {
+  border-bottom: 0;
+}
+.pp-table-scroll td:first-child {
+  font-weight: 650;
+}
+.pp-repeat {
+  gap: 14px;
+  margin-top: 22px;
+}
+.pp-repeat-cards {
+  scrollbar-width: thin;
+  margin-inline: -6px;
+  padding: 4px 6px 14px;
+}
+.pp-repeat article {
+  position: relative;
+  overflow: hidden;
+  flex-basis: 172px;
+  padding: 20px 18px 18px;
+  border-radius: 20px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--acc) 10%, var(--card)),
+    var(--card) 58%
+  );
+  box-shadow: 0 1px 2px #0000000a;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.pp-repeat article::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--acc), transparent);
+}
+.pp-repeat article:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 26px -14px color-mix(in srgb, var(--acc) 45%, transparent);
+}
+.pp-repeat h3 {
+  font-size: 16px;
+  letter-spacing: -0.3px;
+  color: var(--acc);
+}
+.pp-repeat p {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.5px;
+  margin: 2px 0 12px;
+}
+.pp-repeat span {
+  display: block;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.pp-repeat img,
+.pp-cell-image {
+  width: 46px;
+  height: 46px;
+  margin: 2px 0 6px;
+}
+.pp-timeline li::before {
+  width: 10px;
+  height: 10px;
+  left: -5.5px;
+  top: 4px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 18%, transparent);
+}
+.pp-images img {
+  border-radius: 18px;
+  box-shadow: var(--pp-shadow);
+}
+.pp-links button {
+  align-items: center;
+  padding: 13px 15px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  transition:
+    background 0.18s,
+    border-color 0.18s,
+    transform 0.18s;
+}
+.pp-links button:hover {
+  transform: translateX(3px);
+  border-color: color-mix(in srgb, var(--acc) 35%, transparent);
+  background: color-mix(in srgb, var(--acc) 12%, var(--soft));
+}
+.pp-accordion {
+  padding: 20px 24px;
+}
+.pp-accordion summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pp-accordion summary::-webkit-details-marker {
+  display: none;
+}
+.pp-accordion summary::after {
+  content: '＋';
+  margin-left: auto;
+  color: var(--acc);
+  transition: transform 0.25s;
+}
+.pp-accordion[open] summary::after {
+  transform: rotate(45deg);
+}
+.pp-view footer {
+  margin-top: 44px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+@keyframes pp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes pp-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes pp-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (max-width: 700px) {
+  .pp-card,
+  .pp-hero {
+    padding: 22px;
+  }
+  .pp-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-card,
+  .pp-bar-track i,
+  .pp-source-loading::before {
+    animation: none;
+  }
+  .pp-card:hover,
+  .pp-repeat article:hover,
+  .pp-links button:hover {
+    transform: none;
+  }
+}
+
+/* Address bar switch for the Luna view of the current page */
+#bLunaView {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 26px;
+  padding: 0 5px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--mute2);
+  font:
+    650 11px Manrope,
+    sans-serif;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+}
+#bLunaView[hidden] {
+  display: none;
+}
+#bLunaView i {
+  position: relative;
+  width: 24px;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--line3);
+  transition: background 0.2s;
+}
+#bLunaView i::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--card);
+  transition: transform 0.2s;
+}
+#bLunaView[aria-pressed='true'] {
+  color: var(--acc);
+  border-color: color-mix(in srgb, var(--acc) 45%, transparent);
+  background: color-mix(in srgb, var(--acc) 12%, var(--card));
+}
+#bLunaView[aria-pressed='true'] i {
+  background: var(--acc);
+}
+#bLunaView[aria-pressed='true'] i::after {
+  transform: translateX(10px);
+}
+#bLunaView:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* Loading skeletons while values are still being read from the source page */
+.pp-skeleton {
+  display: grid;
+  gap: 11px;
+  margin-top: 22px;
+}
+.pp-skeleton i {
+  display: block;
+  height: 13px;
+  border-radius: 99px;
+  background: linear-gradient(
+    100deg,
+    var(--soft) 30%,
+    color-mix(in srgb, var(--acc) 22%, var(--soft)) 50%,
+    var(--soft) 70%
+  );
+  background-size: 250% 100%;
+  animation: pp-shimmer 1.4s ease-in-out infinite;
+}
+.pp-skeleton i:nth-child(1) {
+  width: 72%;
+}
+.pp-skeleton i:nth-child(2) {
+  width: 48%;
+  animation-delay: 0.12s;
+}
+.pp-skeleton i:nth-child(3) {
+  width: 62%;
+  animation-delay: 0.24s;
+}
+.pp-skeleton-metric i:nth-child(1),
+.pp-skeleton-hero i:nth-child(1) {
+  width: 58%;
+  height: 40px;
+  border-radius: 14px;
+}
+.pp-skeleton-hero i:nth-child(1) {
+  width: 46%;
+  height: 78px;
+  border-radius: 22px;
+}
+.pp-skeleton-metric i:nth-child(3),
+.pp-skeleton-hero i:nth-child(3) {
+  display: none;
+}
+.pp-skeleton-gauge {
+  justify-items: center;
+}
+.pp-skeleton-gauge i:nth-child(1) {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+}
+.pp-skeleton-gauge i:not(:first-child) {
+  display: none;
+}
+.pp-skeleton-line i:nth-child(1),
+.pp-skeleton-bars i:nth-child(1),
+.pp-skeleton-image i:nth-child(1),
+.pp-skeleton-table i:nth-child(1),
+.pp-skeleton-cards i:nth-child(1),
+.pp-skeleton-grid i:nth-child(1) {
+  width: 100%;
+  height: 110px;
+  border-radius: 18px;
+}
+.pp-skeleton-image i:nth-child(1) {
+  height: 170px;
+}
+.pp-skeleton-line i:nth-child(2),
+.pp-skeleton-bars i:nth-child(2),
+.pp-skeleton-table i:nth-child(2),
+.pp-skeleton-cards i:nth-child(2),
+.pp-skeleton-grid i:nth-child(2) {
+  width: 100%;
+}
+.pp-skeleton-image i:not(:first-child) {
+  display: none;
+}
+.pp-skeleton-badge {
+  display: flex;
+  flex-wrap: wrap;
+}
+.pp-skeleton-badge i {
+  width: 84px !important;
+  height: 28px;
+}
+@keyframes pp-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-skeleton i {
+    animation: none;
+  }
+}
+
+/* Interactive rows: clicking opens the item on the source page, the detail view shows what opened */
+.pp-openable {
+  cursor: pointer;
+  border-radius: 12px;
+  transition:
+    background 0.15s,
+    opacity 0.2s;
+}
+.pp-openable:hover {
+  background: color-mix(in srgb, var(--acc) 12%, transparent);
+}
+.pp-openable:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+.pp-card li.pp-openable {
+  padding: 6px 28px 6px 10px;
+  margin-left: -10px;
+  position: relative;
+}
+.pp-card li.pp-openable::after {
+  content: '›';
+  position: absolute;
+  right: 10px;
+  color: var(--acc);
+  font-weight: 700;
+}
+#personalizedPageView.pp-opening {
+  cursor: progress;
+}
+#personalizedPageView.pp-opening .pp-openable {
+  opacity: 0.55;
+  pointer-events: none;
+}
+#personalizedPageView.pp-opening::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--acc), transparent);
+  background-size: 200% 100%;
+  animation: pp-shimmer 1s linear infinite;
+}
+.pp-view .pp-detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 20px;
+}
+.pp-view .pp-detail-bar button {
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--acc);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.pp-view .pp-detail-bar span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute2);
+}
+@media (prefers-reduced-motion: reduce) {
+  #personalizedPageView.pp-opening::before {
+    animation: none;
+  }
+}
+
+/* Readable text inside widgets: paragraphs, bullets, number + unit, time chips */
+.pp-prose {
+  max-width: 70ch;
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.pp-card .pp-prose p {
+  margin: 0 0 0.9em;
+  font-size: inherit;
+  line-height: inherit;
+}
+.pp-card .pp-prose p:last-child,
+.pp-prose .pp-bullets:last-child {
+  margin-bottom: 0;
+}
+.pp-prose .pp-bullets {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 0.9em;
+  padding: 0;
+  list-style: none;
+  font-size: inherit;
+  line-height: 1.6;
+}
+.pp-prose .pp-bullets li {
+  position: relative;
+  padding-left: 22px;
+}
+.pp-prose .pp-bullets li::before {
+  content: '';
+  position: absolute;
+  top: 0.62em;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+.pp-notice .pp-prose {
+  font-size: 16px;
+}
+.pp-unit {
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--mute2);
+}
+.pp-hero .pp-unit {
+  -webkit-text-fill-color: var(--mute2);
+}
+.pp-card small.pp-metric-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--mute2);
+}
+.pp-metric > p.pp-size-m {
+  font-size: clamp(20px, 2.3vw, 27px);
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+}
+.pp-metric > p.pp-size-s {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.45;
+}
+.pp-hero > p.pp-size-m {
+  font-size: clamp(30px, 4.5vw, 52px);
+  letter-spacing: -2px;
+}
+.pp-hero > p.pp-size-s {
+  font-size: 26px;
+  letter-spacing: -0.8px;
+}
+.pp-chip {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  vertical-align: 1px;
+  color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 12%, var(--card));
+}
+.pp-item-text {
+  overflow-wrap: anywhere;
+}
+.pp-table-scroll td {
+  max-width: 340px;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+/* Quiet updates: only changed widgets get a short highlight, the status dot breathes while syncing */
+.pp-updated {
+  animation: pp-updated 1.2s ease-out;
+}
+.pp-source-sync::before {
+  animation: pp-pulse 1.1s ease-in-out infinite;
+}
+@keyframes pp-updated {
+  from {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--acc) 38%, transparent),
+      0 14px 34px -14px color-mix(in srgb, var(--acc) 40%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-updated,
+  .pp-source-sync::before {
+    animation: none;
+  }
+}
+
+/* The degree sign belongs up next to the number, not on the baseline */
+.pp-unit.pp-unit-deg {
+  margin-left: 0.04em;
+  font-size: 0.6em;
+  font-weight: 650;
+  vertical-align: top;
+  line-height: 1.25;
+}
+
+.pp-unit-deg .pp-gap {
+  font-size: 0;
+}

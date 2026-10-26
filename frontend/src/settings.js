@@ -1,4 +1,5 @@
 import { createExtensions } from './extensions-view.js';
+import { agentMayDeleteAutomatically } from './personalized-permissions.js';
 import { personalSettingsHTML } from './personalization.js';
 import { WINDOWS } from './platform.js';
 import { chatSettingsHTML } from './chat.js';
@@ -24,6 +25,43 @@ export function createSettings({
   onSearchKeyChanged,
 }) {
   let personalPagesList = [];
+  let vaultInfo = { status: {}, entries: [] };
+  const loadVault = () =>
+    Promise.all([api.vaultStatus(), api.vaultAll()])
+      .then(([status, entries]) => {
+        vaultInfo = { status: status || {}, entries: entries || [] };
+        if (settingsSection === 'passwords') renderSettingsView();
+      })
+      .catch(() => {});
+  window.addEventListener('luna-vault-changed', loadVault);
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-vault]');
+    if (!button || button.disabled) return;
+    try {
+      if (button.dataset.vault === 'delete')
+        await api.vaultDelete(button.dataset.origin, button.dataset.user);
+      if (button.dataset.vault === 'delete-all') await api.vaultDeleteAll();
+      if (button.dataset.vault === 'offers')
+        await api.setPref('vaultOffers', !vaultInfo.status.offers);
+      window.dispatchEvent(new Event('luna-vault-changed'));
+    } catch (error) {
+      toast(String(error?.message || error));
+    }
+  });
+  function vaultSettingsHTML() {
+    const { status, entries } = vaultInfo;
+    const intro =
+      'Luna speichert Anmeldungen verschlüsselt auf diesem Mac. Den Schlüssel dafür verwahrt der macOS-Schlüsselbund. Ausgefüllt wird nur nach deinem Klick und mit Touch ID, und nur auf genau der Seite, für die du das Passwort gespeichert hast. Deine KI kann Passwörter weder lesen noch ausfüllen. Webseiten und Benutzernamen siehst du in der Liste, Passwörter nie.';
+    if (!status.supported)
+      return `<section id="set-passwords" class="sp-card"><h2>Passwörter</h2><p class="pp-settings-intro">Der Passwort-Tresor ist auf diesem System noch nicht verfügbar. Es gibt ihn bisher auf dem Mac.</p></section>`;
+    const rows = entries
+      .map(
+        (entry) =>
+          `<article class="pp-settings-entry"><div><h3>${esc(entry.origin.replace(/^https?:\/\//, ''))}</h3><p>${esc(entry.username || 'Ohne Benutzername')} · gespeichert am ${esc(new Date(entry.updated * 1000).toLocaleDateString('de-DE'))}</p></div><div class="pp-settings-actions"><button class="btn sm" data-vault="delete" data-origin="${esc(entry.origin)}" data-user="${esc(entry.username)}">Löschen</button></div></article>`,
+      )
+      .join('');
+    return `<section id="set-passwords" class="sp-card"><h2>Passwörter</h2><p class="pp-settings-intro">${intro}</p>${status.error ? `<p class="muted">Tresor nicht verfügbar: ${esc(status.error)}</p>` : ''}<div class="swrow"><div><b>Nach der Anmeldung fragen, ob Luna das Passwort speichern soll</b><span>${status.offers ? 'An: Nach einem Login erscheint ein Schlüssel in der Adressleiste.' : 'Aus: Luna fragt nicht mehr nach.'}</span></div><button class="switch ${status.offers ? 'on' : ''}" role="switch" aria-checked="${!!status.offers}" aria-label="Speichern anbieten" data-vault="offers"><i></i></button></div><div class="pp-settings-list">${rows || '<p class="muted">Noch nichts gespeichert. Melde dich auf einer Seite an, dann fragt Luna, ob sie das Passwort speichern soll.</p>'}</div>${entries.length ? '<div class="row"><button class="btn sm" data-vault="delete-all">Alle löschen …</button></div>' : ''}</section>`;
+  }
   window.addEventListener('luna-personalized-list', () =>
     api
       .personalizedPages()
@@ -132,11 +170,13 @@ export function createSettings({
     ['mcp', 'KI & MCP'],
     ['extensions', 'Erweiterungen'],
     ['personalized', 'Personalisierte Seiten'],
+    ['passwords', 'Passwörter'],
     ['updates', 'Updates'],
     ['data', 'Daten'],
   ];
   const SET_ICONS = {
     personalized: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M9 9v11"/>',
+    passwords: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3M14 9l2 2"/>',
     extensions:
       '<path d="M8 3h4v3a2 2 0 1 0 4 0V3h4v7h-3a2 2 0 1 0 0 4h3v7H8v-3a2 2 0 1 0-4 0v3H2v-7h3a2 2 0 1 0 0-4H2V3h6z"/>',
     look: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M12 4a8 8 0 0 1 0 16"/>',
@@ -225,7 +265,8 @@ export function createSettings({
       ${chatSettingsHTML()}
       ${mcpSettingsHTML(mcpStatus)}
       ${extensions.html()}
-      <section id="set-personalized" class="sp-card"><h2>Personalisierte Seiten</h2><p class="pp-settings-intro">Deine Ansichten für echte Webseiten. Eine verbundene KI liest zuerst die Originalseite und holt Lunas Designleitfaden. Die KI kombiniert fertige Luna-Bausteine wie Kennzahlen, Diagramme, Tabellen und Tabs. Die Ansicht passt sich deinem Browserdesign an und liest Inhalte aus der Originalseite.</p><div class="pp-settings-list">${(personalPagesList || []).map((page) => `<article class="pp-settings-entry"><div><h3>${esc(page.title)}</h3><p>${esc(page.url)}</p><p>${page.enabled ? 'Aktiv' : 'Deaktiviert'} · ${page.scope === 'site' ? 'Gesamte Website' : 'Diese Unterseite'} · ${page.fields.length} Bausteine</p></div><div class="pp-settings-actions"><button class="btn sm" data-personal-page="open" data-id="${esc(page.id)}">Öffnen</button><button class="btn sm" data-personal-page="toggle" data-id="${esc(page.id)}">${page.enabled ? 'Deaktivieren' : 'Aktivieren'}</button><button class="btn sm" data-personal-page="remove" data-id="${esc(page.id)}">Entfernen</button></div></article>`).join('') || '<p class="muted">Noch keine personalisierten Seiten. Bitte deine KI zum Beispiel: „Baue mir eine persönliche Wetteransicht für wetteronline.de.“</p>'}</div></section>
+      <section id="set-personalized" class="sp-card"><h2>Personalisierte Seiten</h2><p class="pp-settings-intro">Deine Ansichten für echte Webseiten. Eine verbundene KI liest zuerst die Originalseite und holt Lunas Designleitfaden. Die KI kombiniert fertige Luna-Bausteine wie Kennzahlen, Diagramme, Tabellen und Tabs. Die Ansicht passt sich deinem Browserdesign an und liest Inhalte aus der Originalseite. Der Schalter „Luna“ in der Adressleiste schaltet alle Ansichten einer Domain gemeinsam aus oder wieder an.</p><div class="pp-settings-list">${(personalPagesList || []).map((page) => `<article class="pp-settings-entry"><div><h3>${esc(page.title)}</h3><p>${esc(page.url)}</p><p>${page.enabled ? 'Aktiv' : 'Deaktiviert'} · ${page.scope === 'site' ? 'Gesamte Website' : 'Diese Unterseite'} · ${page.fields.length} Bausteine</p></div><div class="pp-settings-actions"><button class="btn sm" data-personal-page="open" data-id="${esc(page.id)}">Öffnen</button><button class="btn sm" data-personal-page="toggle" data-id="${esc(page.id)}">${page.enabled ? 'Deaktivieren' : 'Aktivieren'}</button><button class="btn sm" data-personal-page="remove" data-id="${esc(page.id)}">Entfernen</button></div></article>`).join('') || '<p class="muted">Noch keine personalisierten Seiten. Bitte deine KI zum Beispiel: „Baue mir eine persönliche Wetteransicht für wetteronline.de.“</p>'}</div><div class="swrow"><div><b>Mein Agent darf Ansichten automatisch löschen</b><span>${agentMayDeleteAutomatically() ? 'An: Dein Agent löscht personalisierte Seiten ohne Nachfrage.' : 'Aus: Luna fragt dich, bevor dein Agent eine Ansicht löscht.'}</span></div><button class="switch ${agentMayDeleteAutomatically() ? 'on' : ''}" role="switch" aria-checked="${agentMayDeleteAutomatically()}" aria-label="Agent darf Ansichten automatisch löschen" data-act="pp-agent-auto-delete"><i></i></button></div></section>
+      ${vaultSettingsHTML()}
       <section id="set-updates" class="sp-card"><h2>Updates</h2>
         <div class="swrow"><div><b>Luna Browser ${esc(updateState.version || '')}</b><span>Updates direkt aus unseren GitHub Releases.</span></div><span class="muted">${WINDOWS ? 'Windows · experimentell / instabil' : 'macOS'}</span></div>
         <div class="swrow"><div><b>Automatische Updates</b><span>Einmal täglich prüfen und Updates automatisch laden. Luna meldet sich leise mit einem Punkt am Menü, wenn eines bereit ist.</span></div><button class="btn" role="switch" aria-label="Automatische Updates" aria-checked="${!!updateState.automatic}" data-update-action="automatic" ${!updateState.ready ? 'disabled' : ''}>${updateState.automatic ? 'Ein' : 'Aus'}</button></div>
@@ -353,6 +394,7 @@ export function createSettings({
       settingsSection = value === 'chat' ? 'mcp' : value === 'input' ? 'gestures' : value;
       if (settingsSection === 'updates') refreshUpdates();
       if (settingsSection === 'extensions') extensions.refresh();
+      if (settingsSection === 'passwords') loadVault();
       if (settingsSection === 'personalized')
         api
           .personalizedPages()

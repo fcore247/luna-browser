@@ -5,6 +5,7 @@ const icons = {
     '<path d="M7 13h34M7 24h34M7 35h34"/><circle cx="17" cy="13" r="4" fill="var(--card)"/><circle cx="32" cy="24" r="4" fill="var(--card)"/><circle cx="20" cy="35" r="4" fill="var(--card)"/>',
   history: '<circle cx="24" cy="24" r="17"/><path d="M24 13v12l9 5"/>',
   info: '<circle cx="24" cy="24" r="17"/><path d="M24 22v12M24 14v1"/>',
+  warning: '<path d="M24 6L44 41H4z"/><path d="M24 19v11M24 35.5v.5"/>',
 };
 const icon = (name) =>
   `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icons[name] || icons.info}</svg>`;
@@ -60,6 +61,8 @@ export function createBrowserNotifications({ cover }) {
     const dialog = document.createElement('dialog');
     dialog.className = 'luna-notice-dialog';
     dialog.dataset.notice = options.kind || 'info';
+    // blur: keep the page behind visible but blurred instead of covering it with a solid surface.
+    if (options.blur) dialog.dataset.blur = 'true';
     dialog.setAttribute('aria-labelledby', `${id}-title`);
     dialog.setAttribute('aria-describedby', `${id}-description`);
     dialog.innerHTML = `<div class="luna-notice-aura" aria-hidden="true"><i></i><i></i><i></i></div><section class="luna-notice-content">

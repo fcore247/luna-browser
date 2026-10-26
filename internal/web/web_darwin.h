@@ -29,3 +29,6 @@ void fmwSetErrorPalette(const char *palette);
 char *fmwOnboardingClipboard(int tab, const char *provider, int previousCount);
 
 void fmwExtension(const char *json, int req);
+
+void fmwConfigureCredentials(const char *src);
+void fmwFillCredential(int tab, const char *origin, const char *user, const char *pass, int req);

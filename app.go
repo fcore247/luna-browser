@@ -44,6 +44,7 @@ type App struct {
 	spotifyAPI *spotifyapi.Client
 	sonosSync  *sonos.Manager
 	gesture    string // Skript der Mausgeste (wird in jede Seite eingeschleust)
+	vaultData  vaultState
 }
 
 const (
@@ -87,6 +88,7 @@ func (a *App) startup(ctx context.Context) {
 	configurePlatform(a)
 	a.initExtensions(filepath.Dir(dir))
 	a.personalized, _ = personalpages.New(dir)
+	a.initVault(dir)
 	a.autoNext = spotify.NewAutoNext(func(status spotify.NextStatus) { b, _ := json.Marshal(status); a.emit("spotify-next", string(b)) })
 	sonosContext, stopSonos := context.WithCancel(ctx)
 	a.stopSonos = stopSonos
@@ -128,7 +130,7 @@ func (a *App) WebReload(id int)                          { web.Reload(id) }
 func (a *App) WebStop(id int)                            { web.Stop(id) }
 func (a *App) WebSetFrame(x, y, w, h float64)            { web.SetFrame(x, y, w, h) }
 func (a *App) WebShow(id int)                            { web.Show(id) }
-func (a *App) WebClose(id int)                           { web.Close(id) }
+func (a *App) WebClose(id int)                           { a.dropOffer(id); web.Close(id) }
 func (a *App) WebFind(id int, text string, forward bool) { web.Find(id, text, forward) }
 func (a *App) WebZoom(id int, factor float64)            { web.Zoom(id, factor) }
 
