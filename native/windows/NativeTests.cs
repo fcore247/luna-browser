@@ -20,6 +20,31 @@ static class NativeTests
     static void Assert(bool value, string reason) { if (!value) throw new Exception(reason); }
     static async Task Test(Form parent)
     {
+        foreach (var answer in new[] { "verified", "denied" })
+        {
+            Form? verificationOwner = null;
+            var actual = await HelloVerification.WithWindow(parent.Handle, async hwnd =>
+            {
+                verificationOwner = Control.FromHandle(hwnd) as Form;
+                Assert(hwnd != parent.Handle && verificationOwner is { TopLevel: true, Visible: true }, "Hello did not receive its own top-level window");
+                await Task.Yield();
+                Assert(!verificationOwner!.IsDisposed, "Hello owner closed before verification completed");
+                return answer;
+            });
+            Assert(actual == answer && verificationOwner!.IsDisposed, "Hello completion lost result or leaked window");
+        }
+        Form? failedOwner = null;
+        try
+        {
+            await HelloVerification.WithWindow(parent.Handle, hwnd =>
+            {
+                failedOwner = Control.FromHandle(hwnd) as Form;
+                throw new InvalidOperationException("simulated Hello failure");
+            });
+            throw new Exception("Hello failure was swallowed");
+        }
+        catch (InvalidOperationException) { Assert(failedOwner!.IsDisposed, "Failed Hello leaked owner window"); }
+        Assert(!parent.IsDisposed, "Hello closed the browser window");
         var queue = new CommandQueue();
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var order = new List<int>();

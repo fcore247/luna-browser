@@ -9,7 +9,6 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 
 	"github.com/wailsapp/wails/v2"
@@ -113,9 +112,9 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "--mcp":
-			dir, err := os.UserConfigDir()
+			dir, err := userProfileRoot()
 			if err == nil {
-				err = browsermcp.RunBridge(context.Background(), secret.New(filepath.Join(dir, "browser-mac")))
+				err = browsermcp.RunBridge(context.Background(), secret.New(dir))
 			}
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)

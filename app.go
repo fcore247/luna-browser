@@ -55,14 +55,11 @@ func NewApp() *App { return &App{} }
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.mcpBridge.pending = map[string]mcpPending{}
-	dir, err := os.UserConfigDir() // ~/Library/Application Support
+	dir, err := userProfileRoot()
 	if err != nil {
-		dir = os.TempDir()
+		dir = filepath.Join(os.TempDir(), "browser-mac")
 	}
-	if os.Getenv("LUNA_TEST_MODE") == "1" {
-		dir = filepath.Join(dir, "Luna Extension Test")
-	}
-	if a.st, err = store.New(filepath.Join(dir, "browser-mac")); err != nil {
+	if a.st, err = store.New(dir); err != nil {
 		println("Speicher nicht verfügbar:", err.Error())
 	}
 	// Ereignisse dürfen nie direkt vom Main-Thread aus an wr.EventsEmit gehen: Wails' ExecJS gibt dort
@@ -84,12 +81,12 @@ func (a *App) startup(ctx context.Context) {
 	}()
 
 	// Eigene Suchmaschine (Brave-API); der Schlüssel wird bei jeder Anfrage frisch aus der geschützten Datei gelesen.
-	a.secrets = secret.New(filepath.Join(dir, "browser-mac"))
-	a.chat = chat.New(filepath.Join(dir, "browser-mac"), a.secrets, func(c chat.Conversation) { b, _ := json.Marshal(c); a.emit("chat-update", string(b)) })
+	a.secrets = secret.New(dir)
+	a.chat = chat.New(dir, a.secrets, func(c chat.Conversation) { b, _ := json.Marshal(c); a.emit("chat-update", string(b)) })
 	a.spotifyAPI = spotifyapi.New(a.secrets)
 	configurePlatform(a)
-	a.initExtensions(dir)
-	a.personalized, _ = personalpages.New(filepath.Join(dir, "browser-mac"))
+	a.initExtensions(filepath.Dir(dir))
+	a.personalized, _ = personalpages.New(dir)
 	a.autoNext = spotify.NewAutoNext(func(status spotify.NextStatus) { b, _ := json.Marshal(status); a.emit("spotify-next", string(b)) })
 	sonosContext, stopSonos := context.WithCancel(ctx)
 	a.stopSonos = stopSonos

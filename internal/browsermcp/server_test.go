@@ -153,3 +153,66 @@ func TestSetupDoesNotIncludeSecrets(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+func TestSeparateProfilesCanRunTogether(t *testing.T) {
+	dispatch := func(context.Context, string, map[string]any) (any, error) { return map[string]any{"ready": true}, nil }
+	a := New(secret.New(t.TempDir()), dispatch)
+	bStore := secret.New(t.TempDir())
+	b := New(bStore, dispatch)
+	defer a.Close()
+	defer b.Close()
+	if err := a.Configure(true); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Configure(true); err != nil {
+		t.Fatal(err)
+	}
+	if a.Status().Endpoint == b.Status().Endpoint {
+		t.Fatal("profiles share endpoint")
+	}
+	raw, _, err := bStore.Get(configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg Config
+	if err = json.Unmarshal([]byte(raw), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Endpoint != b.Status().Endpoint {
+		t.Fatal("bridge endpoint not persisted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: cfg.Endpoint, HTTPClient: &http.Client{Transport: authTransport{cfg.Token, &http.Transport{Proxy: nil}}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "browser_state", Arguments: map[string]any{}})
+	if err != nil || result.IsError {
+		t.Fatalf("state failed: %v", err)
+	}
+	// An endpoint from another profile does not accept this profile's token.
+	req, _ := http.NewRequest("POST", a.Status().Endpoint, strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatal("profile credentials crossed")
+	}
+}
+
+func TestEndpointValidation(t *testing.T) {
+	for _, endpoint := range []string{"https://127.0.0.1:17845/mcp", "http://example.com:17845/mcp", "http://127.0.0.1/mcp", "http://user@127.0.0.1:123/mcp", "http://127.0.0.1:123/mcp?x=1", "http://127.0.0.1:123/other", "http://127.0.0.1:0/mcp"} {
+		if _, err := endpointAddress(endpoint); err == nil {
+			t.Fatalf("accepted unsafe endpoint %s", endpoint)
+		}
+	}
+	if _, err := endpointAddress(Endpoint); err != nil {
+		t.Fatal(err)
+	}
+}

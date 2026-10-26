@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,8 +27,9 @@ const Endpoint = "http://" + Address + "/mcp"
 const configFile = "mcp-server.json"
 
 type Config struct {
-	Enabled bool   `json:"enabled"`
-	Token   string `json:"token"`
+	Enabled  bool   `json:"enabled"`
+	Token    string `json:"token"`
+	Endpoint string `json:"endpoint,omitempty"`
 }
 type Status struct {
 	Enabled  bool   `json:"enabled"`
@@ -63,11 +66,20 @@ func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	exe, _ := os.Executable()
-	return Status{m.cfg.Enabled, m.server != nil, Endpoint, m.message, exe}
+	endpoint := m.cfg.Endpoint
+	if endpoint == "" {
+		endpoint = Endpoint
+	}
+	return Status{m.cfg.Enabled, m.server != nil, endpoint, m.message, exe}
 }
-func (m *Manager) Configure(on bool) error {
+func (m *Manager) Configure(on bool) (result error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	defer func() {
+		if result != nil {
+			m.message = result.Error()
+		}
+	}()
 	cfg := m.cfg
 	cfg.Enabled = on
 	if cfg.Token == "" {
@@ -80,10 +92,21 @@ func (m *Manager) Configure(on bool) error {
 	var listener net.Listener
 	if on && m.server == nil {
 		var err error
-		listener, err = net.Listen("tcp4", Address)
-		if err != nil {
-			return fmt.Errorf("MCP-Port 17845 ist belegt. Beende eine ältere Luna-Instanz und versuche es erneut.")
+		address := Address
+		if cfg.Endpoint != "" {
+			address, err = endpointAddress(cfg.Endpoint)
+			if err != nil {
+				return err
+			}
 		}
+		listener, err = net.Listen("tcp4", address)
+		if err != nil {
+			listener, err = net.Listen("tcp4", "127.0.0.1:0")
+		}
+		if err != nil {
+			return fmt.Errorf("Lokaler MCP-Server konnte nicht starten: %w", err)
+		}
+		cfg.Endpoint = "http://" + listener.Addr().String() + "/mcp"
 	}
 	raw, _ := json.Marshal(cfg)
 	if err := m.store.Set(configFile, string(raw)); err != nil {
@@ -120,7 +143,7 @@ func (m *Manager) Configure(on bool) error {
 			return m.dispatch(c, name, args)
 		})
 		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
-		m.server = &http.Server{Handler: Protect(cfg.Token, handler), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
+		m.server = &http.Server{Handler: protectAt(listener.Addr().String(), cfg.Token, handler), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 		server := m.server
 		go func() {
 			if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -151,9 +174,12 @@ func (m *Manager) Close() {
 	}
 }
 func Protect(token string, next http.Handler) http.Handler {
+	return protectAt(Address, token, next)
+}
+func protectAt(address, token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		if r.Host != Address || r.Header.Get("Origin") != "" {
+		if r.Host != address || r.Header.Get("Origin") != "" {
 			http.Error(w, "Local MCP clients only", http.StatusForbidden)
 			return
 		}
@@ -189,8 +215,15 @@ func RunBridge(ctx context.Context, store *secret.Store) error {
 	if json.Unmarshal([]byte(raw), &cfg) != nil || !cfg.Enabled || cfg.Token == "" {
 		return errors.New("Luna MCP ist ausgeschaltet. Aktiviere es in den Einstellungen.")
 	}
+	endpoint := cfg.Endpoint
+	if endpoint == "" {
+		endpoint = Endpoint
+	}
+	if _, err := endpointAddress(endpoint); err != nil {
+		return err
+	}
 	client := mcp.NewClient(&mcp.Implementation{Name: "luna-local-bridge", Version: "1.0.0"}, nil)
-	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: Endpoint, HTTPClient: &http.Client{Transport: authTransport{cfg.Token, &http.Transport{Proxy: nil}}, Timeout: 40 * time.Second}}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{Transport: authTransport{cfg.Token, &http.Transport{Proxy: nil}}, Timeout: 40 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil)
 	if err != nil {
 		return errors.New("Luna MCP ist nicht erreichbar. Öffne Luna und aktiviere KI & MCP.")
 	}
@@ -199,6 +232,19 @@ func RunBridge(ctx context.Context, store *secret.Store) error {
 		return session.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
 	})
 	return server.Run(ctx, &mcp.StdioTransport{})
+}
+
+// Refuse credentials, external hosts and redirects in the persisted local endpoint.
+func endpointAddress(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" || u.User != nil || u.Path != "/mcp" || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
+		return "", errors.New("Ungültige lokale MCP-Adresse.")
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return "", errors.New("Ungültiger lokaler MCP-Port.")
+	}
+	return u.Host, nil
 }
 func SetupPrompt(executable string) string {
 	config, _ := json.MarshalIndent(map[string]any{"mcpServers": map[string]any{"luna-browser": map[string]any{"command": executable, "args": []string{"--mcp"}}}}, "", "  ")

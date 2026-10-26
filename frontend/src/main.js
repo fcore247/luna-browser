@@ -2575,6 +2575,8 @@ document.addEventListener('click', async (ev) => {
       } catch (e) {
         toast(String(e));
         await refreshMCPStatus();
+        settings.mcp.message = String(e);
+        renderSettingsView();
       } finally {
         a.disabled = false;
       }

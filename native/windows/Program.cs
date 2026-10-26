@@ -255,7 +255,7 @@ sealed partial class Host : Form
             case "writeSoundData": penData = Convert.FromBase64String(Str(a, "data")); return null;
             case "writeSound": PlayPen(Bool(a, "on")); return null;
             case "sound": soundPlayer?.Dispose(); soundStream?.Dispose(); soundStream = new Mp3FileReader(new MemoryStream(Convert.FromBase64String(Str(a, "data")))); soundPlayer = new WaveOutEvent(); soundPlayer.Init(soundStream); soundPlayer.Play(); return null;
-            case "authenticate": Attach(); if (await UserConsentVerifier.CheckAvailabilityAsync() != UserConsentVerifierAvailability.Available) return "unavailable"; var verified = await UserConsentVerifierInterop.RequestVerificationForWindowAsync(parent, Str(a, "reason")); return verified == UserConsentVerificationResult.Verified ? "verified" : "denied";
+            case "authenticate": Attach(); return await HelloVerification.Request(parent, Str(a, "reason"));
             case "clipboard": return ClipboardStatus(id, Str(a, "provider"), Int(a, "previousCount", -1));
             case "volume": using (var enumerator = new MMDeviceEnumerator()) using (var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)) return new { volume = device.AudioEndpointVolume.Mute ? 0 : (int)Math.Round(device.AudioEndpointVolume.MasterVolumeLevelScalar * 100), device = device.ID };
             case "spotifyState": return await SpotifyState().WaitAsync(TimeSpan.FromSeconds(4));
