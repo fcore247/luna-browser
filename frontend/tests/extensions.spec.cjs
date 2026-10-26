@@ -50,6 +50,12 @@ test('extension install requires an explicit reviewed permission step', async ({
   await page.locator('[data-extension="install"]').click();
   await expect(page.locator('#set-extensions')).toContainText('Example');
   expect(await page.evaluate(() => window.installCalls)).toBe(1);
+  await page.locator('#extension-filter').fill('missing');
+  await expect(page.locator('.ext-entry')).toBeHidden();
+  await expect(page.locator('.ext-no-results')).toBeVisible();
+  await page.locator('#extension-filter').fill('example');
+  await expect(page.locator('.ext-entry')).toBeVisible();
+  await expect(page.locator('.ext-no-results')).toBeHidden();
   await page.locator('#bExtensions').click();
   await expect(page.locator('[data-ext-open]')).toHaveText(/Example/);
   await page.locator('[data-ext-open]').click();

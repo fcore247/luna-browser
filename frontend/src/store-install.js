@@ -12,7 +12,7 @@ export function storeExtensionID(input) {
     return '';
   }
 }
-export function createStoreInstall({ currentTab, review, closeOther, toast }) {
+export function createStoreInstall({ currentTab, closeOther, toast }) {
   const anchor = document.getElementById('bStoreInstall'),
     urlbox = document.getElementById('urlbox');
   let details = null,
@@ -21,11 +21,16 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
     panel = null,
     generation = 0,
     retries = 0,
-    retryTimer;
+    retryTimer,
+    operation = null;
   const cache = new Map();
   const dismissed = new Set();
   const identity = () => `${currentTab()?.id}:${storeExtensionID(currentTab()?.url)}`;
   function close(focus = false, dismiss = false) {
+    if (operation && operation.phase !== 'installing') {
+      if (operation.pending) api.extensionCancel(operation.pending.id).catch(() => {});
+      operation = null;
+    }
     if (!panel) return;
     if (dismiss) dismissed.add(identity());
     panel.remove();
@@ -36,7 +41,8 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
     if (focus) anchor.focus();
   }
   function display(next) {
-    const refresh = panel && next && (details?.name !== next.name || details?.icon !== next.icon);
+    const refresh =
+      panel && !operation && next && (details?.name !== next.name || details?.icon !== next.icon);
     if (refresh) close();
     details = next;
     anchor.hidden = !details;
@@ -57,6 +63,7 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
     const nextKey = id ? `${tab.id}:${id}` : '';
     if (nextKey !== key) {
       close();
+      if (operation?.phase === 'installing') operation = null;
       key = nextKey;
       generation++;
       pendingKey = '';
@@ -68,7 +75,7 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
     // The URL establishes eligibility. Metadata only improves the presentation.
     if (!details) {
       const slug = new URL(tab.url).pathname.split('/').filter(Boolean);
-      const label = slug.length > 2 ? decodeURIComponent(slug[1]).replace(/-/g, ' ') : '';
+      const label = slug.length > 2 ? slug[1].replace(/-/g, ' ') : '';
       display({ id, url: tab.url, name: label || 'Diese Erweiterung', icon: '' });
     }
     if (cache.has(nextKey)) {
@@ -80,11 +87,16 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
     const token = generation;
     retries++;
     try {
-      const info = await api.extensionStoreDetails(tab.id);
+      let official;
+      try {
+        official = await api.extensionStoreLookup(tab.url);
+      } catch {}
+      const info = official?.name ? official : await api.extensionStoreDetails(tab.id);
       if (token !== generation || key !== nextKey || !info || storeExtensionID(info.url) !== id)
         return;
       const expectedName = (tab.title || '').replace(/\s*[-–|]\s*Chrome Web Store.*$/i, '').trim();
       if (
+        !official?.name &&
         expectedName &&
         info.name &&
         expectedName.toLowerCase() !== info.name.trim().toLowerCase()
@@ -92,6 +104,8 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
         return;
       const icon = (() => {
         try {
+          if (/^data:image\/(png|jpeg|gif|webp|x-icon);base64,[A-Za-z0-9+/=]+$/.test(info.icon))
+            return info.icon;
           const u = new URL(info.icon);
           return u.protocol === 'https:' && u.hostname.endsWith('.googleusercontent.com')
             ? u.href
@@ -109,7 +123,7 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
           'Diese Erweiterung',
         icon,
       };
-      cache.set(nextKey, entry);
+      if (entry.icon) cache.set(nextKey, entry);
       display(entry);
     } catch {
       /* Store metadata can arrive on the next navigation state event. */
@@ -147,6 +161,7 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
         ],
         { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' },
       );
+    paintOperation();
     panel.addEventListener('click', async (e) => {
       if (e.target.closest('[data-store-close]')) return close(true, true);
       if (!e.target.closest('[data-store-confirm]')) return;
@@ -154,13 +169,87 @@ export function createStoreInstall({ currentTab, review, closeOther, toast }) {
         close();
         return;
       }
-      close();
+      if (operation?.phase === 'review') {
+        const task = operation;
+        task.phase = 'installing';
+        paintOperation();
+        try {
+          await api.extensionInstall(task.pending.id);
+          if (operation === task) {
+            operation = null;
+            close(false, true);
+          }
+          toast(`${task.pending.name} wurde installiert. Lade die Webseite neu.`);
+          window.dispatchEvent(new Event('luna-extensions-changed'));
+        } catch (error) {
+          if (operation === task) {
+            task.phase = 'error';
+            task.error = String(error?.message || error);
+            paintOperation();
+          }
+        }
+        return;
+      }
+      if (operation && operation.phase !== 'error') return;
+      const task = { phase: 'preparing', identity: identity() };
+      operation = task;
+      paintOperation();
       try {
-        await review(chosen.url);
+        const pending = await api.extensionPrepare(chosen.url);
+        if (operation !== task || identity() !== task.identity) {
+          if (pending?.id) await api.extensionCancel(pending.id);
+          return;
+        }
+        if (!pending?.id) {
+          operation = null;
+          close();
+          return;
+        }
+        task.pending = pending;
+        task.phase = 'review';
+        paintOperation();
       } catch (error) {
-        toast(String(error?.message || error));
+        if (operation === task) {
+          task.phase = 'error';
+          task.error = String(error?.message || error);
+          paintOperation();
+        }
       }
     });
+  }
+  function paintOperation() {
+    if (!panel || !operation) return;
+    const task = operation,
+      busy = task.phase === 'preparing' || task.phase === 'installing';
+    const button = panel.querySelector('[data-store-confirm]');
+    button.disabled = busy;
+    button.textContent =
+      task.phase === 'review'
+        ? 'Zugriff erlauben & installieren'
+        : task.phase === 'installing'
+          ? 'Wird installiert …'
+          : task.phase === 'error'
+            ? 'Erneut versuchen'
+            : 'Wird vorbereitet …';
+    const copy = panel.querySelector('.store-install-copy');
+    copy.querySelector('p').textContent =
+      task.phase === 'review'
+        ? 'Diese Berechtigungen werden benötigt. Möchtest du sie erlauben?'
+        : task.error || 'Luna bereitet die Erweiterung direkt hier für dich vor.';
+    copy.querySelector('.store-permissions')?.remove();
+    if (task.phase === 'review') {
+      copy.querySelector('h2').textContent = task.pending.name;
+      const list = document.createElement('ul');
+      list.className = 'store-permissions';
+      list.innerHTML =
+        (task.pending.permissions || []).map((p) => `<li>${esc(p)}</li>`).join('') ||
+        '<li>Keine zusätzlichen Rechte</li>';
+      copy.append(list);
+    }
+    panel.querySelector('.store-install-note').textContent =
+      task.phase === 'review'
+        ? 'Nur installieren, wenn du der Erweiterung vertraust.'
+        : 'Der Store bleibt bedienbar';
   }
   anchor.addEventListener('click', () => {
     if (panel) return close(true, true);

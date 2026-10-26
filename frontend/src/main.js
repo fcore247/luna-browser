@@ -1967,10 +1967,6 @@ extensionMenu = createExtensionsMenu({
 });
 storeInstall = createStoreInstall({
   currentTab: cur,
-  review: async (source) => {
-    openSettingsAt('extensions');
-    await settings.prepareExtension(source);
-  },
   closeOther: () => {
     extensionMenu.close();
     closeMenu();

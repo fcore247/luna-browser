@@ -30,6 +30,7 @@ var validID = regexp.MustCompile(`^[a-p]{32}$`)
 var tokenID = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type Entry struct {
+	Icon        string   `json:"icon,omitempty"`
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Version     string   `json:"version"`
@@ -112,7 +113,11 @@ func (m *Manager) Restore() {
 func (m *Manager) List() []Entry {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return append([]Entry{}, m.entries...)
+	entries := append([]Entry{}, m.entries...)
+	for i := range entries {
+		entries[i].Icon = packageIcon(filepath.Join(m.root, entries[i].ID))
+	}
+	return entries
 }
 func StoreID(input string) (string, error) {
 	input = strings.TrimSpace(input)
@@ -236,6 +241,7 @@ func (m *Manager) prepareWithKey(b []byte, key []byte) (Entry, error) {
 	}
 	entry.ID = id
 	m.pending[id] = entry
+	entry.Icon = packageIcon(dest)
 	return entry, nil
 }
 func (m *Manager) Cancel(id string) error {

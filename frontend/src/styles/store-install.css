@@ -219,3 +219,26 @@
     font-size: 16px;
   }
 }
+.store-permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 96px;
+  overflow: auto;
+}
+.store-permissions li {
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.store-install-primary:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}

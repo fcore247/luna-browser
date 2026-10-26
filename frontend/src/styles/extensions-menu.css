@@ -106,3 +106,9 @@
 #bExtensions[aria-expanded='true'] {
   background: var(--soft);
 }
+.extension-monogram img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border-radius: 6px;
+}

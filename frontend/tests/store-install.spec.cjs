@@ -24,6 +24,9 @@ async function openApp(page) {
     extensionStoreDetails:
       'async()=>window.customMetadata||({url:window.nativeURL,name:"Free VPN for Chrome - VPN Proxy VeePN",icon:"https://lh3.googleusercontent.com/luna-test.png"})',
     extensionsStatus: 'async()=>({supported:true,entries:[]})',
+    extensionInstall: 'async(id)=>{window.installToken=id;return {name:"VeePN"}}',
+    extensionCancel: 'async(id)=>{window.cancelToken=id}',
+    extensionStoreLookup: 'async()=>window.officialMetadata||null',
     extensionPrepare:
       'async(source)=>{window.reviewSource=source;return {id:"review-vpn",name:"Free VPN for Chrome - VPN Proxy VeePN",version:"5.0",permissions:["proxy","storage"]}}',
   };
@@ -89,7 +92,12 @@ test('store detail automatically offers installation without covering the live p
   await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
   await chip.click();
   await page.locator('[data-store-confirm]').click();
-  await expect(page.locator('#set-extensions')).toContainText('proxy');
+  await expect(page.locator('#storeInstallDrop')).toContainText('proxy');
+  await expect(page.locator('#settingsView')).toBeHidden();
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
+  await page.locator('[data-store-confirm]').click();
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  expect(await page.evaluate(() => window.installToken)).toBe('review-vpn');
   expect(await page.evaluate(() => window.reviewSource)).toBe(detail);
 });
 test('store chip ignores search pages and lookalike hosts and closes when leaving detail', async ({
@@ -184,6 +192,39 @@ test('valid detail URL offers installation even while metadata is unavailable', 
   await expect(page.locator('#bStoreInstall')).toBeVisible();
   await expect(page.locator('[data-store-confirm]')).toBeEnabled();
   await page.locator('[data-store-confirm]').click();
-  await expect(page.locator('#set-extensions')).toContainText('proxy');
+  await expect(page.locator('#storeInstallDrop')).toContainText('proxy');
+  await expect(page.locator('#settingsView')).toBeHidden();
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
+  await page.locator('[data-store-confirm]').click();
+  await expect(page.locator('#storeInstallDrop')).toHaveCount(0);
+  expect(await page.evaluate(() => window.installToken)).toBe('review-vpn');
   expect(await page.evaluate(() => window.reviewSource)).toBe(detail);
+});
+
+test('official icon survives missing live page metadata and review cancels on navigation', async ({
+  page,
+}) => {
+  await openApp(page);
+  const icon =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvS8AAAAASUVORK5CYII=';
+  await page.evaluate(
+    ({ url, icon }) => {
+      window.customMetadata = {};
+      window.officialMetadata = { url, name: 'Verified store name', icon };
+    },
+    { url: detail, icon },
+  );
+  await navigate(page, detail);
+  await expect(page.locator('#storeInstallDrop h2')).toHaveText('Verified store name');
+  await expect(page.locator('#bStoreInstall img')).toHaveAttribute('src', icon);
+  await expect
+    .poll(() =>
+      page.locator('#bStoreInstall img').evaluate((img) => img.complete && img.naturalWidth > 0),
+    )
+    .toBe(true);
+  await page.locator('[data-store-confirm]').click();
+  await expect(page.locator('.store-permissions')).toContainText('proxy');
+  await navigate(page, 'https://example.org');
+  await expect.poll(() => page.evaluate(() => window.cancelToken)).toBe('review-vpn');
+  expect(await page.evaluate(() => window.installToken)).toBeUndefined();
 });
