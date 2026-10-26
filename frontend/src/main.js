@@ -2615,6 +2615,9 @@ document.addEventListener('click', async (ev) => {
       }
       break;
     }
+    case 'extensions':
+      openSettingsAt('extensions');
+      break;
     case 'set-nav':
       settings.section = d.s;
       renderSettingsView();

@@ -27,3 +27,5 @@ int fmwSetDockIcon(const void *bytes, int length);
 
 void fmwSetErrorPalette(const char *palette);
 char *fmwOnboardingClipboard(int tab, const char *provider, int previousCount);
+
+void fmwExtension(const char *json, int req);

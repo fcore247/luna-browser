@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"os/exec"
 )
 
@@ -18,7 +19,12 @@ func closePlatform()                {}
 
 func handlePlatformCommand() bool { return false }
 
-func platformTitle() string { return "Luna Browser" }
+func platformTitle() string {
+	if os.Getenv("LUNA_TEST_MODE") == "1" {
+		return "Luna Browser · Erweiterungen testen"
+	}
+	return "Luna Browser"
+}
 
 func platformWindowSize() (int, int) { return 1280, 820 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"browser-mac/internal/browsermcp"
+	"browser-mac/internal/buildinfo"
 	"browser-mac/internal/secret"
 	"browser-mac/internal/web"
 	"context"
@@ -103,6 +104,9 @@ func buildMenu(app *App) *menu.Menu {
 }
 
 func main() {
+	if buildinfo.TestMode == "1" {
+		os.Setenv("LUNA_TEST_MODE", "1")
+	}
 	if handlePlatformCommand() {
 		return
 	}
@@ -137,11 +141,16 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 239, G: 182, B: 213, A: 1},
 		AssetServer:      &assetserver.Options{Assets: assets},
 		OnStartup:        app.startup,
-		OnDomReady:       func(ctx context.Context) { platformWindowReady(ctx); web.StartUpdates() },
-		OnShutdown:       app.shutdown,
-		Bind:             []interface{}{app},
-		Menu:             buildMenu(app),
-		Mac:              &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
+		OnDomReady: func(ctx context.Context) {
+			platformWindowReady(ctx)
+			if os.Getenv("LUNA_TEST_MODE") != "1" {
+				web.StartUpdates()
+			}
+		},
+		OnShutdown: app.shutdown,
+		Bind:       []interface{}{app},
+		Menu:       buildMenu(app),
+		Mac:        &mac.Options{TitleBar: mac.TitleBarHiddenInset()},
 	})
 	if err != nil {
 		println("Error:", err.Error())

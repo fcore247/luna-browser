@@ -43,7 +43,7 @@ sealed class CommandQueue
     }
 }
 
-sealed class Host : Form
+sealed partial class Host : Form
 {
     readonly int parentPID;
     IntPtr parent;
@@ -127,7 +127,7 @@ sealed class Host : Form
     {
         if (tabs.TryGetValue(id, out var existing)) return existing;
         Attach();
-        environment ??= await CoreWebView2Environment.CreateAsync(null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Luna Browser", "WebView2"));
+        environment ??= await CoreWebView2Environment.CreateAsync(null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Luna Browser", "WebView2"), new CoreWebView2EnvironmentOptions { AreBrowserExtensionsEnabled = true });
         var view = new WebView2 { Dock = DockStyle.Fill, Visible = false };
         Controls.Add(view);
         try { await view.EnsureCoreWebView2Async(environment); } catch { Controls.Remove(view); view.Dispose(); throw; }
@@ -214,6 +214,7 @@ sealed class Host : Form
     {
         int id = a.ValueKind == JsonValueKind.Object ? Int(a, "tab", -1) : -1;
         WebView2 Existing() => tabs.TryGetValue(id, out var t) ? t : throw new InvalidOperationException("Dieser Tab ist nicht geöffnet.");
+        if (op.StartsWith("extension-")) return await Extension(op[10..], a);
         switch (op)
         {
             case "load":

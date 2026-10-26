@@ -138,3 +138,11 @@ export const resetBrowserSettings = () => App.ResetBrowserSettings();
 
 // Only available to Luna’s trusted application UI.
 export const removeLuna = () => window.go.main.App.RemoveLuna();
+
+export const extensionsStatus = () => window.go.main.App.ExtensionsStatus();
+export const extensionPrepare = (source) => window.go.main.App.ExtensionPrepare(source);
+export const extensionInstall = (id) => window.go.main.App.ExtensionInstall(id);
+export const extensionCancel = (id) => window.go.main.App.ExtensionCancel(id);
+export const extensionEnable = (id, on) => window.go.main.App.ExtensionEnable(id, on);
+export const extensionRemove = (id) => window.go.main.App.ExtensionRemove(id);
+export const extensionOpen = (id, tab) => window.go.main.App.ExtensionOpen(id, tab);

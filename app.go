@@ -12,6 +12,7 @@ import (
 
 	"browser-mac/internal/browsermcp"
 	"browser-mac/internal/chat"
+	"browser-mac/internal/extensions"
 	"browser-mac/internal/musicqueue"
 	"browser-mac/internal/search"
 	"browser-mac/internal/secret"
@@ -25,6 +26,7 @@ import (
 
 // App bündelt alle Methoden, die das Frontend aufrufen darf (nur über frontend/src/api.js).
 type App struct {
+	extensions  *extensions.Manager
 	chat        *chat.Service
 	queueRouter musicqueue.Router
 	autoNext    *spotify.AutoNext
@@ -55,6 +57,9 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		dir = os.TempDir()
 	}
+	if os.Getenv("LUNA_TEST_MODE") == "1" {
+		dir = filepath.Join(dir, "Luna Extension Test")
+	}
 	if a.st, err = store.New(filepath.Join(dir, "browser-mac")); err != nil {
 		println("Speicher nicht verfügbar:", err.Error())
 	}
@@ -81,6 +86,7 @@ func (a *App) startup(ctx context.Context) {
 	a.chat = chat.New(filepath.Join(dir, "browser-mac"), a.secrets, func(c chat.Conversation) { b, _ := json.Marshal(c); a.emit("chat-update", string(b)) })
 	a.spotifyAPI = spotifyapi.New(a.secrets)
 	configurePlatform(a)
+	a.initExtensions(dir)
 	a.autoNext = spotify.NewAutoNext(func(status spotify.NextStatus) { b, _ := json.Marshal(status); a.emit("spotify-next", string(b)) })
 	sonosContext, stopSonos := context.WithCancel(ctx)
 	a.stopSonos = stopSonos

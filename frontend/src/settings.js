@@ -1,3 +1,4 @@
+import { createExtensions } from './extensions-view.js';
 import { personalSettingsHTML } from './personalization.js';
 import { WINDOWS } from './platform.js';
 import { chatSettingsHTML } from './chat.js';
@@ -22,6 +23,15 @@ export function createSettings({
   toast,
   onSearchKeyChanged,
 }) {
+  let extensionTarget = -1;
+  const extensions = createExtensions({
+    render: renderSettingsView,
+    toast,
+    targetTab: () =>
+      S.tabs.some((t) => t.id === extensionTarget && t.mode === 'web')
+        ? extensionTarget
+        : (S.tabs.find((t) => t.mode === 'web')?.id ?? -1),
+  });
   let setMsg = { text: '', kind: '' };
   let mcpStatus = {};
   async function refreshMCPStatus() {
@@ -110,10 +120,13 @@ export function createSettings({
     ['search', 'Suche'],
     ['spotify', 'Spotify'],
     ['mcp', 'KI & MCP'],
+    ['extensions', 'Erweiterungen'],
     ['updates', 'Updates'],
     ['data', 'Daten'],
   ];
   const SET_ICONS = {
+    extensions:
+      '<path d="M8 3h4v3a2 2 0 1 0 4 0V3h4v7h-3a2 2 0 1 0 0 4h3v7H8v-3a2 2 0 1 0-4 0v3H2v-7h3a2 2 0 1 0 0-4H2V3h6z"/>',
     look: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M12 4a8 8 0 0 1 0 16"/>',
     bm: '<path d="M6 4h12v17l-6-4-6 4z"/>',
     panels: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>',
@@ -199,6 +212,7 @@ export function createSettings({
       ${sonosSettingsHTML(sonosState)}
       ${chatSettingsHTML()}
       ${mcpSettingsHTML(mcpStatus)}
+      ${extensions.html()}
       <section id="set-updates" class="sp-card"><h2>Updates</h2>
         <div class="swrow"><div><b>Luna Browser ${esc(updateState.version || '')}</b><span>Updates direkt aus unseren GitHub Releases.</span></div><span class="muted">${WINDOWS ? 'Windows · experimentell / instabil' : 'macOS'}</span></div>
         <div class="swrow"><div><b>Automatische Updates</b><span>Einmal täglich prüfen und Updates automatisch laden. Luna meldet sich leise mit einem Punkt am Menü, wenn eines bereit ist.</span></div><button class="btn" role="switch" aria-label="Automatische Updates" aria-checked="${!!updateState.automatic}" data-update-action="automatic" ${!updateState.ready ? 'disabled' : ''}>${updateState.automatic ? 'Ein' : 'Aus'}</button></div>
@@ -321,8 +335,10 @@ export function createSettings({
       return settingsSection;
     },
     set section(value) {
+      if (value === 'extensions' && cur()?.mode === 'web') extensionTarget = cur().id;
       settingsSection = value === 'chat' ? 'mcp' : value === 'input' ? 'gestures' : value;
       if (settingsSection === 'updates') refreshUpdates();
+      if (settingsSection === 'extensions') extensions.refresh();
     },
     get mcp() {
       return mcpStatus;

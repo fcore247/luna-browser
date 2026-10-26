@@ -59,13 +59,23 @@ jobs:
         shell: pwsh
         run: |
           $p = Start-Process build/bin/native/Luna.Windows.exe -ArgumentList '--self-test' -PassThru -RedirectStandardOutput native-test.log -RedirectStandardError native-test-errors.log
-          if (!$p.WaitForExit(90000)) { $p.Kill(); throw 'Native tests timed out' }
+          if (!$p.WaitForExit(150000)) { $p.Kill(); throw 'Native tests timed out' }
           Get-Content native-test.log
           Get-Content native-test-errors.log
           if ($p.ExitCode -ne 0) { throw "Native tests failed: $($p.ExitCode)" }
           if (!(Select-String -Path native-test.log -Pattern NATIVE_TESTS_PASSED -Quiet)) { throw 'Native tests did not complete' }
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+      - name: Native macOS extension integration tests
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          xcrun clang -fobjc-arc -framework Cocoa -framework WebKit -framework LocalAuthentication native/tests/extensions-macos.m -o /tmp/luna-extension-tests
+          python3 -m http.server 18769 --bind 127.0.0.1 --directory native/tests/extension-fixture >/tmp/luna-extension-http.log 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for attempt in 1 2 3 4 5; do curl -fsS http://127.0.0.1:18769/ >/dev/null && break || sleep 1; done
+          /tmp/luna-extension-tests "$PWD/native/tests/extension-fixture" http://127.0.0.1:18769/
       - name: Build macOS
         if: runner.os == 'macOS'
         shell: bash

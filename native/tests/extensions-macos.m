@@ -1,0 +1,28 @@
+#import "../../internal/web/web_darwin.m"
+static NSMutableDictionary *results;
+void goWebEvent(char *json) {}
+void goSnapshotDone(int req,char *value) { results[@(req)] = [NSString stringWithUTF8String:value]; }
+static void pump(double seconds) { NSDate *end=[NSDate dateWithTimeIntervalSinceNow:seconds];while (end.timeIntervalSinceNow>0) [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.02]]; }
+static void check(BOOL condition,NSString *reason) { if (!condition) {fprintf(stderr,"FAILED: %s\n",reason.UTF8String);exit(1);} }
+static void call(NSString *op,NSString *path) {
+ static int seq=0;int req=++seq;NSDictionary *args=@{@"id":@"abcdef0123456789abcdef0123456789",@"path":path?:@""};
+ NSData *j=[NSJSONSerialization dataWithJSONObject:@{@"op":op,@"args":args} options:0 error:nil];NSString *s=[[NSString alloc]initWithData:j encoding:NSUTF8StringEncoding];fmwExtension(s.UTF8String,req);
+ NSDate *end=[NSDate dateWithTimeIntervalSinceNow:20];while (!results[@(req)]&&end.timeIntervalSinceNow>0) pump(.05);
+ check(results[@(req)]!=nil,@"Native extension command timed out");
+ NSDictionary *response=[NSJSONSerialization JSONObjectWithData:[results[@(req)] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+ check([response[@"error"] length]==0,response[@"error"]);printf("%s passed\n",op.UTF8String);
+}
+static NSString *marker(void) {
+ if (!gTabs[@1]) { pump(.1); return @""; }
+ __block BOOL done=NO;__block NSString *value=nil;[gTabs[@1].view evaluateJavaScript:@"document.body?.dataset.lunaExtension || ''" completionHandler:^(id result,NSError *error){value=[result isKindOfClass:NSString.class]?result:@"";done=YES;}];while(!done)pump(.02);return value;
+}
+int main(int argc,const char **argv) { @autoreleasepool {
+ check(argc==3,@"Usage: extensions-macos packageDir httpURL");results=[NSMutableDictionary new];[NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+ NSWindow *window=[[NSWindow alloc]initWithContentRect:NSMakeRect(50,50,800,600) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];WKWebView *ui=[[WKWebView alloc]initWithFrame:window.contentView.bounds];[window.contentView addSubview:ui];[window makeKeyAndOrderFront:nil];
+ NSString *path=[NSString stringWithUTF8String:argv[1]],*url=[NSString stringWithUTF8String:argv[2]];
+ call(@"supported",path);call(@"load",path);fmwLoad(1,url.UTF8String);fmwShow(1);
+ NSDate *end=[NSDate dateWithTimeIntervalSinceNow:20];while(!marker().length&&end.timeIntervalSinceNow>0)pump(.1);check(marker().intValue>=1,@"Extension did not inject or chrome.storage.local failed");
+ int first=marker().intValue;call(@"unload",path);fmwHistory(1,2);pump(2);check(marker().length==0,@"Disabled extension still injected");
+ call(@"load",path);fmwHistory(1,2);end=[NSDate dateWithTimeIntervalSinceNow:20];while(marker().intValue<=first&&end.timeIntervalSinceNow>0)pump(.1);check(marker().intValue>first,@"Extension storage did not persist after reactivation");
+ call(@"unload",path);printf("MACOS_EXTENSIONS_PASSED (injection, isolated storage, disable, re-enable, persistence)\n");
+ }return 0;}

@@ -60,6 +60,7 @@ static class NativeTests
             while (DateTime.UtcNow < deadline) { title = (string?)await Call("evaluate", new { tab = 1, source = "document.title" }); if (title == "Luna Test") break; await Task.Delay(100); }
             Assert(title == "Luna Test", "Native WebView2 navigation failed");
             Assert((string?)await Call("evaluate", new { tab = 1, source = "document.querySelector('#field').value='hello';document.querySelector('#field').value" }) == "hello", "DOM interaction failed");
+            await TestExtensions(Call, $"http://127.0.0.1:{port}/");
             await Call("zoom", new { tab = 1, factor = 1.25 });
             await Call("appearance", new { mode = "dark" });
             var shot = (string?)await Call("screenshot", new { tab = 1 }); Assert(Convert.FromBase64String(shot!).Length > 100, "Screenshot missing"); Assert(Clipboard.ContainsImage(), "Screenshot not copied");
@@ -73,6 +74,21 @@ static class NativeTests
             await TestIPC($"http://127.0.0.1:{port}/");
         }
         finally { cancel.Cancel(); listener.Stop(); await server; }
+    }
+    static async Task TestExtensions(Func<string,object,Task<object?>> call,string url) {
+        var args=new{id="luna-native-extension-test",path=Path.GetFullPath("native/tests/extension-fixture")};
+        await call("extension-load",args);
+        async Task<int> Marker() { var s=(string?)await call("evaluate",new{tab=1,source="document.body?.dataset.lunaExtension || ''"});return int.TryParse(s,out var n)?n:0; }
+        try {
+            await call("load",new{tab=1,url});
+            var end=DateTime.UtcNow.AddSeconds(15);while(await Marker()==0&&DateTime.UtcNow<end)await Task.Delay(100);
+            var first=await Marker();Assert(first>0,"Extension injection or chrome.storage.local failed");
+            await call("extension-unload",args);await call("load",new{tab=1,url});await Task.Delay(1500);
+            Assert(await Marker()==0,"Disabled extension still injected");
+            await call("extension-load",args);await call("load",new{tab=1,url});
+            end=DateTime.UtcNow.AddSeconds(15);while(await Marker()<=first&&DateTime.UtcNow<end)await Task.Delay(100);
+            Assert(await Marker()>first,"Reactivated extension lost persistent storage");
+        } finally { await call("extension-remove",args); }
     }
     static async Task Serve(TcpListener listener,CancellationToken token) {
         var clients=new List<Task>();

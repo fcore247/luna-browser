@@ -64,10 +64,13 @@ static void applyGesture(WKWebViewConfiguration *c) {
 	}
 }
 
+static WKWebExtensionController *extensionController(void) API_AVAILABLE(macos(15.4));
+
 static WKWebViewConfiguration *sharedConfig(void) {
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
 		gConfig = [WKWebViewConfiguration new];
+        if (@available(macOS 15.4, *)) gConfig.webExtensionController = extensionController();
 		// Als Safari ausgeben, sonst blocken manche Seiten (Google u. a.) unbekannte Browser.
 		gConfig.applicationNameForUserAgent = @"Version/17.4 Safari/605.1.15";
 		applyGesture(gConfig);
@@ -127,13 +130,15 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
  @"</style><style id=luna-error-palette>%@</style><main><div class=mark>LUNA BROWSER</div><svg aria-hidden=true viewBox=\"0 0 48 48\" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d=\"M24 4 7 11v12c0 10 17 21 17 21s17-11 17-21V11Z\"/><path d=\"M24 14v12m0 7h.01\"/></svg><div class=host>%@</div><h1>%@</h1><p>%@</p><p>%@</p>%@<details><summary>Technische Details</summary><p>%@ (%@ · %ld)</p></details></main></html>", esc(title), gErrorPaletteCSS, esc(u.host), esc(title), esc(reason), esc(hint), retry, esc(e.localizedDescription), esc(e.domain), (long)e.code];
 }
 
-@interface FMTab : NSObject <WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate>
+@interface FMTab : NSObject <WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, WKWebExtensionTab>
 @property (nonatomic) int tid;
 @property (nonatomic, strong) WKWebView *view;
 @property (nonatomic) BOOL isError;
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg;
 - (void)teardown;
 @end
+
+static id extensionWindow(void) API_AVAILABLE(macos(15.4));
 
 static void layoutTab(FMTab *t) {
 	NSView *cv = fmWindow().contentView;
@@ -149,6 +154,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	if (!t) {
 		t = [[FMTab alloc] initWithId:tid config:cfg ?: sharedConfig()];
 		gTabs[@(tid)] = t;
+        if (@available(macOS 15.4, *)) [extensionController() didOpenTab:t];
 		layoutTab(t);
 	}
 	return t;
@@ -173,7 +179,17 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	return self;
 }
 
+- (WKWebView *)webViewForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _view; }
+- (id<WKWebExtensionWindow>)windowForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { if (@available(macOS 15.4, *)) return extensionWindow(); return nil; }
+- (NSString *)titleForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _view.title; }
+- (NSURL *)urlForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _view.URL; }
+- (BOOL)isLoadingCompleteForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return !_view.loading; }
+- (BOOL)isSelectedForWebExtensionContext:(WKWebExtensionContext *)context API_AVAILABLE(macos(15.4)) { return _tid == gActive; }
+- (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); }
+- (void)reloadFromOrigin:(BOOL)origin forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view reload]; done(nil); }
+
 - (void)teardown {
+    if (@available(macOS 15.4, *)) [extensionController() didCloseTab:self windowIsClosing:NO];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view removeObserver:self forKeyPath:k];
 	_view.navigationDelegate = nil;
@@ -194,7 +210,8 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 		if (dl) emit(@{@"t": @"dl", @"id": dl, @"state": @"progress", @"received": @(((NSProgress *)object).completedUnitCount), @"total": @(((NSProgress *)object).totalUnitCount)});
 		return;
 	}
-	[self push];
+	if (@available(macOS 15.4, *)) [extensionController() didChangeTabProperties:(WKWebExtensionTabChangedPropertiesLoading | WKWebExtensionTabChangedPropertiesTitle | WKWebExtensionTabChangedPropertiesURL) forTab:self];
+    [self push];
 }
 
 #pragma mark Navigation
@@ -203,7 +220,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	NSURL *u = action.request.URL;
 	NSString *sch = u.scheme.lowercaseString;
 	if (action.shouldPerformDownload) { handler(WKNavigationActionPolicyDownload); return; }
-	if (sch.length && ![@[@"http", @"https", @"file", @"about", @"data", @"blob", @"javascript"] containsObject:sch]) {
+	if (sch.length && ![@[@"http", @"https", @"file", @"about", @"data", @"blob", @"javascript", @"webkit-extension"] containsObject:sch]) {
 		[[NSWorkspace sharedWorkspace] openURL:u]; // mailto:, tel:, Apps …
 		handler(WKNavigationActionPolicyCancel);
 		return;
@@ -306,6 +323,8 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 
 @end
 
+#include "extensions_darwin.inc"
+
 @implementation FMGestureHandler
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
 	if (![msg.name isEqualToString:@"fmGesture"]) return;
@@ -349,7 +368,9 @@ void fmwSetFrame(double x, double y, double w, double h) {
 }
 void fmwShow(int id) {
 	dispatch_async(dispatch_get_main_queue(), ^{
-		gActive = id;
+		FMTab *previous = gTabs[@(gActive)];
+        gActive = id;
+        if (@available(macOS 15.4, *)) if (gTabs[@(id)]) [extensionController() didActivateTab:gTabs[@(id)] previousActiveTab:previous];
 		for (FMTab *t in gTabs.allValues) t.view.hidden = (t.tid != gActive);
 	});
 }
