@@ -20,7 +20,7 @@ import { initTabGroups } from './tab-groups.js';
 import { createSettings } from './settings.js';
 import { createExtensionsMenu } from './extensions-menu.js';
 import { createStoreInstall } from './store-install.js';
-import { createPersonalizedPages } from './personalized-pages.js';
+import { createPersonalizedPages, pageMatches } from './personalized-pages.js';
 let personalizedPages = null;
 let storeInstall = null;
 let extensionMenu = null;
@@ -1977,6 +1977,15 @@ extensionMenu = createExtensionsMenu({
 });
 personalizedPages = createPersonalizedPages({
   currentTab: cur,
+  sourceTab: (url) =>
+    (
+      S.tabs.find(
+        (tab) =>
+          tab.mode === 'web' &&
+          pageMatches({ url, scope: 'path', enabled: true }, tab.url) &&
+          new URL(tab.url).search === new URL(url).search,
+      ) || newTab(url, { background: true })
+    ).id,
   showNative: nativeShow,
   refreshUI: renderAll,
   openURL: (url) => newTab(url),

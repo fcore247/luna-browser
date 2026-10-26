@@ -161,3 +161,25 @@ export const personalizedRemove = (id) => window.go.main.App.PersonalizedRemove(
 export const personalizedSource = (tab, selectors = []) =>
   window.go.main.App.PersonalizedSource(tab, selectors);
 export const onPersonalizedPages = (cb) => EventsOn('personalized-pages-changed', cb);
+
+export const personalizedInspect = (
+  tab,
+  query = '',
+  selector = '',
+  offset = 0,
+  area = 'main',
+  valuesOnly = false,
+  rootSelector = '',
+) =>
+  window.go.main.App.PersonalizedInspect(
+    tab,
+    query,
+    selector,
+    offset,
+    area,
+    valuesOnly,
+    rootSelector,
+  );
+export const personalizedRead = (tab, fields) => window.go.main.App.PersonalizedRead(tab, fields);
+export const personalizedValidate = (recipe) =>
+  window.go.main.App.PersonalizedValidate(JSON.stringify(recipe));

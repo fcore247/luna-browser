@@ -5,27 +5,60 @@ package personalpages
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
 
+type Source struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
+}
+type Format struct {
+	Attribute string `json:"attribute,omitempty"`
+	Pattern   string `json:"pattern,omitempty"`
+	Group     int    `json:"group,omitempty"`
+	Unit      string `json:"unit,omitempty"`
+}
+type Threshold struct {
+	Op    string  `json:"op"`
+	Value float64 `json:"value"`
+	Tone  string  `json:"tone"`
+}
+type Column struct {
+	Title    string  `json:"title"`
+	Selector string  `json:"selector"`
+	Format   *Format `json:"format,omitempty"`
+}
 type Field struct {
-	Title    string `json:"title"`
-	Selector string `json:"selector"`
-	Kind     string `json:"kind"`
-	Icon     string `json:"icon,omitempty"`
+	Title          string      `json:"title"`
+	Selector       string      `json:"selector"`
+	Kind           string      `json:"kind"`
+	Icon           string      `json:"icon,omitempty"`
+	Width          string      `json:"width,omitempty"`
+	Group          string      `json:"group,omitempty"`
+	Tone           string      `json:"tone,omitempty"`
+	Max            float64     `json:"max,omitempty"`
+	Limit          int         `json:"limit,omitempty"`
+	Source         string      `json:"source,omitempty"`
+	Format         *Format     `json:"format,omitempty"`
+	Columns        []Column    `json:"columns,omitempty"`
+	Thresholds     []Threshold `json:"thresholds,omitempty"`
+	FirstRowHeader bool        `json:"firstRowHeader,omitempty"`
 }
 type Page struct {
-	ID       string  `json:"id"`
-	Title    string  `json:"title"`
-	Subtitle string  `json:"subtitle"`
-	URL      string  `json:"url"`
-	Scope    string  `json:"scope"`
-	Enabled  bool    `json:"enabled"`
-	Fields   []Field `json:"fields"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Subtitle string   `json:"subtitle"`
+	URL      string   `json:"url"`
+	Scope    string   `json:"scope"`
+	Enabled  bool     `json:"enabled"`
+	Fields   []Field  `json:"fields"`
+	Sources  []Source `json:"sources,omitempty"`
 }
 type Manager struct {
 	mu    sync.Mutex
@@ -66,26 +99,71 @@ func Validate(page Page) error {
 	if page.Scope != "path" && page.Scope != "site" {
 		return errors.New("scope muss path oder site sein")
 	}
-	if len(page.Fields) == 0 || len(page.Fields) > 24 {
-		return errors.New("Eine Ansicht braucht 1 bis 24 Felder")
+	if len(page.Fields) == 0 || len(page.Fields) > 60 {
+		return errors.New("Eine Ansicht braucht 1 bis 60 Bausteine")
+	}
+	sources := map[string]bool{"": true}
+	if len(page.Sources) > 8 {
+		return errors.New("Maximal 8 zusätzliche Quellen")
+	}
+	for _, source := range page.Sources {
+		u, err := url.Parse(source.URL)
+		if source.ID == "" || len(source.ID) > 80 || sources[source.ID] || err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil {
+			return errors.New("Ungültige oder doppelte Quelle")
+		}
+		sources[source.ID] = true
 	}
 	for _, f := range page.Fields {
-		if len(f.Title) > 150 || len(f.Icon) > 24 || f.Selector == "" || len(f.Selector) > 1000 {
+		if !sources[f.Source] {
+			return errors.New("Unbekannte Quelle für Baustein: " + f.Title)
+		}
+		if err := validateFormat(f.Format); err != nil {
+			return err
+		}
+		if len(f.Columns) > 12 || len(f.Thresholds) > 6 {
+			return errors.New("Zu viele Spalten oder Schwellenwerte")
+		}
+		for _, column := range f.Columns {
+			if len(column.Title) > 150 || column.Selector == "" || len(column.Selector) > 1000 {
+				return errors.New("Ungültige Spalte")
+			}
+			if err := validateFormat(column.Format); err != nil {
+				return err
+			}
+		}
+		for _, threshold := range f.Thresholds {
+			if (threshold.Op != "gt" && threshold.Op != "gte" && threshold.Op != "lt" && threshold.Op != "lte") || (threshold.Tone != "positive" && threshold.Tone != "warning" && threshold.Tone != "critical") || math.IsNaN(threshold.Value) || math.IsInf(threshold.Value, 0) {
+				return errors.New("Ungültiger Schwellenwert")
+			}
+		}
+
+		if len(f.Title) > 150 || len(f.Icon) > 24 || (f.Selector == "" && f.Kind != "heading" && f.Kind != "divider") || len(f.Selector) > 1000 {
 			return errors.New("Feld oder Quellselektor ungültig")
 		}
-		if f.Kind != "metric" && f.Kind != "text" && f.Kind != "list" {
-			return errors.New("Feldtyp muss metric, text oder list sein")
+		switch f.Kind {
+		case "metric", "text", "list", "heading", "divider", "notice", "badge", "progress", "gauge", "bars", "line", "table", "timeline", "image", "link", "accordion", "hero", "cards", "grid":
+		default:
+			return errors.New("Unbekannter Bausteintyp")
 		}
+		if (f.Width != "" && f.Width != "normal" && f.Width != "wide" && f.Width != "full") || len(f.Group) > 80 {
+			return errors.New("Ungültige Bausteinbreite oder Tabgruppe")
+		}
+		if f.Tone != "" && f.Tone != "neutral" && f.Tone != "positive" && f.Tone != "warning" && f.Tone != "critical" {
+			return errors.New("Ungültiger Statusstil")
+		}
+		if math.IsNaN(f.Max) || math.IsInf(f.Max, 0) || f.Max < 0 || f.Max > 1e12 || f.Limit < 0 || f.Limit > 50 {
+			return errors.New("Ungültige Skala oder Anzahl")
+		}
+
 	}
 	return nil
 }
 func (m *Manager) List() []Page {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	out := append([]Page{}, m.pages...)
-	for i := range out {
-		out[i].Fields = append([]Field{}, out[i].Fields...)
-	}
+	raw, _ := json.Marshal(m.pages)
+	out := []Page{}
+	_ = json.Unmarshal(raw, &out)
 	return out
 }
 func (m *Manager) change(apply func([]Page) ([]Page, error)) error {
@@ -145,4 +223,28 @@ func (m *Manager) Enable(id string, enabled bool) error {
 		}
 		return nil, errors.New("Seite nicht gefunden")
 	})
+}
+
+func validateFormat(f *Format) error {
+	if f == nil {
+		return nil
+	}
+	switch f.Attribute {
+	case "", "text", "alt", "title", "aria-label":
+	default:
+		return errors.New("Nicht unterstütztes Quellattribut")
+	}
+	if len(f.Pattern) > 300 || f.Group < 0 || f.Group > 12 || len(f.Unit) > 40 {
+		return errors.New("Ungültiges Textformat")
+	}
+	if f.Pattern != "" {
+		compiled, err := regexp.Compile(f.Pattern)
+		if err != nil {
+			return errors.New("Ungültiges Extraktionsmuster: " + err.Error())
+		}
+		if f.Group > compiled.NumSubexp() {
+			return errors.New("Extraktionsgruppe existiert nicht")
+		}
+	}
+	return nil
 }
