@@ -1,5 +1,5 @@
 /* Luna Browser – Webseite
-   Abendhimmel (Canvas), ein Browserfenster, das beim Scrollen Lunas Funktionen zeigt,
+   Luna-Wellen (Canvas), ein Browserfenster, das beim Scrollen Lunas Funktionen zeigt,
    Farbwelten wie im Browser (gleiche Formeln wie color-themes.js) und ein Installationsdialog. */
 (() => {
   'use strict';
@@ -53,74 +53,63 @@
     if (persist) store.set('luna-site-theme', id);
   }
 
-  /* ---------- Abendhimmel: Wolken aus Rauschen, einmal berechnet, je Farbwelt neu eingefärbt ---------- */
-  const SW = 640, SH = 400;
-  const skyCanvas = $('#skyCanvas');
-  skyCanvas.width = SW; skyCanvas.height = SH;
-  const sctx = skyCanvas.getContext('2d');
-  const density = new Float32Array(SW * SH), light = new Float32Array(SW * SH);
-  (function cloudField() {
-    const P = new Uint8Array(512);
-    let seed = 7;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    const perm = Array.from({ length: 256 }, (_, i) => i);
-    for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
-    for (let i = 0; i < 512; i++) P[i] = perm[i & 255];
-    const val = (x, y) => P[P[x & 255] + (y & 255)] / 255;
-    const fade = (q) => q * q * (3 - 2 * q);
-    function noise(x, y) {
-      const xi = Math.floor(x), yi = Math.floor(y), xf = fade(x - xi), yf = fade(y - yi);
-      const a = val(xi, yi), b = val(xi + 1, yi), c = val(xi, yi + 1), d = val(xi + 1, yi + 1);
-      return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
-    }
-    function fbm(x, y, oct = 5) { let s = 0, amp = 0.5, f = 1; for (let o = 0; o < oct; o++) { s += amp * noise(x * f, y * f); f *= 2.03; amp *= 0.5; } return s; }
-    const raw = new Float32Array(SW * SH);
-    for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
-      const u = x / 230, v = y / 130;
-      const wx = fbm(u + 3.1, v + 1.7, 3), wy = fbm(u + 8.3, v + 2.8, 3);
-      raw[y * SW + x] = fbm(u + wx * 0.7, v + wy * 0.5);
-    }
-    for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
-      const nx = x / SW - 0.5, ny = y / SH;
-      // oben in der Mitte bleibt der Himmel frei für die Überschrift, unten und an den Seiten türmen sich Wolken
-      const mask = clamp(0.1 + 0.9 * ny ** 1.6 + 1.1 * Math.abs(nx) ** 1.8 - 0.25 * Math.exp(-(nx * nx) / 0.02) * (1 - ny));
-      const n = raw[y * SW + x] * (0.55 + mask * 0.75);
-      const d = clamp((n - 0.44) / 0.2) * clamp(mask * 1.8);
-      density[y * SW + x] = d * d * (3 - 2 * d);
-      const yu = Math.max(0, y - 6), mu = clamp(0.1 + 0.9 * (yu / SH) ** 1.6 + 1.1 * Math.abs(nx) ** 1.8 - 0.25 * Math.exp(-(nx * nx) / 0.02) * (1 - yu / SH));
-      const up = raw[yu * SW + x] * (0.55 + mu * 0.75);
-      light[y * SW + x] = clamp(0.62 + (n - up) * 6);
-    }
-  })();
-  const hsl2rgb = (h, s, l) => {
-    h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
-    const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
-    return [0, 8, 4].map((n) => 255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
-  };
-  let skyTimer;
+  /* ---------- Luna-Wellen: Farbverlauf und sanft wogende Wellen in der Farbwelt ---------- */
+  const skyCanvas = $('#skyCanvas'), sctx = skyCanvas.getContext('2d');
+  let skyColors = null, skyW = 0, skyH = 0, skyVisible = true;
+  function waveColors() {
+    const th = THEMES.find((x) => x[0] === themeId);
+    const h = th[2], s = Math.max(th[3], 18);
+    return {
+      top: `hsl(${h - 15} ${s * 0.8}% 16%)`, bottom: `hsl(${h + 5} ${s}% 40%)`,
+      // von hinten nach vorne immer heller, wie die Wellen auf Lunas Startseite
+      layers: [0, 1, 2, 3, 4].map((i) => `hsl(${h + i * 6} ${s + 4}% ${36 + i * 10}% / ${0.5 + i * 0.1})`),
+      rim: `hsl(${h + 10} 80% 92% / .35)`,
+    };
+  }
+  // Jede Welle ist eine Summe aus zwei Sinuskurven, die sich langsam verschieben
+  const WAVES = [
+    { y: 0.5, a: 0.05, f: 1.2, p: 0.3, v: 0.05 },
+    { y: 0.6, a: 0.045, f: 1.6, p: 2.1, v: -0.07 },
+    { y: 0.7, a: 0.04, f: 1.1, p: 4.2, v: 0.06 },
+    { y: 0.8, a: 0.035, f: 1.9, p: 1.4, v: -0.05 },
+    { y: 0.9, a: 0.03, f: 1.4, p: 3.3, v: 0.08 },
+  ];
+  function paintWaves(c, w, h, time, col) {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, col.top); g.addColorStop(1, col.bottom);
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    WAVES.forEach((wv, i) => {
+      const yAt = (x) => {
+        const u = x / w;
+        return h * (wv.y + wv.a * Math.sin(u * Math.PI * 2 * wv.f + wv.p + time * wv.v) + wv.a * 0.5 * Math.sin(u * Math.PI * 2 * (wv.f * 2.3) - wv.p - time * wv.v * 1.7));
+      };
+      c.beginPath(); c.moveTo(0, yAt(0));
+      for (let x = 0; x <= w; x += 8) c.lineTo(x, yAt(x));
+      c.lineTo(w, h); c.lineTo(0, h); c.closePath();
+      c.fillStyle = col.layers[i]; c.fill();
+      c.beginPath(); c.moveTo(0, yAt(0));
+      for (let x = 0; x <= w; x += 8) c.lineTo(x, yAt(x));
+      c.strokeStyle = col.rim; c.lineWidth = 1.2; c.stroke();
+    });
+  }
+  function fitSky() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    skyW = innerWidth; skyH = innerHeight;
+    skyCanvas.width = skyW * dpr; skyCanvas.height = skyH * dpr;
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  fitSky(); addEventListener('resize', fitSky);
+  new IntersectionObserver((es) => { skyVisible = es[0].isIntersecting; }).observe($('.skywrap'));
+  (function frame(now) {
+    if (skyColors && skyVisible && !document.hidden) paintWaves(sctx, skyW, skyH, reduce ? 0 : now / 1000, skyColors);
+    requestAnimationFrame(frame);
+  })(0);
   function drawSky() {
-    clearTimeout(skyTimer);
-    skyTimer = setTimeout(() => {
-      const th = THEMES.find((x) => x[0] === themeId);
-      const h = th[2], s = Math.max(th[3], 22);
-      const img = sctx.createImageData(SW, SH), d = img.data;
-      const lit = hsl2rgb(h + 15, 70, 95), mid = hsl2rgb(h, s + 10, 80), shade = hsl2rgb(h - 10, s, 52);
-      for (let y = 0; y < SH; y++) {
-        const k = y / SH;
-        const top = hsl2rgb(h - 25, s * 0.7 + 10, 24 + 8 * k), bot = hsl2rgb(h + 20, s + 15, 46 + 32 * k * k);
-        const sky = top.map((v, i) => v + (bot[i] - v) * k);
-        for (let x = 0; x < SW; x++) {
-          const i = y * SW + x, a = density[i], l = light[i];
-          const cl = l > 0.5 ? mid.map((v, j) => v + (lit[j] - v) * (l - 0.5) * 2) : shade.map((v, j) => v + (mid[j] - v) * l * 2);
-          d[i * 4] = sky[0] + (cl[0] - sky[0]) * a;
-          d[i * 4 + 1] = sky[1] + (cl[1] - sky[1]) * a;
-          d[i * 4 + 2] = sky[2] + (cl[2] - sky[2]) * a;
-          d[i * 4 + 3] = 255;
-        }
-      }
-      sctx.putImageData(img, 0, 0);
-      try { root.style.setProperty('--sky-img', `url(${skyCanvas.toDataURL('image/jpeg', 0.86)})`); } catch {}
-    }, 30);
+    skyColors = waveColors();
+    // Standbild der Wellen für Karten und den Schluss
+    const off = document.createElement('canvas'); off.width = 960; off.height = 600;
+    paintWaves(off.getContext('2d'), 960, 600, 0, skyColors);
+    try { root.style.setProperty('--sky-img', `url(${off.toDataURL('image/jpeg', 0.88)})`); } catch {}
   }
 
   /* ---------- Farbwahl in der Feature-Karte und im Fenster ---------- */
