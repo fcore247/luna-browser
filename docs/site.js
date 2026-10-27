@@ -188,7 +188,7 @@
     { cap: t('Klick eine Farbwelt an und probier sie aus.'), cmd: 'theme' },
     { cap: t('Mal ein S, und der Screenshot ist im Kasten.'), cmd: '' },
     { cap: t('Tippe play, und deine Musik spielt mit.'), cmd: 'play one more time' },
-    { cap: t('Sira hilft, ganz lokal auf deinem Mac.'), cmd: 'chat' },
+    { cap: t('Deine KI macht aus nervigen Seiten deine eigenen.'), cmd: 'wetter-portal.example' },
   ];
   let step = -1, run = 0;
   const placeholder = t('Suchen oder Adresse eingeben');
@@ -207,7 +207,8 @@
     frame.removeAttribute('style');
     $$('.tcard').forEach((c) => c.classList.remove('on'));
     $('#spotTitle').textContent = 'Spotify'; $('#spotSub').textContent = t('Keine Wiedergabe');
-    $('#siraText').textContent = '';
+    frame.classList.remove('made');
+    $$('.ag-log li').forEach((li) => li.classList.remove('on'));
     const s = STEPS[n];
     if (s.cmd) { if (!(await typeAddr(s.cmd, my))) return; await sleep(reduce ? 0 : 250); }
     else resetAddr();
@@ -228,10 +229,15 @@
     }
     if (n === 3) { resetAddr(); $('#spotTitle').textContent = 'One More Time'; $('#spotSub').textContent = 'Daft Punk'; }
     if (n === 4) {
-      resetAddr();
-      const A = t('Das ist Lunas Startseite: Uhr, Suche und deine Musik, alles ruhig an einem Ort. Ich laufe lokal auf deinem Mac, ganz ohne Konto.');
-      await sleep(700);
-      for (let k = 1; k <= A.length && my === run; k++) { $('#siraText').textContent = A.slice(0, k); await sleep(reduce ? 0 : 18); }
+      resetAddr(); addrText.textContent = 'wetter-portal.example';
+      // Die verbundene KI arbeitet die Schritte ab, dann wird aus der nervigen Seite die persönliche
+      const items = $$('.ag-log li');
+      for (let i = 0; i < items.length && my === run; i++) {
+        await sleep(reduce ? 0 : 700);
+        if (my !== run) return;
+        items[i].classList.add('on');
+        if (i === items.length - 1) { frame.classList.add('made'); addrText.textContent = t('Mein Wetter · persönliche Seite'); }
+      }
     }
   }
   function setStep(n) {
@@ -253,6 +259,15 @@
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; onScroll(); }); } }, { passive: true });
   addEventListener('resize', onScroll);
   onScroll();
+
+  /* ---------- Eigene Seiten: Vorher/Nachher zum Ziehen ---------- */
+  const compare = $('#compare');
+  const copy = (sel) => { const n = $(sel).cloneNode(true); n.removeAttribute('id'); return n; };
+  $('#cmpBefore').append(copy('#clutter'));
+  $('#cmpAfter').append(copy('#ppage'));
+  const cmpRange = $('#cmpRange');
+  const setCmp = () => compare.style.setProperty('--x', `${cmpRange.value}%`);
+  cmpRange.addEventListener('input', setCmp); setCmp();
 
   /* ---------- Einblenden ---------- */
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });

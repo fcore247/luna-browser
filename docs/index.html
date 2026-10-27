@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Luna Browser – Mach es dir im Web gemütlich</title>
-<meta name="description" content="Luna ist ein gemütlicher Browser für macOS und Windows: zehn Farbwelten, Mausgesten, Spotify und eine KI, die auf Wunsch mitdenkt.">
+<meta name="description" content="Luna ist ein gemütlicher Browser für macOS und Windows: zehn Farbwelten, Mausgesten, Spotify und deine eigene KI, die aus nervigen Seiten persönliche macht.">
 <meta name="theme-color" content="#0c0a0d">
 <meta property="og:title" content="Luna Browser – Mach es dir im Web gemütlich">
 <meta property="og:description" content="Zehn Farbwelten, Mausgesten, Spotify und KI – ein Browser, der sich nach dir richtet.">
 <meta property="og:image" content="https://luna-browser.com/assets/media/poster.jpg">
 <link rel="icon" href="assets/luna-icon.svg">
 <link rel="preload" href="assets/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=themes-1">
+<link rel="stylesheet" href="style.css?v=pages-1">
 </head>
 <body>
 
@@ -45,7 +45,7 @@
   <div class="nav-in">
     <a class="brand" href="#top" aria-label="Luna Browser"><svg class="brand-icon"><use href="#icon"/></svg><svg class="brand-wm"><use href="#wm"/></svg></a>
     <nav class="links" aria-label="Hauptmenü">
-      <a href="#tour">Tour</a><a href="#browser">Features</a><a href="#privat">Privatsphäre</a><a href="#trailer">Trailer</a>
+      <a href="#tour">Tour</a><a href="#browser">Features</a><a href="#seiten">Eigene Seiten</a><a href="#privat">Privatsphäre</a>
     </nav>
     <div class="nav-tools">
       <a class="pill-btn ghost" href="https://github.com/fcore247/luna-browser"><svg><use href="#gh"/></svg><span>GitHub</span></a>
@@ -62,7 +62,7 @@
     <section class="hero">
       <a class="badge" href="#download">Jetzt für macOS und Windows <span>›</span></a>
       <h1>Mach es dir im Web gemütlich.<br><span class="soft">Ein Browser, der sich nach dir richtet.</span></h1>
-      <p class="sub">Deine Farben, deine Musik, Mausgesten und eine KI, die auf Wunsch mitdenkt.</p>
+      <p class="sub">Deine Farben, deine Musik, Mausgesten und deine eigene KI, die aus nervigen Seiten ruhige macht.</p>
       <div class="cta">
         <button class="pill-btn solid lg download">Luna herunterladen</button>
         <a class="pill-btn glass lg" href="https://github.com/fcore247/luna-browser"><svg><use href="#gh"/></svg><span>Auf GitHub ansehen</span></a>
@@ -114,12 +114,35 @@
                 <div class="m-sonos"><img src="assets/era100.png" alt="" width="64" height="44" loading="lazy"><div><b>Sonos Era 100</b><span>Wohnzimmer · Lautstärke synchron</span></div><div class="m-vol"><i></i></div></div>
               </div>
 
-              <!-- Schritt: Sira -->
-              <aside class="side">
-                <div class="side-head"><b>Sira</b><span><i></i>Lokal auf deinem Mac</span></div>
-                <div class="bubble u">Fasse diese Seite kurz zusammen</div>
-                <div class="bubble a"><b>Sira</b><span id="siraText"></span></div>
-                <div class="side-input">Frag Sira etwas …</div>
+              <!-- Schritt: eigene KI baut eine persönliche Seite -->
+              <div class="clutter" id="clutter" aria-hidden="true">
+                <div class="cl-ad">ANZEIGE · Jetzt 70 % sparen! · ANZEIGE</div>
+                <div class="cl-nav"><b>wetter-portal</b><span>News</span><span>Video</span><span>Reise</span><span>Shop</span><span>Login</span></div>
+                <div class="cl-body">
+                  <div class="cl-main"><i class="w60"></i><i></i><i></i><i class="w80"></i><div class="cl-temp">14 °C, leicht bewölkt</div><i></i><i class="w40"></i><i></i></div>
+                  <div class="cl-side"><div class="cl-box">ANZEIGE</div><div class="cl-box tall">VIDEO</div></div>
+                </div>
+                <div class="cl-pop"><b>Newsletter abonnieren!</b><span>Verpasse kein Wetter mehr.</span><em>Nein danke</em></div>
+                <div class="cl-cookie"><span>Wir und unsere 846 Partner verwenden Cookies …</span><b>Alle akzeptieren</b><em>Einstellungen</em></div>
+              </div>
+              <div class="ppage" id="ppage" aria-hidden="true">
+                <div class="pp-head"><b>Mein Wetter</b><span>Dein persönlicher Überblick</span><em>Original öffnen</em></div>
+                <div class="pp-grid">
+                  <div class="pp-card pp-hero"><span>Jetzt</span><b>14°</b><em>Leicht bewölkt</em></div>
+                  <div class="pp-card pp-line"><span>Nächste Stunden</span><svg viewBox="0 0 200 60" preserveAspectRatio="none"><path d="M0 40 C20 30 35 22 55 26 S95 44 115 34 S160 12 200 18"/></svg></div>
+                  <div class="pp-card pp-days"><span>Woche</span><div><i>Mo<b>15°</b></i><i>Di<b>12°</b></i><i>Mi<b>16°</b></i><i>Do<b>17°</b></i></div></div>
+                  <div class="pp-card pp-note">☂ Regen ab 18 Uhr</div>
+                </div>
+              </div>
+              <aside class="agent" aria-hidden="true">
+                <div class="ag-head"><b>Deine KI</b><span><i></i>über MCP verbunden</span></div>
+                <div class="ag-ask">Mach mir aus dieser Wetterseite eine ruhige Übersicht.</div>
+                <ol class="ag-log">
+                  <li>Seite geöffnet und gelesen</li>
+                  <li>Werbung und Pop-ups weggelassen</li>
+                  <li>6 Bausteine aus Lunas Baukasten gewählt</li>
+                  <li>Persönliche Seite gespeichert</li>
+                </ol>
               </aside>
             </div>
           </div>
@@ -180,20 +203,41 @@
 
         <article class="card reveal">
           <div class="card-art">
-            <div class="gpanel sira-panel">
-              <div class="gp-head"><b>Sira</b><span class="live"><i></i>lokal</span></div>
-              <div class="bubble u">Was steht auf dieser Seite?</div>
-              <div class="bubble a">Ein Rezept für Zimtschnecken, 12 Stück, etwa 45 Minuten.</div>
-              <div class="models"><span>Apple Intelligence</span><span>Groq</span><span>OpenRouter</span></div>
+            <div class="gpanel music-panel">
+              <div class="mp-row"><div class="mp-cover"></div><div><b>One More Time</b><span>Daft Punk · Discovery</span></div></div>
+              <div class="mp-bar"><i></i></div>
+              <div class="mp-sonos"><img src="assets/era100.png" alt="" width="48" height="32" loading="lazy"><span>Sonos Era 100 · Wohnzimmer</span><em>synchron</em></div>
             </div>
           </div>
-          <p class="card-text"><b>KI, wenn du sie willst.</b> Sira läuft komplett auf deinem Mac mit Apples eigener KI, ohne Konto und ohne Schlüssel. Oder du nutzt Modelle von Groq und OpenRouter.</p>
+          <p class="card-text"><b>Musik, die mitkommt.</b> Spotify direkt in Luna: Suche, Warteschlange und Wiedergabe. Auf Wunsch gleicht Luna die Lautstärke mit deinen Sonos-Lautsprechern ab.</p>
         </article>
       </div>
 
       <div class="extras reveal">
         <span>Tabs &amp; Tabgruppen</span><span>Lesezeichen &amp; Verlauf</span><span>Downloads</span><span>Suche auf der Seite</span><span>Sitzung wiederherstellen</span><span>Passwort-Tresor</span><span>Erweiterungen</span>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ EIGENE SEITEN ============ -->
+  <section class="block" id="seiten">
+    <div class="wrap">
+      <div class="head reveal">
+        <h2>Deine KI räumt nervige Seiten auf.</h2>
+        <p>Verbinde deine eigene KI-App mit Luna. Sie baut aus überladenen Websites persönliche Seiten in deiner Farbwelt, ohne Werbung, Pop-ups und Gedränge.</p>
+      </div>
+      <div class="compare reveal" id="compare">
+        <div class="cmp-layer cmp-before" id="cmpBefore"></div>
+        <div class="cmp-layer cmp-after" id="cmpAfter"></div>
+        <div class="cmp-handle" aria-hidden="true"><i></i></div>
+        <span class="cmp-tag left">Vorher</span><span class="cmp-tag right">Mit Luna</span>
+        <input type="range" id="cmpRange" min="0" max="100" value="34" aria-label="Vorher und nachher vergleichen">
+      </div>
+      <ol class="how reveal">
+        <li><b>Verbinde deine KI.</b><p>Jede KI-App, die MCP versteht, verbindet sich lokal mit Luna. Eingeschaltet wird nur mit Touch ID oder deinem Mac-Passwort.</p><code>"command": "…/Luna Browser", "args": ["--mcp"]</code></li>
+        <li><b>Sag, was dich nervt.</b><p>Zum Beispiel: „Mach mir aus dieser Wetterseite eine ruhige Übersicht.“ Deine KI liest die Seite und wählt, was wichtig ist.</p></li>
+        <li><b>Luna baut deine Seite.</b><p>Aus Lunas Bausteinen wie Kennzahlen, Karten, Diagrammen und Listen. Die Werte bleiben live, die Originalseite bleibt für Anmeldung und Navigation da.</p></li>
+      </ol>
     </div>
   </section>
 
@@ -271,7 +315,7 @@
 <section class="windows-install"><h3>Windows installieren</h3><p>ZIP vollständig entpacken und Luna Browser.exe starten. Den Ordner native daneben lassen. WebView2 wird benötigt.</p><p>Experimentelle Version: noch instabil und nicht signiert. Windows kann einen unbekannten Herausgeber melden.</p><a href="https://github.com/fcore247/luna-browser/blob/main/docs/WINDOWS-TEST.md">Hinweise zur Windows-Version ↗</a></section>
 <section id="macInstall"><h3>macOS installieren</h3><p class="lead">Füge diesen Befehl ins Terminal ein und drücke Enter.</p><div class="command"><pre id="installCommand"></pre><button id="copy">Befehl kopieren</button></div><p id="copyStatus" role="status"></p><aside><b>Gut zu wissen</b><p>Apple Silicon (M1 oder neuer), macOS 13+. Die App ist noch nicht Apple-notarisiert. Falls macOS den ersten Start blockiert, prüfe die Meldung unter Systemeinstellungen → Datenschutz &amp; Sicherheit. Der Installer verändert keine Sicherheitseinstellungen. Beende eine bereits laufende Luna-Version vorher.</p></aside><div class="manual"><p><strong>Bitte nicht die DMG-Datei einzeln laden.</strong> Luna ist noch nicht von Apple notarisiert: Eine im Browser geladene DMG löst eine Sicherheitsmeldung aus. Der Befehl oben lädt Luna ohne diese Markierung.</p><a href="install.sh">Installationsskript ansehen ↗</a></div></section></dialog>
 
-<script src="i18n.js?v=themes-1"></script>
-<script src="site.js?v=themes-1"></script>
+<script src="i18n.js?v=pages-1"></script>
+<script src="site.js?v=pages-1"></script>
 </body>
 </html>
