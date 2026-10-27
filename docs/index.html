@@ -11,7 +11,7 @@
 <meta property="og:image" content="https://luna-browser.com/assets/media/poster.jpg">
 <link rel="icon" href="assets/luna-icon.svg">
 <link rel="preload" href="assets/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=waves-1">
+<link rel="stylesheet" href="style.css?v=themes-1">
 </head>
 <body>
 
@@ -73,11 +73,11 @@
     <section class="tour" id="tour">
       <div class="tour-sticky">
         <div class="frame" id="frame" data-step="0">
-          <div class="app" role="img" aria-label="Illustration der Luna-Startseite">
+          <div class="app">
             <div class="app-tabs"><div class="app-tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span id="tabTitle">Neuer Tab</span></div><span class="app-plus">+</span></div>
             <div class="app-bar">
               <div class="app-nv"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg></div>
-              <div class="app-addr" id="addr"><span id="addrText">Suchen oder Adresse eingeben</span><i class="caret"></i><span class="sd"><svg><use href="#spot"/></svg></span></div>
+              <div class="app-addr" id="addr" role="button" tabindex="0" aria-label="Farbwelt im Browser wählen"><span id="addrText">Suchen oder Adresse eingeben</span><i class="caret"></i><span class="sd"><svg><use href="#spot"/></svg></span></div>
               <div class="app-spot" id="spotPill"><span class="cov-s">S</span><span><b id="spotTitle">Spotify</b><em id="spotSub">Keine Wiedergabe</em></span></div>
             </div>
 
@@ -88,12 +88,12 @@
                 <div class="home-clock"><b id="clock">21:41</b><i></i><svg><use href="#wm"/></svg></div>
                 <div class="home-greet"><b id="greet">Guten Abend</b><span id="date">Dienstag, 20. Oktober</span></div>
                 <div class="home-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><span>Mit Luna Search suchen oder Adresse eingeben</span><kbd>⌘L</kbd></div>
-                <div class="home-chips"><span>☆ Lesezeichen</span><span>◷ Verlauf</span><span>↓ Downloads</span><span>☾ Erscheinungsbild</span><span>⚙ Einstellungen</span></div>
+                <div class="home-chips"><span>☆ Lesezeichen</span><span>◷ Verlauf</span><span>↓ Downloads</span><button type="button" id="appearanceChip">☾ Erscheinungsbild</button><span>⚙ Einstellungen</span></div>
               </div>
 
               <!-- Schritt: Farbwelten (Adressleiste klappt auf) -->
-              <div class="drop" id="drop">
-                <div class="drop-head"><b>Deine Farbwelt</b><span class="seg"><i>Hell</i><i class="on">Dunkel</i><i>System</i></span></div>
+              <div class="drop" id="drop" role="dialog" aria-label="Farbwelt">
+                <div class="drop-head"><b>Deine Farbwelt</b><span class="seg" id="seg"><button type="button" data-mode="light">Hell</button><button type="button" data-mode="dark">Dunkel</button><button type="button" data-mode="system">System</button></span></div>
                 <div class="drop-grid" id="dropGrid"></div>
               </div>
 
@@ -271,7 +271,7 @@
 <section class="windows-install"><h3>Windows installieren</h3><p>ZIP vollständig entpacken und Luna Browser.exe starten. Den Ordner native daneben lassen. WebView2 wird benötigt.</p><p>Experimentelle Version: noch instabil und nicht signiert. Windows kann einen unbekannten Herausgeber melden.</p><a href="https://github.com/fcore247/luna-browser/blob/main/docs/WINDOWS-TEST.md">Hinweise zur Windows-Version ↗</a></section>
 <section id="macInstall"><h3>macOS installieren</h3><p class="lead">Füge diesen Befehl ins Terminal ein und drücke Enter.</p><div class="command"><pre id="installCommand"></pre><button id="copy">Befehl kopieren</button></div><p id="copyStatus" role="status"></p><aside><b>Gut zu wissen</b><p>Apple Silicon (M1 oder neuer), macOS 13+. Die App ist noch nicht Apple-notarisiert. Falls macOS den ersten Start blockiert, prüfe die Meldung unter Systemeinstellungen → Datenschutz &amp; Sicherheit. Der Installer verändert keine Sicherheitseinstellungen. Beende eine bereits laufende Luna-Version vorher.</p></aside><div class="manual"><p><strong>Bitte nicht die DMG-Datei einzeln laden.</strong> Luna ist noch nicht von Apple notarisiert: Eine im Browser geladene DMG löst eine Sicherheitsmeldung aus. Der Befehl oben lädt Luna ohne diese Markierung.</p><a href="install.sh">Installationsskript ansehen ↗</a></div></section></dialog>
 
-<script src="i18n.js?v=waves-1"></script>
-<script src="site.js?v=waves-1"></script>
+<script src="i18n.js?v=themes-1"></script>
+<script src="site.js?v=themes-1"></script>
 </body>
 </html>

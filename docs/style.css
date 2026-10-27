@@ -87,7 +87,7 @@ h1 .soft{color:#ffffff9c}
 .app-plus{margin-bottom:.5em;width:1.8em;height:1.8em;display:grid;place-items:center;border-radius:.5em;background:var(--soft);color:var(--mute-a)}
 .app-bar{display:flex;align-items:center;gap:1.2em;padding:.8em 1.2em;background:var(--panel);border-bottom:1px solid var(--line-a);transition:background-color .6s}
 .app-nv{display:flex;gap:.8em}.app-nv svg{width:1.3em;height:1.3em;fill:none;stroke:var(--mute-a);stroke-width:2;stroke-linecap:round}
-.app-addr{flex:1;display:flex;align-items:center;gap:.4em;height:2.8em;padding:0 .5em 0 1.2em;border-radius:.8em;background:var(--card-a);border:1px solid var(--line3);color:var(--mute-a);white-space:nowrap;overflow:hidden;transition:border-color .3s,box-shadow .3s}
+.app-addr{cursor:pointer;flex:1;display:flex;align-items:center;gap:.4em;height:2.8em;padding:0 .5em 0 1.2em;border-radius:.8em;background:var(--card-a);border:1px solid var(--line3);color:var(--mute-a);white-space:nowrap;overflow:hidden;transition:border-color .3s,box-shadow .3s}
 .app-addr.typing{border-color:var(--acc);box-shadow:0 0 0 .25em color-mix(in srgb,var(--acc) 18%,transparent);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .app-addr #addrText{overflow:hidden;text-overflow:ellipsis}
 .caret{width:1px;height:1.3em;background:var(--acc);opacity:0}
@@ -113,18 +113,22 @@ h1 .soft{color:#ffffff9c}
 .home-search span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .home-search svg{width:1.3em;height:1.3em;fill:none;stroke:currentColor;stroke-width:2}
 .home-chips{display:flex;gap:.7em;flex-wrap:wrap;justify-content:center}
-.home-chips span{padding:.5em 1.1em;border-radius:2em;background:color-mix(in srgb,var(--card-a) 80%,transparent);font-weight:700;font-size:.92em;color:var(--ink2)}
+.home-chips span,.home-chips button{padding:.5em 1.1em;border-radius:2em;background:color-mix(in srgb,var(--card-a) 80%,transparent);font-weight:700;font-size:.92em;color:var(--ink2)}
+.home-chips button{cursor:pointer;transition:background-color .2s}
+.home-chips button:hover{background:var(--card-a)}
 
 /* Schritt 1: Farbwelten */
 .drop{position:absolute;left:8.5em;right:14em;top:.6em;padding:1.4em;border-radius:1.2em;background:var(--panel);border:1px solid var(--line3);box-shadow:0 2em 4em -1.5em hsl(var(--h) 40% 15% / .35);opacity:0;transform:translateY(-1em) scale(.98);transform-origin:top;transition:opacity .4s,transform .5s var(--ease),background-color .6s;pointer-events:none}
-.frame[data-step="1"] .drop{opacity:1;transform:none}
+.frame[data-step="1"] .drop,.frame.picker .drop{opacity:1;transform:none;pointer-events:auto}
 .drop-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.1em}
 .drop-head b{font-size:1.15em}
 .seg{display:flex;gap:.2em;padding:.25em;border-radius:.7em;background:var(--soft);font-size:.85em}
-.seg i{font-style:normal;padding:.3em .9em;border-radius:.5em;color:var(--mute-a);font-weight:700}
-.seg i.on{background:var(--card-a);color:var(--ink)}
+.seg button{padding:.3em .9em;border-radius:.5em;color:var(--mute-a);font-weight:700;font-size:1em;transition:background-color .2s,color .2s}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed=true]{background:var(--card-a);color:var(--ink);box-shadow:0 1px 3px #0002}
 .drop-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.8em}
-.tcard{padding:.5em;border-radius:.8em;border:1.5px solid var(--line-a);background:var(--card-a);font-weight:700;font-size:.9em;transition:border-color .3s,transform .3s}
+.tcard{padding:.5em;border-radius:.8em;border:1.5px solid var(--line-a);background:var(--card-a);color:var(--ink);font-weight:700;font-size:.9em;text-align:left;transition:border-color .3s,transform .3s}
+.tcard:hover{transform:translateY(-.2em);border-color:var(--line3)}
 .tcard div{height:3.6em;border-radius:.5em;margin-bottom:.45em;position:relative;overflow:hidden}
 .tcard div::after{content:"";position:absolute;left:.6em;right:1.4em;bottom:.6em;height:.5em;border-radius:.3em;background:#ffffffa0}
 .tcard.on{border-color:var(--acc);transform:translateY(-.2em)}
@@ -327,8 +331,10 @@ aside{border-left:2px solid var(--line2);padding-left:16px;margin-top:22px}aside
   .home-search{width:84%}
   .home-clock svg{display:none}.home-clock i{display:none}
   .drop{left:.8em;right:.8em}
-  .drop-grid{grid-template-columns:repeat(3,1fr)}
-  .tcard:nth-child(n+7){display:none}
+  .drop{padding:1em}
+  .drop-grid{grid-template-columns:repeat(4,1fr);gap:.5em}
+  .tcard{font-size:.8em;padding:.35em}
+  .tcard div{height:2.6em}
   .music{width:92%}
   .m-ctrl{display:none}
   .side{width:78%}

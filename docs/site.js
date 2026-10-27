@@ -22,21 +22,33 @@
     ['peach', t('Pfirsich'), 22, 58], ['cherry', t('Kirschblüte'), 350, 46], ['arctic', t('Arktis'), 188, 43],
     ['graphite', t('Graphit'), 220, 5],
   ];
-  // handabgestimmte Originalpalette von Luna Rosé (hell, so wie Luna im Fenster erscheint)
-  const LUNA = { desk: '#efb6d5', body: '#f3e1ec', panel: '#fbf2f7', card: '#ffffff', hover: '#ead0df', soft: '#f7e9f1', line: '#ecd3e2', line3: '#e2c6d6', ink: '#3a2433', ink2: '#4a3042', mute: '#8a6c7e', acc: '#a24d84', 'acc-l': '#d889b8', pri: '#3a2433', 'pri-fg': '#fbeef6' };
+  // handabgestimmte Originalpalette von Luna Rosé
+  const LUNA = {
+    light: { desk: '#efb6d5', body: '#f3e1ec', panel: '#fbf2f7', card: '#ffffff', hover: '#ead0df', soft: '#f7e9f1', line: '#ecd3e2', line3: '#e2c6d6', ink: '#3a2433', ink2: '#4a3042', mute: '#8a6c7e', acc: '#a24d84', 'acc-l': '#d889b8', pri: '#3a2433', 'pri-fg': '#fbeef6' },
+    dark: { desk: '#2b1626', body: '#251621', panel: '#1c1119', card: '#2d1b28', hover: '#3a2434', soft: '#2f1e29', line: '#43293a', line3: '#563548', ink: '#fbeef6', ink2: '#e6d2de', mute: '#a98d9e', acc: '#d889b8', 'acc-l': '#f4a9d4', pri: '#fbeef6', 'pri-fg': '#2a1621' },
+  };
   // Namen, die auf der Seite selbst schon vergeben sind, bekommen ein -a (für "App")
   const RENAME = { card: 'card-a', line: 'line-a', mute: 'mute-a' };
-  function palette(id) {
+  function palette(id, dark) {
     const th = THEMES.find((x) => x[0] === id) || THEMES[0];
     const [, , h, s] = th;
     const c = (l, sat = s) => `hsl(${h} ${sat}% ${l}%)`;
-    const v = id === 'luna' ? { ...LUNA } : { desk: c(83), body: c(92, 30), panel: c(97, 25), card: '#ffffff', hover: c(87, 30), soft: c(94, 25), line: c(86, 24), line3: c(79, 25), ink: c(18, 28), ink2: c(25, 26), mute: c(44, 18), acc: c(38), 'acc-l': c(62), pri: c(20, 30), 'pri-fg': '#ffffff' };
-    v.tile = c(40, Math.max(s, 8));
-    v.a1 = `hsl(${h} ${s}% 76%)`; v.a2 = `hsl(${h + 12} ${s}% 76%)`; v.a3 = `hsl(${h + 24} ${s}% 76%)`;
+    let v;
+    if (id === 'luna') v = { ...LUNA[dark ? 'dark' : 'light'] };
+    else if (dark) v = { desk: c(14), body: c(11, 22), panel: c(9, 20), card: c(16, 22), hover: c(22, 24), soft: c(18, 22), line: c(25, 22), line3: c(33, 24), ink: c(96, 24), ink2: c(88, 22), mute: c(67, 16), acc: c(73), 'acc-l': c(80), pri: c(94, 25), 'pri-fg': c(12, 25) };
+    else v = { desk: c(83), body: c(92, 30), panel: c(97, 25), card: '#ffffff', hover: c(87, 30), soft: c(94, 25), line: c(86, 24), line3: c(79, 25), ink: c(18, 28), ink2: c(25, 26), mute: c(44, 18), acc: c(38), 'acc-l': c(62), pri: c(20, 30), 'pri-fg': '#ffffff' };
+    v.tile = c(dark ? 50 : 40, Math.max(s, 8));
+    const l = dark ? 35 : 76;
+    v.a1 = `hsl(${h} ${s}% ${l}%)`; v.a2 = `hsl(${h + 12} ${s}% ${l}%)`; v.a3 = `hsl(${h + 24} ${s}% ${l}%)`;
     return { v, h, s };
   }
+  // Hell, Dunkel oder System gilt für Luna im Fenster; die Seite selbst bleibt dunkel
+  const sysDark = matchMedia('(prefers-color-scheme: dark)');
+  let appMode = store.get('luna-site-appmode');
+  if (!['light', 'dark', 'system'].includes(appMode)) appMode = 'light';
+  const appDark = () => appMode === 'dark' || (appMode === 'system' && sysDark.matches);
   function paint(el, id) {
-    const { v, h, s } = palette(id);
+    const { v, h, s } = palette(id, appDark());
     el.style.setProperty('--h', h); el.style.setProperty('--s', s);
     for (const [k, val] of Object.entries(v)) el.style.setProperty(`--${RENAME[k] || k}`, val);
   }
@@ -121,14 +133,37 @@
     b.onclick = () => setTheme(id, true);
     swatches.append(b);
   });
+  // Farbwelten im virtuellen Browser: anklicken probiert sie direkt aus
+  let userPicked = false;
   const dropGrid = $('#dropGrid');
   THEMES.forEach(([id, name, h, s]) => {
-    const c = document.createElement('div');
-    c.className = 'tcard'; c.dataset.tcard = id;
+    const c = document.createElement('button');
+    c.type = 'button'; c.className = 'tcard'; c.dataset.tcard = id; c.dataset.themeId = id; c.setAttribute('role', 'radio');
     c.innerHTML = `<div style="background:linear-gradient(160deg,hsl(${h} ${s}% 82%),hsl(${h + 20} ${s}% 70%))"></div>${name}`;
+    c.onclick = () => {
+      userPicked = true; frame.removeAttribute('style');
+      setTheme(id, true);
+      $$('.tcard').forEach((x) => x.classList.toggle('on', x === c));
+    };
     dropGrid.append(c);
   });
-  setTheme(themeId, false);
+  const segs = $$('#seg button');
+  function setAppMode(m, persist) {
+    appMode = m;
+    segs.forEach((b) => b.setAttribute('aria-pressed', b.dataset.mode === m));
+    frame.classList.toggle('app-dark', appDark());
+    paint(root, themeId);
+    if (persist) store.set('luna-site-appmode', m);
+  }
+  segs.forEach((b) => b.addEventListener('click', () => { userPicked = true; frame.removeAttribute('style'); setAppMode(b.dataset.mode, true); }));
+  sysDark.addEventListener?.('change', () => { if (appMode === 'system') setAppMode('system', false); });
+  // Adressleiste oder "Erscheinungsbild" öffnen die Auswahl jederzeit, ein Klick daneben schließt sie
+  const togglePicker = (open) => { frame.classList.toggle('picker', open); if (open) $$('.tcard').forEach((x) => x.classList.toggle('on', x.dataset.tcard === themeId)); };
+  $('#addr').addEventListener('click', (e) => { e.stopPropagation(); togglePicker(!frame.classList.contains('picker')); });
+  $('#appearanceChip').addEventListener('click', (e) => { e.stopPropagation(); togglePicker(true); });
+  $('#drop').addEventListener('click', (e) => e.stopPropagation());
+  $('.app-page').addEventListener('click', () => togglePicker(false));
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') togglePicker(false); });
 
   /* ---------- Navigation wird über dunklem Grund fest ---------- */
   const nav = $('#nav'), skywrap = $('.skywrap');
@@ -146,9 +181,11 @@
   /* ---------- Tour: Scrollen wechselt den Inhalt im Fenster ---------- */
   const tour = $('#tour'), frame = $('#frame'), caption = $('#caption'), pager = $$('#pager i');
   const addr = $('#addr'), addrText = $('#addrText');
+  setAppMode(appMode, false);
+  setTheme(themeId, false);
   const STEPS = [
     { cap: t('Deine Startseite, ruhig und aufgeräumt.'), cmd: '' },
-    { cap: t('Tippe theme, und Luna zieht sich um.'), cmd: 'theme' },
+    { cap: t('Klick eine Farbwelt an und probier sie aus.'), cmd: 'theme' },
     { cap: t('Mal ein S, und der Screenshot ist im Kasten.'), cmd: '' },
     { cap: t('Tippe play, und deine Musik spielt mit.'), cmd: 'play one more time' },
     { cap: t('Sira hilft, ganz lokal auf deinem Mac.'), cmd: 'chat' },
@@ -166,6 +203,7 @@
   async function enter(n) {
     const my = ++run;
     frame.dataset.step = '';
+    frame.classList.remove('picker');
     frame.removeAttribute('style');
     $$('.tcard').forEach((c) => c.classList.remove('on'));
     $('#spotTitle').textContent = 'Spotify'; $('#spotSub').textContent = t('Keine Wiedergabe');
@@ -176,14 +214,17 @@
     if (my !== run) return;
     frame.dataset.step = n;
     if (n === 1) {
-      // Farbwelten der Reihe nach durchprobieren
-      const order = ['ocean', 'mint', 'peach', 'lavender', 'sand', themeId];
-      for (let i = 0; my === run; i = (i + 1) % order.length) {
+      $$('.tcard').forEach((c) => c.classList.toggle('on', c.dataset.tcard === themeId));
+      // Solange niemand selbst klickt, probiert Luna ein paar Farbwelten vor
+      await sleep(1200);
+      const order = ['ocean', 'mint', 'peach', 'lavender', themeId];
+      for (let i = 0; my === run && !userPicked; i = (i + 1) % order.length) {
         const id = order[i];
         $$('.tcard').forEach((c) => c.classList.toggle('on', c.dataset.tcard === id));
         if (id === themeId) frame.removeAttribute('style'); else paint(frame, id);
-        await sleep(1500);
+        await sleep(1600);
       }
+      if (my === run) { frame.removeAttribute('style'); $$('.tcard').forEach((c) => c.classList.toggle('on', c.dataset.tcard === themeId)); }
     }
     if (n === 3) { resetAddr(); $('#spotTitle').textContent = 'One More Time'; $('#spotSub').textContent = 'Daft Punk'; }
     if (n === 4) {
