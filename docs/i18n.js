@@ -1,97 +1,142 @@
-/* Browser language: German, with English as the fallback. */
+/* Sprache der Webseite: Deutsch, Englisch als Fallback. Eine manuelle Wahl (Footer) hat Vorrang. */
 (() => {
   'use strict';
-  const language = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().split('-')[0] === 'de' ? 'de' : 'en';
+  let saved = null;
+  try { saved = localStorage.getItem('luna-site-lang'); } catch {}
+  const browser = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().split('-')[0];
+  const language = (saved === 'de' || saved === 'en') ? saved : browser === 'de' ? 'de' : 'en';
   const translations = {
-"Luna herunterladen": "Download Luna",
-"Für macOS und Windows": "For macOS and Windows",
-"Jetzt auch für Windows verfügbar · experimentelle Version": "Now available for Windows · experimental version",
-"macOS 13+ (Apple Silicon) oder Windows 10/11 (x64)": "macOS 13+ (Apple Silicon) or Windows 10/11 (x64)",
-"Luna Browser · Für macOS und Windows.": "Luna Browser · For macOS and Windows.",
-"Wähle deine Plattform. Luna ist jetzt auch für Windows verfügbar.": "Choose your platform. Luna is now also available for Windows.",
-"Installationsanleitung ↓": "Installation instructions ↓",
-"Für Windows herunterladen ↓": "Download for Windows ↓",
-"Windows installieren": "Install on Windows",
-"macOS installieren": "Install on macOS",
-"ZIP vollständig entpacken und Luna Browser.exe starten. Den Ordner native daneben lassen. WebView2 wird benötigt.": "Extract the entire ZIP and launch Luna Browser.exe. Keep the native folder beside it. WebView2 is required.",
-"Experimentelle Version: noch instabil und nicht signiert. Windows kann einen unbekannten Herausgeber melden.": "Experimental version: still unstable and unsigned. Windows may report an unknown publisher.",
-"Hinweise zur Windows-Version ↗": "Windows version notes ↗",
-"Luna ist ein gemütlicher Browser für macOS und Windows: zehn Farbwelten, Mausgesten, Spotify und eine KI, die auf Wunsch mitdenkt.": "Luna is a cozy browser for macOS and Windows: ten color themes, mouse gestures, Spotify and optional AI assistance.",
-    'Windows-Testversion · experimentell und instabil': 'Windows preview · experimental and unstable',
+    // Meta & Navigation
     'Luna Browser – Mach es dir im Web gemütlich': 'Luna Browser – Make yourself at home on the web',
-    'Farbwelten': 'Color themes', 'Für Apple-Silicon-Macs · macOS 13+': 'For Apple Silicon Macs · macOS 13+',
-    'Mach es dir im Web': 'Make yourself at home', 'gemütlich.': 'on the web.',
-    'Luna ist ein Browser für macOS und Windows, der sich nach dir richtet: mit deinen Farben, deiner Musik, Mausgesten und einer KI, die auf Wunsch mitdenkt.': 'Luna is a browser for macOS and Windows that adapts to you: your colors, your music, mouse gestures, and AI when you want a helping hand.',
-    'Luna installieren': 'Install Luna', 'Trailer ansehen': 'Watch the trailer', 'Probier’s aus – wähl deine Farbwelt:': 'Try it out – choose your color theme:',
-    'Neuer Tab': 'New tab', 'Suchen oder Adresse eingeben': 'Search or enter an address', 'Keine Wiedergabe': 'Not playing',
+    'Luna ist ein ruhiger Browser für macOS und Windows: zehn Farbwelten, Befehle in der Adressleiste, Mausgesten, Spotify und eine KI, die lokal mitdenkt. Probier Luna direkt im Browser aus.': 'Luna is a calm browser for macOS and Windows: ten color themes, address-bar commands, mouse gestures, Spotify and AI that thinks along locally. Try Luna right in your browser.',
+    'Zehn Farbwelten, Mausgesten, Spotify und KI. Ein Browser, der sich nach dir richtet. Jetzt virtuell ausprobieren.': 'Ten color themes, mouse gestures, Spotify and AI. A browser that adapts to you. Try it virtually now.',
+    'Hauptmenü': 'Main menu', 'Ausprobieren': 'Try it', 'Farbwelten': 'Color themes', 'Farbwelt': 'Color theme',
+    'Hell oder Dunkel wechseln': 'Toggle light or dark mode', 'Hell / Dunkel': 'Light / Dark',
+    // Hero
+    'Mach es dir': 'Make yourself', 'im Web': 'at home', 'gemütlich.': 'on the web.',
+    'Ein Browser, der sich nach dir richtet. Deine Farben, deine Musik, Mausgesten, eine KI, die lokal mitdenkt. Und sonst nichts, was dich ablenkt.': 'A browser that adapts to you. Your colors, your music, mouse gestures, an AI that thinks along locally. And nothing else to distract you.',
+    'Luna herunterladen': 'Download Luna', 'Virtuell ausprobieren': 'Try it virtually',
+    // Virtuelle Luna
+    'Virtuelle Luna': 'Virtual Luna',
+    'Das ist keine Abbildung. Tipp einen Befehl in die Adressleiste, zeichne mit gedrückter Maustaste ein': 'This is not a picture. Type a command into the address bar, hold the mouse button and draw an',
+    'oder einen': 'or a', 'Kreis': 'circle', 'auf die Seite, wechsle die Farbwelt.': 'on the page, switch the color theme.',
+    'Tabs': 'Tabs', 'Neuer Tab': 'New tab', 'Zurück': 'Back', 'Vor': 'Forward', 'Neu laden': 'Reload',
+    'Suchen oder Adresse eingeben': 'Search or enter an address', 'Adressleiste der virtuellen Luna': 'Address bar of the virtual Luna',
+    'Keine Wiedergabe': 'Not playing', 'Luna Chat': 'Luna Chat', 'Gesten-Modus für Touch': 'Gesture mode for touch', 'Gesten-Modus': 'Gesture mode',
+    'Sira · lokal auf deinem Mac': 'Sira · locally on your Mac', 'Chat schließen': 'Close chat', 'Frag Sira etwas …': 'Ask Sira something …', 'Nachricht an Sira': 'Message to Sira', 'Senden': 'Send',
+    'Befehle zum Ausprobieren': 'Commands to try', 'Probier mal:': 'Try:',
+    'Tab schließen': 'Close tab', 'Lesezeichen': 'Bookmarks', 'Verlauf': 'History', 'Erscheinungsbild': 'Appearance', 'Einstellungen': 'Settings',
     'Mit Luna Search suchen oder Adresse eingeben': 'Search with Luna Search or enter an address',
-    '☆ Lesezeichen': '☆ Bookmarks', '◷ Verlauf': '◷ History', '☾ Erscheinungsbild': '☾ Appearance', '⚙ Einstellungen': '⚙ Settings',
-    'Was Luna besonders macht': 'What makes Luna special', 'Ruhig, weil Luna dich nicht': 'A calm space, without the', 'zuschüttet.': 'clutter.',
-    'Alles andere richtest du dir selbst ein, in deinem Tempo und mit deinen Farben.': 'Make everything else your own, at your own pace and in your own colors.',
-    '01 · Farbwelten': '01 · Color themes', 'Zehn Looks. Ein Klick.': 'Ten looks. One click.',
-    'Luna Rosé, Lavendel, Ozean, Minze und mehr – jede passt sich an Hell und Dunkel an, sogar das Icon im Dock färbt sich mit. Probier es gleich hier aus.': 'Luna Rosé, Lavender, Ocean, Mint and more – each adapts to light and dark mode, and even the Dock icon changes color. Try it right here.',
-    '02 · Befehle': '02 · Commands', 'Tippen statt klicken.': 'Type instead of clicking.', 'Viele Befehle starten sofort, ganz ohne Enter.': 'Many commands run instantly, without pressing Enter.',
-    '03 · Mausgesten': '03 · Mouse gestures', 'Mal einen Buchstaben.': 'Draw a letter.',
-    'Maustaste halten und in die Luft zeichnen. Ein': 'Hold the mouse button and draw. An', 'macht einen Screenshot, ein Kreis öffnet deinen Notizzettel. Zeichne es gleich selbst:': 'takes a screenshot; a circle opens your notes. Give it a try:',
-    'Halte die Maustaste und zeichne': 'Hold the mouse button and draw',
-    '04 · Musik': '04 · Music', 'Musik, die mitkommt.': 'Music that stays with you.',
-    'Spotify direkt in Luna: Suche, Warteschlange und Wiedergabe. Auf Wunsch gleicht Luna die Lautstärke mit deinen Sonos-Lautsprechern ab.': 'Spotify right inside Luna: search, queue and playback. Luna can also synchronize the volume with your Sonos speakers.',
-    'Wohnzimmer · synchron': 'Living room · synchronized', '05 · KI': '05 · AI', 'KI, wenn du sie willst.': 'AI when you want it.',
-    'läuft komplett auf deinem Mac mit Apples eigener KI, ohne Konto und ohne Schlüssel.': 'runs entirely on your Mac using Apple’s own AI, with no account or API key.',
-    'Sira · läuft lokal auf deinem Mac': 'Sira · runs locally on your Mac',
-    '06 · Privatsphäre': '06 · Privacy', 'Deine Daten bleiben bei dir.': 'Your data stays with you.',
-    'Lesezeichen, Verlauf, Notizen und Chats liegen lokal auf deinem Mac.': 'Bookmarks, history, notes and chats are stored locally on your Mac.',
-    'API-Schlüssel werden nie in der Oberfläche angezeigt.': 'API keys are never displayed in the interface.',
-    'Der KI-Zugriff für andere Apps ist standardmäßig aus und braucht Touch ID.': 'AI access for other apps is off by default and requires Touch ID.',
-    'Updates kommen signiert direkt in der App an.': 'Signed updates arrive directly in the app.',
-    'Tabs & Tabgruppen': 'Tabs & tab groups', 'Lesezeichen & Verlauf': 'Bookmarks & history', 'Suche auf der Seite': 'Find on page', 'Sitzung wiederherstellen': 'Restore session',
-    'In 30 Sekunden': 'In 30 seconds', 'Luna im': 'Luna at a', 'Schnelldurchlauf.': 'glance.',
-    'So sieht es aus': 'Take a look', 'Dein neues': 'Your new', 'Zuhause': 'home', 'im Web.': 'on the web.', 'Startseite': 'Start page', 'Befehle': 'Commands',
-    'Apple-Silicon-Mac (M1 oder neuer) · macOS 13 oder neuer · Updates kommen direkt in Luna an': 'Apple Silicon Mac (M1 or later) · macOS 13 or later · Updates arrive directly in Luna',
-    'Luna Browser · Ein unabhängiges macOS-Projekt.': 'Luna Browser · An independent macOS project.', 'Quellcode & Releases ↗': 'Source code & releases ↗',
-    'Hallo,': 'Hello,', 'Füge diesen Befehl ins Terminal ein und drücke Enter.': 'Paste this command into Terminal and press Enter.', 'Befehl kopieren': 'Copy command', 'Gut zu wissen': 'Good to know',
-    'Apple Silicon (M1 oder neuer), macOS 13+. Die App ist noch nicht Apple-notarisiert. Falls macOS den ersten Start blockiert, prüfe die Meldung unter Systemeinstellungen → Datenschutz & Sicherheit. Der Installer verändert keine Sicherheitseinstellungen. Beende eine bereits laufende Luna-Version vorher.': 'Apple Silicon (M1 or later), macOS 13+. The app is not yet notarized by Apple. If macOS blocks the first launch, check the message in System Settings → Privacy & Security. The installer does not change security settings. Quit any running version of Luna first.',
-    'Bitte nicht die DMG-Datei einzeln laden.': 'Please do not download the DMG separately.',
-    'Luna ist noch nicht von Apple notarisiert: Eine im Browser geladene DMG löst eine Sicherheitsmeldung aus. Der Befehl oben lädt Luna ohne diese Markierung.': 'Luna is not yet notarized by Apple: downloading the DMG in a browser triggers a security warning. The command above downloads Luna without that flag.',
-    'Installationsskript ansehen ↗': 'View installation script ↗',
-    'Hell oder Dunkel wechseln': 'Toggle light or dark mode', 'Hell / Dunkel': 'Light / Dark', 'Farbwelt': 'Color theme', 'Weiter nach unten': 'Scroll down', 'Illustration der Luna-Startseite': 'Illustration of the Luna start page',
-    'Trailer abspielen': 'Play trailer', 'Sprache': 'Language', 'Anleitung schließen': 'Close instructions',
-    'Die Startseite von Luna mit Uhr, Suche und Musik': 'Luna’s start page with a clock, search and music',
-    'Die Adressleiste klappt nach unten auf und zeigt alle zehn Farbwelten': 'The address bar expands to show all ten color themes',
-    'Die Befehlsseite mit Karten, die jeden Befehl erklären': 'The commands page with cards explaining each command',
-    'Lavendel': 'Lavender', 'Ozean': 'Ocean', 'Minze': 'Mint', 'Wald': 'Forest', 'Pfirsich': 'Peach', 'Kirschblüte': 'Cherry blossom', 'Arktis': 'Arctic', 'Graphit': 'Graphite',
     'Gute Nacht': 'Good night', 'Guten Morgen': 'Good morning', 'Guten Tag': 'Good afternoon', 'Guten Abend': 'Good evening',
-    'Farbwelt wählen': 'Choose a color theme', 'Wiedergabe an Spotify übergeben': 'Play in Spotify', 'Luna Chat geöffnet': 'Luna Chat opened',
-    'Fasse diese Seite kurz zusammen': 'Summarize this page briefly',
-    'Das ist Lunas Startseite: Uhr, Suche und deine Musik, alles ruhig an einem Ort. Ich laufe lokal auf deinem Mac, ganz ohne Konto.': 'This is Luna’s start page: a clock, search and your music, all in one calm space. I run locally on your Mac, with no account needed.',
+    'Noch keine Lesezeichen': 'No bookmarks yet', 'Dein Verlauf bleibt lokal auf deinem Mac': 'Your history stays local on your Mac', 'Keine Downloads': 'No downloads',
+    'Dunkel': 'Dark', 'Hell': 'Light', 'Deine Farbwelt': 'Your color theme',
+    'ungefähr': 'about', 'Ergebnisse': 'results', 'Wikipedia': 'Wikipedia', 'Übersicht': 'overview', 'Alles Wichtige auf einen Blick, kompakt zusammengefasst.': 'Everything important at a glance, neatly summarized.',
+    'Offizielle Seite': 'Official site', 'Die offizielle Seite mit Neuigkeiten, Hintergründen und mehr.': 'The official site with news, background and more.',
+    'Frag Sira zu': 'Ask Sira about', 'Lass dir die Treffer von Sira zusammenfassen, lokal auf deinem Mac.': 'Let Sira summarize the results, locally on your Mac.',
+    'Video': 'Video', 'erklärt in drei Minuten': 'explained in three minutes', 'Kurz, verständlich und ohne Umwege.': 'Short, clear and to the point.',
+    'Befehle': 'Commands', 'Jeder Befehl hat einen Schalter. Klick eine Karte, um ihn an- oder auszuschalten.': 'Every command has a switch. Click a card to turn it on or off.', 'An': 'On', 'Aus': 'Off',
+    'Farbwelt wählen': 'Choose a color theme', 'Die Eingabeleiste wächst nach unten und zeigt alle Themes. Ein Klick färbt Luna sofort um.': 'The address bar expands to show all themes. One click recolors Luna instantly.',
+    'Luna Chat öffnen': 'Open Luna Chat', 'Sobald du chat getippt hast, öffnet sich der Chat. Auch hier ohne Enter.': 'As soon as you type chat, the chat opens. No Enter needed.',
+    'Spotify durchsuchen': 'Search Spotify', 'Tippe spotify und danach einen Suchbegriff. Treffer erscheinen direkt in Luna.': 'Type spotify followed by a search term. Results appear right in Luna.',
+    'Song sofort abspielen': 'Play a song instantly', 'play und ein Songname, dann Enter. Luna übergibt den besten Treffer an Spotify.': 'play plus a song name, then Enter. Luna hands the best match to Spotify.',
+    'Tabs steuern': 'Control tabs', 'tab open youtube.com, tab close, tab list, tab reload oder tab zoom 120. Mit Enter ausführen.': 'tab open youtube.com, tab close, tab list, tab reload or tab zoom 120. Run with Enter.',
+    'einstellungen': 'settings', 'Einstellungen öffnen': 'Open settings', 'Luna fragt kurz nach, ob du die Einstellungen öffnen möchtest, statt im Web zu suchen.': 'Luna briefly asks whether you want to open settings instead of searching the web.',
+    'Alle Befehle zeigen': 'Show all commands', 'Öffnet diese Übersicht. Jeder Befehl hat einen Schalter: grün für an, rot für aus.': 'Opens this overview. Every command has a switch: green for on, red for off.',
+    'Direkt zu einer Seite': 'Straight to a site', 'Tippe youtube oder google und eine kurze Tipp-Pause später bist du dort.': 'Type youtube or google and a short pause later you are there.',
+    'Mausgesten': 'Mouse gestures', 'S für Screenshot, Kreis für Notizen': 'S for screenshot, circle for notes', 'Welche Wörter in der Adressleiste etwas auslösen': 'Which words in the address bar trigger something',
+    'Suche, Warteschlange und Wiedergabe': 'Search, queue and playback', 'KI-Zugriff für andere Apps': 'AI access for other apps', 'Standardmäßig aus, braucht Touch ID': 'Off by default, requires Touch ID',
+    'Sitzung wiederherstellen': 'Restore session', 'Tabs beim nächsten Start wieder öffnen': 'Reopen tabs on next launch', 'Alles freiwillig, alles jederzeit änderbar.': 'All optional, all changeable at any time.',
+    'Top-Treffer': 'Top result', 'Künstler': 'Artist', 'Enter': 'Enter', 'sofort': 'instant', 'Abspielen': 'Play', 'Suchen': 'Search',
+    'Einstellungen öffnen?': 'Open settings?', 'Öffnen': 'Open', 'Lieber suchen': 'Search instead', 'wird geöffnet': 'is opening',
+    'Tabs geschlossen': 'tabs closed', 'Unbekannter Tab-Befehl': 'Unknown tab command', 'Schon ganz am Anfang': 'Already at the beginning',
+    'Wiedergabe an Spotify übergeben': 'Playback handed to Spotify', 'Pause': 'Paused',
+    'Hallo, ich bin Sira. Ich laufe lokal auf deinem Mac, ohne Konto und ohne Schlüssel. Frag mich etwas, oder sag „Farbwelt Ozean“, „dunkel“ oder „spiel One More Time“.': 'Hi, I’m Sira. I run locally on your Mac, no account, no API key. Ask me something, or say “theme ocean”, “dark” or “play One More Time”.',
+    'Gern. Luna trägt jetzt': 'Sure. Luna is now wearing', 'Gute Wahl, schon umgestellt.': 'Good choice, already switched.',
+    'Dunkel gestellt. Schön für den Abend.': 'Switched to dark. Nice for the evening.', 'Hell gestellt.': 'Switched to light.',
+    'Läuft': 'Now playing', 'von': 'by',
+    'Das ist Lunas Startseite: Uhr, Suche und deine Musik, alles ruhig an einem Ort. Nichts, was dich ablenkt.': 'This is Luna’s start page: clock, search and your music, all calm in one place. Nothing to distract you.',
+    'Du bist gerade auf': 'You are on', 'In Luna lese ich die Seite und fasse sie dir in drei Sätzen zusammen, lokal und ohne dass etwas deinen Mac verlässt.': 'In Luna I read the page and sum it up in three sentences, locally, without anything leaving your Mac.',
+    'Neuer Tab mit': 'New tab with', 'ist offen.': 'is open.',
+    'Ich bin Sira, Lunas KI auf Apples eigenem Modell. Ich kann Tabs öffnen, Seiten zusammenfassen, die Farbwelt wechseln oder Musik starten. Für größere Fragen gibt es im Luna Chat auch Modelle von Groq und OpenRouter.': 'I’m Sira, Luna’s AI on Apple’s own model. I can open tabs, summarize pages, switch the color theme or start music. For bigger questions, Luna Chat also offers models from Groq and OpenRouter.',
+    'Halte die Maustaste auf der Seite gedrückt und zeichne ein S. Dann fliegt ein Sofortbild in die Ecke. Ein Kreis öffnet den Notizzettel.': 'Hold the mouse button on the page and draw an S. A polaroid flies into the corner. A circle opens the note.',
+    'Hallo! Schön, dass du da bist. Was darf ich für dich tun?': 'Hello! Nice to have you here. What can I do for you?', 'Sehr gern.': 'You’re welcome.',
+    'Das würde ich in Luna direkt für dich erledigen. Hier auf der Webseite kann ich Tabs öffnen, die Farbwelt wechseln, Musik starten oder die Seite zusammenfassen.': 'In Luna I would take care of that right away. Here on the website I can open tabs, switch the color theme, start music or summarize the page.',
+    'Gute Frage. In der echten Luna beantworte ich das mit Blick auf deine offenen Tabs, lokal auf deinem Mac.': 'Good question. In the real Luna I answer that with a look at your open tabs, locally on your Mac.',
+    'Probier mal „Farbwelt Lavendel“, „dunkel“ oder „spiel Nightcall“.': 'Try “theme lavender”, “dark” or “play Nightcall”.',
+    'Screenshot gespeichert': 'Screenshot saved', 'Notiz': 'Note', 'Deine Gedanken zu dieser Seite …': 'Your thoughts on this page …', 'Notiz schließen': 'Close note', 'Notizzettel geöffnet': 'Note opened',
+    'Tab geschlossen': 'Tab closed', 'Geste': 'Gesture', 'erkannt. Was sie auslöst, legst du in Luna selbst fest.': 'recognized. What it triggers is up to you in Luna.',
+    'Nicht erkannt. Probier ein S oder einen Kreis.': 'Not recognized. Try an S or a circle.',
+    'Gesten-Modus an: jetzt mit dem Finger zeichnen': 'Gesture mode on: draw with your finger', 'Gesten-Modus aus': 'Gesture mode off',
+    'Jetzt du: Maustaste halten und ein S zeichnen': 'Your turn: hold the mouse button and draw an S',
+    // Features
+    'Was Luna anders macht': 'What Luna does differently', 'Ruhig, weil Luna dich nicht': 'Calm, because Luna doesn’t', 'zuschüttet.': 'bury you.',
+    'Zehn Farbwelten': 'Ten color themes',
+    'Luna Rosé, Lavendel, Ozean, Minze, Wald, Sand, Pfirsich, Kirschblüte, Arktis und Graphit. Jede passt sich an Hell und Dunkel an, sogar das Icon im Dock färbt sich mit.': 'Luna Rosé, Lavender, Ocean, Mint, Forest, Sand, Peach, Cherry Blossom, Arctic and Graphite. Each adapts to light and dark, and even the Dock icon changes color.',
+    'Befehle statt Klicks': 'Commands instead of clicks',
+    'Gib in die Adressleiste ein, was du willst.': 'Type what you want into the address bar.', ': viele Befehle starten sofort, ganz ohne Enter. Welche aktiv sind, entscheidest du.': ': many commands run instantly, without Enter. You decide which are active.',
+    'Alle Befehle sehen': 'See all commands',
+    'Maustaste halten und einen Buchstaben in die Luft malen. Ein': 'Hold the mouse button and draw a letter in the air. An', 'macht einen Screenshot, der wie ein Sofortbild in die Ecke fliegt. Ein Kreis öffnet deinen Notizzettel zur Seite.': 'takes a screenshot that flies into the corner like a polaroid. A circle opens your note for the page.',
+    'Selbst zeichnen': 'Draw it yourself',
+    'Musik, die mitkommt': 'Music that comes along',
+    'Spotify direkt in Luna: Suche, Warteschlange und Wiedergabe, ohne den Browser zu verlassen. Auf Wunsch gleicht Luna die Lautstärke deines Macs mit deinen Sonos-Lautsprechern ab.': 'Spotify right inside Luna: search, queue and playback without leaving the browser. Luna can also sync your Mac’s volume with your Sonos speakers.',
+    'Song abspielen': 'Play a song',
+    'KI, wenn du sie willst': 'AI when you want it',
+    'läuft komplett auf deinem Mac mit Apples eigener KI, ohne Konto und ohne Schlüssel. Im Luna Chat sprichst du auch mit Modellen von Groq oder OpenRouter. Deine KI-Apps dürfen Tabs steuern, aber nur, wenn du es einschaltest, und mit Touch ID.': 'runs entirely on your Mac with Apple’s own AI, no account, no API key. In Luna Chat you can also talk to models from Groq or OpenRouter. Your AI apps may control tabs, but only if you turn it on, and with Touch ID.',
+    'Mit Sira sprechen': 'Talk to Sira',
+    'Alles, was ein Browser können muss': 'Everything a browser needs',
+    'Tabs und Tabgruppen, Lesezeichen, Verlauf, Downloads, Suche auf der Seite, Zoom, Erweiterungen und eine Sitzung, die auf Wunsch beim nächsten Start wieder da ist. Auf dem WebKit deines Macs, dem Motor hinter Safari.': 'Tabs and tab groups, bookmarks, history, downloads, find on page, zoom, extensions and a session that can be restored on next launch. Built on your Mac’s WebKit, the engine behind Safari.',
+    'Tab öffnen': 'Open a tab',
+    // Farbwelten
+    'Zehn Looks.': 'Ten looks.', 'Ein Klick.': 'One click.', 'Klick eine Farbwelt an. Die ganze Seite färbt sich mit, genau wie Luna.': 'Click a color theme. The whole page changes with it, just like Luna.',
+    'Lavendel': 'Lavender', 'Ozean': 'Ocean', 'Minze': 'Mint', 'Wald': 'Forest', 'Pfirsich': 'Peach', 'Kirschblüte': 'Cherry Blossom', 'Arktis': 'Arctic', 'Graphit': 'Graphite',
+    // Trailer
+    'In 30 Sekunden': 'In 30 seconds', 'Luna im': 'Luna at a', 'Schnelldurchlauf.': 'glance.', 'Trailer abspielen': 'Play trailer', 'Sprache': 'Language',
+    // Privatsphäre
+    'Privatsphäre': 'Privacy', 'Deine Daten bleiben': 'Your data stays', 'bei dir.': 'with you.',
+    'Lokal.': 'Local.', 'Lesezeichen, Verlauf, Notizen und Chats liegen auf deinem Rechner, nirgendwo sonst.': 'Bookmarks, history, notes and chats live on your computer, nowhere else.',
+    'Unsichtbar.': 'Invisible.', 'API-Schlüssel werden nie in der Oberfläche angezeigt.': 'API keys are never shown in the interface.',
+    'Aus.': 'Off.', 'Der KI-Zugriff für andere Apps ist standardmäßig deaktiviert und braucht Touch ID.': 'AI access for other apps is off by default and requires Touch ID.',
+    'Signiert.': 'Signed.', 'Updates kommen geprüft direkt in der App an. Der Quellcode ist offen.': 'Updates arrive verified, right in the app. The source code is open.',
+    // Download
+    'Hallo,': 'Hello,', 'Kostenlos, offen und in einer Minute installiert.': 'Free, open and installed in a minute.', 'Plattform': 'Platform',
+    'Öffne das Terminal, füge diesen Befehl ein und drücke Enter. Luna wird geladen, geprüft und gestartet.': 'Open Terminal, paste this command and press Enter. Luna is downloaded, verified and launched.',
+    'Befehl kopieren': 'Copy command', 'Apple Silicon (M1 oder neuer) · macOS 13 oder neuer ·': 'Apple Silicon (M1 or later) · macOS 13 or later ·',
+    'Warum ein Terminal-Befehl?': 'Why a Terminal command?',
+    'Luna ist noch nicht von Apple notarisiert. Eine im Browser geladene DMG markiert macOS als „aus dem Internet“, und beim Start erscheint eine Warnung. Der Befehl lädt Luna ohne diese Markierung, prüft Prüfsumme und Signatur und verändert keine Sicherheitseinstellungen.': 'Luna is not yet notarized by Apple. A DMG downloaded in a browser is flagged by macOS as “from the internet”, and a warning appears on launch. The command downloads Luna without that flag, verifies checksum and signature, and changes no security settings.',
+    'Skript ansehen ↗': 'View script ↗', 'Hast du die DMG doch selbst geladen? Dieser Befehl nimmt nur Luna die Markierung ab:': 'Downloaded the DMG anyway? This command removes the flag from Luna only:',
+    'Lade das ZIP, entpacke es vollständig und starte': 'Download the ZIP, extract it completely and launch', '. Den Ordner': '. Keep the', 'daneben lassen.': 'folder next to it.',
+    'Für Windows laden': 'Download for Windows', 'Windows 10/11 · x64 · WebView2 wird benötigt ·': 'Windows 10/11 · x64 · WebView2 required ·',
+    'Experimentelle Version': 'Experimental version',
+    'Die Windows-Version ist eine frühe Testversion: noch instabil und nicht signiert. Windows kann einen unbekannten Herausgeber melden.': 'The Windows version is an early preview: still unstable and unsigned. Windows may report an unknown publisher.',
+    'Hinweise zur Windows-Version ↗': 'Windows version notes ↗', 'Alle Versionen & Prüfsummen ↗': 'All releases & checksums ↗', 'Quellcode ↗': 'Source code ↗',
     'Kopiert. Jetzt im Terminal einfügen und Enter drücken.': 'Copied. Paste into Terminal and press Enter.', 'Bitte den markierten Befehl mit ⌘ C kopieren.': 'Please copy the selected command with ⌘ C.',
-    'Luna ist ein gemütlicher Browser für den Mac: zehn Farbwelten, Mausgesten, Spotify und eine KI, die auf Wunsch mitdenkt.': 'Luna is a cozy browser for Mac: ten color themes, mouse gestures, Spotify and optional AI assistance.',
-    'Zehn Farbwelten, Mausgesten, Spotify und KI – ein Browser, der sich nach dir richtet.': 'Ten color themes, mouse gestures, Spotify and AI – a browser that adapts to you.'
+    // Footer
+    'Luna Browser · Ein unabhängiges Projekt für macOS und Windows.': 'Luna Browser · An independent project for macOS and Windows.', 'Sprache wechseln': 'Switch language',
   };
-  const t = text => language === 'en' ? (translations[text] || text) : text;
+  const t = (text) => (language === 'en' ? (translations[text] || text) : text);
   window.lunaI18n = { language, t };
   document.documentElement.lang = language;
   if (language === 'de') return;
   function translate(node) {
     if (node.nodeType === Node.TEXT_NODE) {
-      if (node.parentElement?.closest('script,style,pre,code')) return;
-      const text = node.nodeValue.trim(), translated = t(text);
+      if (node.parentElement?.closest('script,style,pre,code,textarea')) return;
+      const text = node.nodeValue.trim(); if (!text) return;
+      const translated = t(text);
       if (text !== translated) node.nodeValue = node.nodeValue.replace(text, translated);
     } else if (node.nodeType === Node.ELEMENT_NODE) {
-      for (const attr of ['aria-label', 'title', 'alt', 'content']) {
+      for (const attr of ['aria-label', 'title', 'alt', 'content', 'placeholder']) {
         if (node.hasAttribute(attr)) node.setAttribute(attr, t(node.getAttribute(attr)));
       }
       for (const child of node.childNodes) translate(child);
     }
   }
   translate(document.documentElement);
-  // Localize demo output and accessible labels added after initial rendering.
-  new MutationObserver(records => {
+  new MutationObserver((records) => {
     for (const record of records) {
       if (record.type === 'characterData') translate(record.target);
       else for (const node of record.addedNodes) translate(node);
     }
   }).observe(document.body, { childList: true, subtree: true, characterData: true });
-  document.querySelector('#vid').src = 'assets/media/trailer-en.mp4';
-  document.querySelectorAll('.vlang button').forEach(button => button.classList.toggle('on', button.textContent === 'EN'));
+  const vid = document.querySelector('#vid'); if (vid) vid.src = 'assets/media/trailer-en.mp4';
+  document.querySelectorAll('.vlang button').forEach((b) => b.classList.toggle('on', b.textContent === 'EN'));
 })();
