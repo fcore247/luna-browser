@@ -1,6 +1,6 @@
 /* Luna Browser – Webseite
    Farbwelten wie im Browser (gleiche Formeln wie color-themes.js), Hell/Dunkel,
-   kleine Live-Demos und ein Installationsdialog. */
+   Sternenhimmel, Scroll-Szenen, kleine Live-Demos und ein Installationsdialog. */
 (() => {
   'use strict';
   const { t, language } = window.lunaI18n;
@@ -8,6 +8,9 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const finePointer = matchMedia('(pointer: fine)').matches;
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch {} },
@@ -26,8 +29,8 @@
     dark: { desk: '#2b1626', body: '#251621', panel: '#1c1119', card: '#2d1b28', hover: '#3a2434', soft: '#2f1e29', line: '#43293a', line3: '#563548', ink: '#fbeef6', ink2: '#e6d2de', mute2: '#b99dae', mute: '#a98d9e', acc: '#d889b8', 'acc-l': '#f4a9d4', pri: '#fbeef6', 'pri-fg': '#2a1621', tab: 'rgba(255,255,255,.06)' },
   };
   function palette(id, dark) {
-    const t = THEMES.find((x) => x[0] === id) || THEMES[0];
-    const [, , h, s] = t;
+    const th = THEMES.find((x) => x[0] === id) || THEMES[0];
+    const [, , h, s] = th;
     const c = (l, sat = s) => `hsl(${h} ${sat}% ${l}%)`;
     let v;
     if (id === 'luna') v = { ...LUNA[dark ? 'dark' : 'light'] };
@@ -39,11 +42,11 @@
     return { v, h, s };
   }
   const root = document.documentElement;
-  const sysDark = matchMedia('(prefers-color-scheme: dark)');
   let themeId = store.get('luna-site-theme');
-  if (!THEMES.some((t) => t[0] === themeId)) themeId = 'luna';
-  let mode = store.get('luna-site-mode') || (sysDark.matches ? 'dark' : 'light');
-  let trailColor = '#a24d84';
+  if (!THEMES.some((x) => x[0] === themeId)) themeId = 'luna';
+  // Luna ist eine Nacht: dunkel als Standard, hell nur auf Wunsch
+  let mode = store.get('luna-site-mode') || 'dark';
+  let accent = '#d889b8';
 
   function apply(persist) {
     const dark = mode === 'dark';
@@ -52,33 +55,174 @@
     root.style.colorScheme = dark ? 'dark' : 'light';
     root.style.setProperty('--h', h); root.style.setProperty('--s', s);
     for (const [k, val] of Object.entries(v)) root.style.setProperty(`--${k}`, val);
-    trailColor = v.acc;
-    const meta = $('meta[name=theme-color]'); if (meta) meta.content = v.body;
+    accent = v.acc;
+    const meta = $('meta[name=theme-color]'); if (meta) meta.content = dark ? `hsl(${h} ${s * 0.6}% 5%)` : `hsl(${h} ${s}% 96%)`;
     $$('[data-theme-id]').forEach((b) => b.setAttribute('aria-checked', b.dataset.themeId === themeId));
+    const name = THEMES.find((x) => x[0] === themeId)[1];
+    $('#themeName').textContent = name;
     if (persist) { store.set('luna-site-theme', themeId); store.set('luna-site-mode', mode); }
   }
-  function setTheme(id) { themeId = id; apply(true); }
+  // Farbwechsel breitet sich als Kreis vom Klickpunkt aus
+  function transition(e, fn) {
+    if (!document.startViewTransition || reduce) { fn(); return; }
+    const x = e?.clientX ?? innerWidth / 2, y = e?.clientY ?? innerHeight / 2;
+    root.style.setProperty('--vx', `${x}px`); root.style.setProperty('--vy', `${y}px`);
+    document.startViewTransition(fn);
+  }
+  const setTheme = (id, e) => transition(e, () => { themeId = id; apply(true); });
 
-  // Punkte im Hero + Karten im Feature-Bereich
-  const dots = $('#dots'), grid = $('#themeGrid');
-  THEMES.forEach(([id, name, h, s]) => {
+  const dots = $('#dots'), planets = $('#planets');
+  THEMES.forEach(([id, name, h, s], i) => {
     const d = document.createElement('button');
     d.dataset.themeId = id; d.setAttribute('role', 'radio'); d.title = name; d.setAttribute('aria-label', name);
     d.style.setProperty('--c', `hsl(${h} ${Math.max(s, 18)}% 68%)`);
-    d.onclick = () => setTheme(id);
+    d.onclick = (e) => setTheme(id, e);
     dots.append(d);
-    const c = document.createElement('button');
-    c.className = 'tc'; c.dataset.themeId = id; c.setAttribute('role', 'radio');
-    c.style.setProperty('--c1', `hsl(${h} ${s}% 70%)`); c.style.setProperty('--c2', `hsl(${h} ${s}% 86%)`);
-    c.innerHTML = `<div class="pv" style="background:hsl(${h} ${s}% 80%)"><i style="left:8px"></i><i style="left:17px"></i><i style="left:26px"></i><u></u></div><b>${name}</b><span class="ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>`;
-    c.onclick = () => setTheme(id);
-    grid.append(c);
+
+    const p = document.createElement('div');
+    p.className = 'planet'; p.style.setProperty('--a', `${(i / THEMES.length) * 360 - 90}deg`);
+    p.innerHTML = `<div class="pin"><button role="radio" data-theme-id="${id}" aria-label="${name}" style="--c1:hsl(${h} ${Math.max(s, 18)}% 62%);--c2:hsl(${h + 20} ${Math.max(s, 18)}% 40%)"></button><label>${name}</label></div>`;
+    p.querySelector('button').onclick = (e) => setTheme(id, e);
+    planets.append(p);
   });
-  $('#mode').onclick = () => { mode = mode === 'dark' ? 'light' : 'dark'; apply(true); };
-  sysDark.addEventListener?.('change', (e) => { if (!store.get('luna-site-mode')) { mode = e.matches ? 'dark' : 'light'; apply(false); } });
+  $('#mode').onclick = (e) => transition(e, () => { mode = mode === 'dark' ? 'light' : 'dark'; apply(true); });
   apply(false);
 
-  /* ---------- Uhr & Begrüßung im Hero ---------- */
+  /* ---------- Überschrift Buchstabe für Buchstabe ---------- */
+  (function split() {
+    const line = $('#heroTitle .line');
+    if (!line || reduce) return;
+    let i = 0;
+    const words = line.textContent.trim().split(/\s+/);
+    line.innerHTML = '';
+    words.forEach((w, wi) => {
+      const ws = document.createElement('span'); ws.className = 'w';
+      for (const ch of w) { const c = document.createElement('span'); c.className = 'ch'; c.style.setProperty('--i', i++); c.textContent = ch; ws.append(c); }
+      line.append(ws); if (wi < words.length - 1) line.append(' ');
+    });
+    line.setAttribute('aria-label', words.join(' '));
+  })();
+
+  /* ---------- Sternenhimmel ---------- */
+  const sky = $('#sky'), sc = sky.getContext('2d');
+  let SW = 0, SH = 0, stars = [], shooting = [];
+  const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+  function fitSky() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    SW = innerWidth; SH = innerHeight; sky.width = SW * dpr; sky.height = SH * dpr; sc.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round((SW * SH) / 5200);
+    stars = Array.from({ length: n }, () => ({ x: Math.random() * SW, y: Math.random() * SH, z: Math.random() ** 2, tw: Math.random() * Math.PI * 2, sp: 0.5 + Math.random() * 2 }));
+  }
+  fitSky(); addEventListener('resize', fitSky);
+  let scrollY0 = scrollY;
+  function drawSky(now) {
+    sc.clearRect(0, 0, SW, SH);
+    const dark = mode === 'dark';
+    mouse.x += (mouse.tx - mouse.x) * 0.05; mouse.y += (mouse.ty - mouse.y) * 0.05;
+    sc.fillStyle = dark ? '#fff' : accent;
+    for (const s of stars) {
+      const depth = 0.2 + s.z;
+      let x = s.x - mouse.x * 18 * depth, y = (s.y - scrollY0 * 0.06 * depth - mouse.y * 18 * depth) % SH;
+      if (y < 0) y += SH;
+      const a = (dark ? 0.25 + 0.75 * s.z : 0.12 + 0.3 * s.z) * (0.55 + 0.45 * Math.sin(now / 1000 * s.sp + s.tw));
+      sc.globalAlpha = a;
+      const r = 0.4 + s.z * 1.4;
+      sc.beginPath(); sc.arc(x, y, r, 0, 7); sc.fill();
+    }
+    // Sternschnuppen
+    if (dark && Math.random() < 0.006 && shooting.length < 2) shooting.push({ x: Math.random() * SW * 0.8, y: Math.random() * SH * 0.4, vx: 9 + Math.random() * 6, vy: 3 + Math.random() * 3, life: 1 });
+    for (const s of shooting) {
+      s.x += s.vx; s.y += s.vy; s.life -= 0.018;
+      const g = sc.createLinearGradient(s.x, s.y, s.x - s.vx * 14, s.y - s.vy * 14);
+      g.addColorStop(0, `rgba(255,255,255,${s.life})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+      sc.globalAlpha = 1; sc.strokeStyle = g; sc.lineWidth = 1.6; sc.lineCap = 'round';
+      sc.beginPath(); sc.moveTo(s.x, s.y); sc.lineTo(s.x - s.vx * 14, s.y - s.vy * 14); sc.stroke();
+    }
+    shooting = shooting.filter((s) => s.life > 0);
+    sc.globalAlpha = 1;
+    if (!reduce) requestAnimationFrame(drawSky);
+  }
+  requestAnimationFrame(drawSky);
+
+  /* ---------- Maus: Lichtschein, Mond-Parallaxe, magnetische Buttons ---------- */
+  const glow = $('#glow'), moonWrap = $('#moonWrap');
+  if (finePointer && !reduce) {
+    document.body.classList.add('pointer');
+    addEventListener('pointermove', (e) => {
+      glow.style.transform = `translate(${e.clientX}px,${e.clientY}px)`;
+      mouse.tx = e.clientX / SW - 0.5; mouse.ty = e.clientY / SH - 0.5;
+      moonWrap.style.setProperty('--mx', `${mouse.tx * -30}px`); moonWrap.style.setProperty('--my', `${mouse.ty * -30}px`);
+    }, { passive: true });
+    $$('.magnetic').forEach((b) => {
+      b.addEventListener('pointermove', (e) => {
+        const r = b.getBoundingClientRect();
+        b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.25}px,${(e.clientY - r.top - r.height / 2) * 0.35}px)`;
+      });
+      b.addEventListener('pointerleave', () => { b.style.transform = ''; });
+    });
+    const priv = $('#privCard');
+    priv.addEventListener('pointermove', (e) => {
+      const r = priv.getBoundingClientRect();
+      priv.style.setProperty('--lx', `${e.clientX - r.left}px`); priv.style.setProperty('--ly', `${e.clientY - r.top}px`);
+    });
+    // Browserfenster kippt leicht mit der Maus
+    const stage = $('#stage'), win = $('#win');
+    stage.addEventListener('pointermove', (e) => {
+      const r = stage.getBoundingClientRect();
+      win.style.rotate = `${((e.clientY - r.top) / r.height - 0.5) * -4}deg ${((e.clientX - r.left) / r.width - 0.5) * 6}deg 0`;
+    });
+    stage.addEventListener('pointerleave', () => { win.style.rotate = ''; });
+  }
+
+  /* ---------- Scroll: Fortschritt, Navigation, 3D-Fenster, Trailer, Mondaufgang ---------- */
+  const nav = $('#nav'), progress = $('#progress'), win = $('#win'), stageEl = $('#stage'), video = $('#video'), closing = $('#download');
+  const navLinks = $$('.links a');
+  let lastY = scrollY, ticking = false;
+  function onScroll() {
+    ticking = false;
+    const y = scrollY, vh = innerHeight;
+    scrollY0 = y;
+    progress.style.setProperty('--p', y / Math.max(1, document.documentElement.scrollHeight - vh));
+    nav.classList.toggle('hide', y > lastY && y > 400 && !document.querySelector('dialog[open]'));
+    lastY = y;
+    if (!reduce) {
+      const sr = stageEl.getBoundingClientRect();
+      const p = clamp(1 - (sr.top - vh * 0.15) / (vh * 0.65));
+      win.style.setProperty('--p', p.toFixed(3)); stageEl.style.setProperty('--p', p.toFixed(3));
+      moonWrap.style.setProperty('--scrollMoon', `${y * 0.35}px`);
+      const vr = video.getBoundingClientRect();
+      video.style.setProperty('--v', clamp(1 - (vr.top - vh * 0.1) / (vh * 0.7)).toFixed(3));
+      const cr = closing.getBoundingClientRect();
+      closing.style.setProperty('--c', clamp((cr.top) / vh).toFixed(3));
+    }
+    let current = null;
+    for (const a of navLinks) { const s = $(a.getAttribute('href')); if (s && s.getBoundingClientRect().top < vh * 0.4) current = a; }
+    navLinks.forEach((a) => a.classList.toggle('on', a === current));
+  }
+  addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+  onScroll();
+
+  /* ---------- Einblenden beim Scrollen ---------- */
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
+  $$('.reveal').forEach((el) => io.observe(el));
+
+  // Zahlen zählen hoch
+  const cio = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return; cio.unobserve(e.target);
+    const el = e.target, to = +el.dataset.count, suf = el.dataset.suffix || '';
+    if (reduce || to === 0) { el.textContent = to + suf; return; }
+    const t0 = performance.now();
+    (function step(now) { const k = clamp((now - t0) / 1600); el.textContent = Math.round(to * (1 - (1 - k) ** 4)) + suf; if (k < 1) requestAnimationFrame(step); })(t0);
+  }), { threshold: 0.6 });
+  $$('[data-count]').forEach((el) => cio.observe(el));
+
+  /* ---------- Ticker ---------- */
+  const words = ['theme', 'play bohemian rhapsody', 'spotify daft punk', 'chat', 'tab open youtube.com', t('einstellungen'), 'commands'];
+  const words2 = ['sonos', 'screenshot', 'notes', 'tab close', 'spotify queue', 'theme ozean', 'chat sira'];
+  const fill = (el, list) => { const html = list.map((w, i) => `<span${i % 3 === 0 ? ' class="hl"' : ''}>${w}</span>`).join(''); el.innerHTML = html.repeat(4); };
+  fill($('#tk1'), words); fill($('#tk2'), words2);
+
+  /* ---------- Uhr & Begrüßung ---------- */
   function tickClock() {
     const d = new Date(), hr = d.getHours();
     $('#clock').textContent = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
@@ -90,66 +234,69 @@
   // Adressleiste tippt sich selbst
   (async function typeAddr() {
     const el = $('#addrTyped');
-    const words = [t('Suchen oder Adresse eingeben'), 'theme', 'play bohemian rhapsody', 'spotify daft punk', 'tab open youtube.com'];
+    const list = [t('Suchen oder Adresse eingeben'), 'theme', 'play bohemian rhapsody', 'spotify daft punk', 'tab open youtube.com'];
     if (reduce) return;
-    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-    let i = 0;
-    for (;;) {
-      const w = words[i++ % words.length];
-      el.style.color = w === words[0] ? 'var(--mute)' : 'var(--ink)';
-      el.style.fontFamily = w === words[0] ? '' : 'ui-monospace,SFMono-Regular,Menlo,monospace';
-      for (let k = 0; k <= w.length; k++) { el.textContent = w.slice(0, k) || ' '; await wait(70); }
-      await wait(1900);
-      for (let k = w.length; k >= 0; k--) { el.textContent = w.slice(0, k) || ' '; await wait(28); }
-      await wait(350);
+    await sleep(1800);
+    for (let i = 0; ; i++) {
+      const w = list[i % list.length];
+      el.style.color = i % list.length === 0 ? 'var(--mute)' : 'var(--ink)';
+      el.style.fontFamily = i % list.length === 0 ? '' : 'ui-monospace,SFMono-Regular,Menlo,monospace';
+      for (let k = 0; k <= w.length; k++) { el.textContent = w.slice(0, k) || ' '; await sleep(70); }
+      await sleep(1900);
+      for (let k = w.length; k >= 0; k--) { el.textContent = w.slice(0, k) || ' '; await sleep(28); }
+      await sleep(350);
     }
   })();
 
-  /* ---------- Einblenden beim Scrollen ---------- */
-  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-  $$('.reveal').forEach((el) => io.observe(el));
+  /* ---------- Story: Szenen wechseln mit dem Scrollen ---------- */
+  const ADDR = { cmd: 'luna://commands', gest: 'luna://gestures', music: 'luna://spotify', ai: 'luna://chat' };
+  let scene = 'cmd';
+  const setScene = (s) => {
+    scene = s;
+    $$('.scene').forEach((el) => el.classList.toggle('on', el.dataset.scene === s));
+    $$('.step').forEach((el) => el.classList.toggle('on', el.dataset.scene === s));
+    $('#dvAddr').textContent = ADDR[s];
+  };
+  setScene('cmd');
+  const sio = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) setScene(e.target.dataset.scene); }), { rootMargin: '-45% 0px -45% 0px' });
+  $$('.step').forEach((el) => sio.observe(el));
 
-  /* Demos laufen nur, wenn sie sichtbar sind */
-  const visible = new WeakMap();
-  const vio = new IntersectionObserver((es) => es.forEach((e) => visible.set(e.target, e.isIntersecting)));
-  const isVis = (el) => visible.get(el) !== false && !document.hidden;
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  async function until(el) { while (!isVis(el)) await sleep(400); }
+  // Demos laufen nur, wenn ihre Szene sichtbar ist
+  const device = $('#device');
+  let deviceVisible = false;
+  new IntersectionObserver((es) => { deviceVisible = es[0].isIntersecting; }).observe(device);
+  async function until(s) { while (scene !== s || !deviceVisible || document.hidden) await sleep(300); }
 
-  /* ---------- Befehle-Demo ---------- */
-  const cmdCard = $('.c-cmd');
-  vio.observe(cmdCard);
+  /* Befehle */
   const CMDS = [
-    ['theme', () => `<div class="row">${THEMES.slice(0, 6).map((t) => `<i class="sw" style="--c:hsl(${t[2]} ${Math.max(t[3], 18)}% 68%)"></i>`).join('')}<span>Farbwelt wählen</span></div>`],
-    ['play bohemian rhapsody', () => '<div class="row"><i class="cov"></i><span>Bohemian Rhapsody · Queen<br><small>Wiedergabe an Spotify übergeben</small></span></div>'],
-    ['spotify daft punk', () => '<div class="row"><i class="cov"></i><span>One More Time</span></div><div class="row"><i class="cov"></i><span>Get Lucky</span></div><div class="row"><i class="cov"></i><span>Around the World</span></div>'],
-    ['tab open youtube.com', () => '<div class="row">⊕ <span>Neuer Tab · youtube.com</span></div>'],
-    ['chat', () => '<div class="row">✧ <span>Luna Chat geöffnet</span></div>'],
+    ['theme', () => `<div class="row">${THEMES.slice(0, 7).map((x) => `<i class="sw" style="--c:hsl(${x[2]} ${Math.max(x[3], 18)}% 68%)"></i>`).join('')}<span style="margin-left:12px">${t('Farbwelt wählen')}</span></div><div class="row"><span class="ico">☾</span><span>${t('Hell')} / ${t('Dunkel')}</span></div>`],
+    ['play bohemian rhapsody', () => `<div class="row"><i class="cov"></i><span>Bohemian Rhapsody · Queen<br><small>${t('Wiedergabe an Spotify übergeben')}</small></span></div>`],
+    ['spotify daft punk', () => '<div class="row"><i class="cov"></i><span>One More Time<br><small>Daft Punk</small></span></div><div class="row"><i class="cov" style="filter:hue-rotate(60deg)"></i><span>Get Lucky<br><small>Daft Punk</small></span></div><div class="row"><i class="cov" style="filter:hue-rotate(140deg)"></i><span>Around the World<br><small>Daft Punk</small></span></div>'],
+    ['tab open youtube.com', () => `<div class="row"><span class="ico">⊕</span><span>${t('Neuer Tab')} · youtube.com</span></div>`],
+    ['chat', () => `<div class="row"><span class="ico">✧</span><span>${t('Luna Chat geöffnet')}</span></div>`],
   ];
   (async function cmdLoop() {
-    const t = $('#cmdText'), out = $('#cmdOut');
-    if (reduce) { t.textContent = CMDS[0][0]; out.innerHTML = CMDS[0][1](); return; }
+    const el = $('#cmdText'), out = $('#cmdOut');
+    if (reduce) { el.textContent = CMDS[0][0]; out.innerHTML = CMDS[0][1](); return; }
     for (let i = 0; ; i++) {
       const [c, html] = CMDS[i % CMDS.length];
-      await until(cmdCard);
+      await until('cmd');
       out.innerHTML = '';
-      for (let k = 0; k <= c.length; k++) { t.textContent = c.slice(0, k); await sleep(75); }
+      for (let k = 0; k <= c.length; k++) { el.textContent = c.slice(0, k); await sleep(75); }
       await sleep(250); out.innerHTML = html();
       await sleep(2600);
-      for (let k = c.length; k >= 0; k--) { t.textContent = c.slice(0, k); await sleep(20); }
+      for (let k = c.length; k >= 0; k--) { el.textContent = c.slice(0, k); await sleep(20); }
     }
   })();
 
-  /* ---------- KI-Chat-Demo ---------- */
-  const chatCard = $('.c-ai');
-  vio.observe(chatCard);
+  /* KI-Chat */
   (async function chatLoop() {
     const u = $('#msgU'), a = $('#msgA'), at = $('#msgAt');
     const Q = t('Fasse diese Seite kurz zusammen');
     const A = t('Das ist Lunas Startseite: Uhr, Suche und deine Musik, alles ruhig an einem Ort. Ich laufe lokal auf deinem Mac, ganz ohne Konto.');
     if (reduce) { u.textContent = Q; at.textContent = A; return; }
     for (;;) {
-      await until(chatCard);
+      await until('ai');
       u.textContent = ''; at.textContent = ''; a.style.opacity = 0; u.classList.add('typing');
       for (let k = 1; k <= Q.length; k++) { u.textContent = Q.slice(0, k); await sleep(38); }
       u.classList.remove('typing'); await sleep(500); a.style.opacity = 1; a.classList.add('typing');
@@ -158,40 +305,95 @@
     }
   })();
 
-  /* ---------- Gesten: selbst zeichnen ---------- */
+  /* Musik: Zeit, Fortschritt, Visualizer, Lautstärke */
+  (function music() {
+    const tNow = $('#tNow'), fillBar = $('#barFill'), viz = $('#viz');
+    const bars = Array.from({ length: 36 }, () => { const i = document.createElement('i'); i.style.height = '100%'; viz.append(i); return i; });
+    let s = 72;
+    setInterval(() => {
+      if (document.hidden || scene !== 'music') return;
+      s = s >= 319 ? 72 : s + 1;
+      tNow.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      fillBar.style.width = `${(s / 320) * 100}%`;
+      const v = 45 + Math.sin(s / 4) * 20;
+      $('.v1').style.setProperty('--v', `${v}%`); $('.v2').style.setProperty('--v', `${v}%`);
+    }, 1000);
+    if (reduce) return;
+    (function frame(now) {
+      if (scene === 'music' && deviceVisible) bars.forEach((b, i) => { b.style.transform = `scaleY(${0.15 + Math.abs(Math.sin(now / 260 + i * 0.6) * Math.cos(now / 410 + i * 0.25))})`; });
+      requestAnimationFrame(frame);
+    })(0);
+  })();
+
+  /* Gesten: selbst zeichnen, S oder Kreis wird erkannt */
   const gest = $('#gest'), cv = $('#trail'), ctx = cv.getContext('2d');
-  vio.observe(gest);
-  let pts = [], down = false, W = 0, H = 0;
+  let pts = [], stroke = [], down = false, W = 0, H = 0;
   function fit() {
     const r = gest.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
     W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   new ResizeObserver(fit).observe(gest); fit();
   const pos = (e) => { const r = gest.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, t: performance.now() }; };
-  gest.addEventListener('pointerdown', (e) => { down = true; gest.setPointerCapture(e.pointerId); pts.push({ ...pos(e), brk: true }); $('#gHint').style.opacity = 0; e.preventDefault(); });
-  gest.addEventListener('pointermove', (e) => { if (down) pts.push(pos(e)); });
-  const up = () => { down = false; };
+  gest.addEventListener('pointerdown', (e) => {
+    down = true; gest.setPointerCapture(e.pointerId); const p = pos(e);
+    pts.push({ ...p, brk: true }); stroke = [p];
+    $('#gHint').style.opacity = 0; gest.classList.add('drawn'); e.preventDefault();
+  });
+  gest.addEventListener('pointermove', (e) => { if (down) { const p = pos(e); pts.push(p); stroke.push(p); } });
+  const show = (id, ms = 2200) => { const el = $(id); el.classList.add('show'); setTimeout(() => el.classList.remove('show'), ms); };
+  function recognise(path) {
+    if (path.length < 8) return null;
+    const xs = path.map((p) => p.x), ys = path.map((p) => p.y);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys), size = Math.max(w, h);
+    if (size < 40) return null;
+    const a = path[0], b = path[path.length - 1];
+    const closed = Math.hypot(a.x - b.x, a.y - b.y) < size * 0.3;
+    return closed ? 'circle' : 's';
+  }
+  const up = () => {
+    if (!down) return; down = false;
+    const kind = recognise(stroke);
+    if (kind === 'circle') { $('#gBadge kbd').textContent = '○'; $('#gBadgeT').textContent = t('Notizzettel'); show('#gBadge'); show('#gNote', 2600); }
+    else if (kind === 's') { $('#gBadge kbd').textContent = 'S'; $('#gBadgeT').textContent = 'Screenshot'; show('#gBadge'); flash(); show('#gPol', 2600); }
+  };
+  function flash() { gest.animate([{ background: '#fff' }, { background: '' }], { duration: 350 }); }
   gest.addEventListener('pointerup', up); gest.addEventListener('pointercancel', up);
-  (function draw() {
-    ctx.clearRect(0, 0, W, H);
-    const now = performance.now();
-    pts = pts.filter((p) => now - p.t < 1400);
-    for (let i = 1; i < pts.length; i++) {
-      const p = pts[i], q = pts[i - 1]; if (p.brk) continue;
-      const life = 1 - (now - p.t) / 1400;
-      ctx.globalAlpha = Math.max(0, life);
-      ctx.strokeStyle = trailColor; ctx.lineWidth = 3 + 7 * life; ctx.lineCap = 'round';
-      ctx.shadowColor = trailColor; ctx.shadowBlur = 14 * life;
-      ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+  // Ohne Interaktion zeichnet die Demo das S selbst
+  (async function autoGesture() {
+    if (reduce) return;
+    const path = $('#gPath'), len = path.getTotalLength();
+    for (;;) {
+      await until('gest');
+      await sleep(1400);
+      if (gest.classList.contains('drawn') || scene !== 'gest') continue;
+      const box = $('.gest-s').getBoundingClientRect(), gb = gest.getBoundingClientRect();
+      const sx = box.width / 300, sy = box.height / 220;
+      for (let d = 0; d <= len; d += len / 50) {
+        const p = path.getPointAtLength(d);
+        pts.push({ x: box.left - gb.left + p.x * sx, y: box.top - gb.top + p.y * sy, t: performance.now(), brk: d === 0 });
+        await sleep(16);
+      }
+      $('#gBadge kbd').textContent = 'S'; $('#gBadgeT').textContent = 'Screenshot';
+      show('#gBadge'); flash(); show('#gPol', 2600);
+      await sleep(4200);
     }
-    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-    requestAnimationFrame(draw);
   })();
-
-  /* ---------- Musik: Zeit läuft mit ---------- */
-  (function music() {
-    const el = $('#tNow'); let s = 72;
-    setInterval(() => { if (document.hidden) return; s = s >= 319 ? 72 : s + 1; el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }, 1000);
+  (function draw() {
+    if (scene === 'gest' || pts.length) {
+      ctx.clearRect(0, 0, W, H);
+      const now = performance.now();
+      pts = pts.filter((p) => now - p.t < 1400);
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i], q = pts[i - 1]; if (p.brk) continue;
+        const life = 1 - (now - p.t) / 1400;
+        ctx.globalAlpha = Math.max(0, life);
+        ctx.strokeStyle = accent; ctx.lineWidth = 3 + 9 * life; ctx.lineCap = 'round';
+        ctx.shadowColor = accent; ctx.shadowBlur = 18 * life;
+        ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    }
+    requestAnimationFrame(draw);
   })();
 
   /* ---------- Trailer ---------- */
