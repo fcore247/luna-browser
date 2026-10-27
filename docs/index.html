@@ -46,9 +46,6 @@
 <!-- Himmel: Sterne (Canvas), Nebel und ein Lichtschein, der der Maus folgt -->
 <canvas id="sky" aria-hidden="true"></canvas>
 <div class="nebula" aria-hidden="true"><i></i><i></i><i></i></div>
-<div class="grain" aria-hidden="true"></div>
-<div class="cursor-glow" id="glow" aria-hidden="true"></div>
-<div class="progress" id="progress" aria-hidden="true"></div>
 
 <header class="nav" id="nav">
   <a class="brand" href="#top" aria-label="Luna Browser"><svg class="brand-icon"><use href="#icon"/></svg><svg class="brand-wm"><use href="#wm"/></svg></a>
@@ -67,8 +64,6 @@
     <div class="moon-wrap" id="moonWrap" aria-hidden="true">
       <div class="halo"></div>
       <div class="moon-orb"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="orbit o1"><span></span></div>
-      <div class="orbit o2"><span></span></div>
     </div>
 
     <div class="hero-copy">
@@ -76,8 +71,8 @@
       <h1 class="split" id="heroTitle"><span class="line">Mach es dir im Web</span> <span class="script">gemütlich.</span></h1>
       <p class="lead reveal">Luna ist ein Browser für macOS und Windows, der sich nach dir richtet: mit deinen Farben, deiner Musik, Mausgesten und einer KI, die auf Wunsch mitdenkt.</p>
       <div class="cta-row reveal">
-        <button class="btn primary download magnetic"><span>Luna herunterladen</span><svg><use href="#dl"/></svg></button>
-        <a class="btn ghost magnetic" href="#trailer"><svg viewBox="0 0 24 24" class="play"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>Trailer ansehen</span></a>
+        <button class="btn primary download"><span>Luna herunterladen</span><svg><use href="#dl"/></svg></button>
+        <a class="btn ghost" href="#trailer"><svg viewBox="0 0 24 24" class="play"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>Trailer ansehen</span></a>
       </div>
       <div class="try reveal">
         <span>Probier’s aus – wähl deine Farbwelt:</span>
@@ -102,26 +97,8 @@
           <div class="p-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><span>Mit Luna Search suchen oder Adresse eingeben</span><kbd>⌘L</kbd></div>
           <div class="p-chips"><span>☆ Lesezeichen</span><span>◷ Verlauf</span><span>↓ Downloads</span><span>☾ Erscheinungsbild</span><span>⚙ Einstellungen</span></div>
         </div>
-        <div class="win-shine"></div>
       </div>
-      <div class="float f1"><svg><use href="#tick"/></svg><span>100 % lokal</span></div>
-      <div class="float f2"><kbd>S</kbd><span>Screenshot</span></div>
-      <div class="float f3"><span class="eq"><i></i><i></i><i></i><i></i></span><span>Sonos · synchron</span></div>
     </div>
-  </section>
-
-  <!-- ============ TICKER ============ -->
-  <div class="ticker" aria-hidden="true">
-    <div class="tk-row"><div class="tk-in" id="tk1"></div></div>
-    <div class="tk-row rev"><div class="tk-in" id="tk2"></div></div>
-  </div>
-
-  <!-- ============ ZAHLEN ============ -->
-  <section class="stats">
-    <div class="stat reveal"><b data-count="10">10</b><span>Farbwelten</span></div>
-    <div class="stat reveal"><b data-count="0">0</b><span>Konten nötig</span></div>
-    <div class="stat reveal"><b data-count="100" data-suffix=" %">100 %</b><span>lokal gespeichert</span></div>
-    <div class="stat reveal"><b data-count="2">2</b><span>Plattformen</span></div>
   </section>
 
   <!-- ============ STORY (sticky) ============ -->
@@ -180,7 +157,7 @@
                   <div class="bar"><i id="barFill"></i></div><div class="t"><span id="tNow">1:12</span><span>5:20</span></div>
                   <div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span></div>
                 </div>
-                <div class="viz" id="viz" aria-hidden="true"></div>
+                
               </div>
               <div class="sonos"><img src="assets/era100.png" alt="" width="64" height="44" loading="lazy"><div><b>Sonos Era 100</b><span>Wohnzimmer · synchron</span>
                 <div class="vol"><label>Mac</label><div class="vb"><i class="v1"></i></div></div><div class="vol"><label>Sonos</label><div class="vb"><i class="v2"></i></div></div></div></div>
@@ -268,7 +245,7 @@
       <svg class="big-icon"><use href="#icon"/></svg>
       <svg class="big-wm"><use href="#wm"/></svg>
       <h2>Mach es dir im Web <span class="script">gemütlich.</span></h2>
-      <button class="btn primary big download magnetic"><span>Luna herunterladen</span><svg><use href="#dl"/></svg></button>
+      <button class="btn primary big download"><span>Luna herunterladen</span><svg><use href="#dl"/></svg></button>
       <p>macOS 13+ (Apple Silicon) oder Windows 10/11 (x64)</p>
       <p class="windows-test-note"><a href="https://github.com/fcore247/luna-browser/blob/main/docs/WINDOWS-TEST.md">Jetzt auch für Windows verfügbar · experimentelle Version</a></p>
     </div>

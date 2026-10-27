@@ -88,29 +88,13 @@
   $('#mode').onclick = (e) => transition(e, () => { mode = mode === 'dark' ? 'light' : 'dark'; apply(true); });
   apply(false);
 
-  /* ---------- Überschrift Buchstabe für Buchstabe ---------- */
-  (function split() {
-    const line = $('#heroTitle .line');
-    if (!line || reduce) return;
-    let i = 0;
-    const words = line.textContent.trim().split(/\s+/);
-    line.innerHTML = '';
-    words.forEach((w, wi) => {
-      const ws = document.createElement('span'); ws.className = 'w';
-      for (const ch of w) { const c = document.createElement('span'); c.className = 'ch'; c.style.setProperty('--i', i++); c.textContent = ch; ws.append(c); }
-      line.append(ws); if (wi < words.length - 1) line.append(' ');
-    });
-    line.setAttribute('aria-label', words.join(' '));
-  })();
-
   /* ---------- Sternenhimmel ---------- */
   const sky = $('#sky'), sc = sky.getContext('2d');
-  let SW = 0, SH = 0, stars = [], shooting = [];
-  const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+  let SW = 0, SH = 0, stars = [];
   function fitSky() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     SW = innerWidth; SH = innerHeight; sky.width = SW * dpr; sky.height = SH * dpr; sc.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Math.round((SW * SH) / 5200);
+    const n = Math.round((SW * SH) / 11000);
     stars = Array.from({ length: n }, () => ({ x: Math.random() * SW, y: Math.random() * SH, z: Math.random() ** 2, tw: Math.random() * Math.PI * 2, sp: 0.5 + Math.random() * 2 }));
   }
   fitSky(); addEventListener('resize', fitSky);
@@ -118,78 +102,37 @@
   function drawSky(now) {
     sc.clearRect(0, 0, SW, SH);
     const dark = mode === 'dark';
-    mouse.x += (mouse.tx - mouse.x) * 0.05; mouse.y += (mouse.ty - mouse.y) * 0.05;
     sc.fillStyle = dark ? '#fff' : accent;
     for (const s of stars) {
       const depth = 0.2 + s.z;
-      let x = s.x - mouse.x * 18 * depth, y = (s.y - scrollY0 * 0.06 * depth - mouse.y * 18 * depth) % SH;
+      const x = s.x; let y = (s.y - scrollY0 * 0.04 * depth) % SH;
       if (y < 0) y += SH;
-      const a = (dark ? 0.25 + 0.75 * s.z : 0.12 + 0.3 * s.z) * (0.55 + 0.45 * Math.sin(now / 1000 * s.sp + s.tw));
+      const a = (dark ? 0.15 + 0.5 * s.z : 0.08 + 0.2 * s.z) * (0.8 + 0.2 * Math.sin(now / 2500 * s.sp + s.tw));
       sc.globalAlpha = a;
       const r = 0.4 + s.z * 1.4;
       sc.beginPath(); sc.arc(x, y, r, 0, 7); sc.fill();
     }
-    // Sternschnuppen
-    if (dark && Math.random() < 0.006 && shooting.length < 2) shooting.push({ x: Math.random() * SW * 0.8, y: Math.random() * SH * 0.4, vx: 9 + Math.random() * 6, vy: 3 + Math.random() * 3, life: 1 });
-    for (const s of shooting) {
-      s.x += s.vx; s.y += s.vy; s.life -= 0.018;
-      const g = sc.createLinearGradient(s.x, s.y, s.x - s.vx * 14, s.y - s.vy * 14);
-      g.addColorStop(0, `rgba(255,255,255,${s.life})`); g.addColorStop(1, 'rgba(255,255,255,0)');
-      sc.globalAlpha = 1; sc.strokeStyle = g; sc.lineWidth = 1.6; sc.lineCap = 'round';
-      sc.beginPath(); sc.moveTo(s.x, s.y); sc.lineTo(s.x - s.vx * 14, s.y - s.vy * 14); sc.stroke();
-    }
-    shooting = shooting.filter((s) => s.life > 0);
     sc.globalAlpha = 1;
     if (!reduce) requestAnimationFrame(drawSky);
   }
   requestAnimationFrame(drawSky);
 
-  /* ---------- Maus: Lichtschein, Mond-Parallaxe, magnetische Buttons ---------- */
-  const glow = $('#glow'), moonWrap = $('#moonWrap');
-  if (finePointer && !reduce) {
-    document.body.classList.add('pointer');
-    addEventListener('pointermove', (e) => {
-      glow.style.transform = `translate(${e.clientX}px,${e.clientY}px)`;
-      mouse.tx = e.clientX / SW - 0.5; mouse.ty = e.clientY / SH - 0.5;
-      moonWrap.style.setProperty('--mx', `${mouse.tx * -30}px`); moonWrap.style.setProperty('--my', `${mouse.ty * -30}px`);
-    }, { passive: true });
-    $$('.magnetic').forEach((b) => {
-      b.addEventListener('pointermove', (e) => {
-        const r = b.getBoundingClientRect();
-        b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.25}px,${(e.clientY - r.top - r.height / 2) * 0.35}px)`;
-      });
-      b.addEventListener('pointerleave', () => { b.style.transform = ''; });
-    });
-    const priv = $('#privCard');
-    priv.addEventListener('pointermove', (e) => {
-      const r = priv.getBoundingClientRect();
-      priv.style.setProperty('--lx', `${e.clientX - r.left}px`); priv.style.setProperty('--ly', `${e.clientY - r.top}px`);
-    });
-    // Browserfenster kippt leicht mit der Maus
-    const stage = $('#stage'), win = $('#win');
-    stage.addEventListener('pointermove', (e) => {
-      const r = stage.getBoundingClientRect();
-      win.style.rotate = `${((e.clientY - r.top) / r.height - 0.5) * -4}deg ${((e.clientX - r.left) / r.width - 0.5) * 6}deg 0`;
-    });
-    stage.addEventListener('pointerleave', () => { win.style.rotate = ''; });
-  }
-
-  /* ---------- Scroll: Fortschritt, Navigation, 3D-Fenster, Trailer, Mondaufgang ---------- */
-  const nav = $('#nav'), progress = $('#progress'), win = $('#win'), stageEl = $('#stage'), video = $('#video'), closing = $('#download');
+  /* ---------- Scroll: Navigation, 3D-Fenster, Trailer, Mondaufgang ---------- */
+  const moonWrap = $('#moonWrap');
+  const nav = $('#nav'), win = $('#win'), stageEl = $('#stage'), video = $('#video'), closing = $('#download');
   const navLinks = $$('.links a');
   let lastY = scrollY, ticking = false;
   function onScroll() {
     ticking = false;
     const y = scrollY, vh = innerHeight;
     scrollY0 = y;
-    progress.style.setProperty('--p', y / Math.max(1, document.documentElement.scrollHeight - vh));
     nav.classList.toggle('hide', y > lastY && y > 400 && !document.querySelector('dialog[open]'));
     lastY = y;
     if (!reduce) {
       const sr = stageEl.getBoundingClientRect();
       const p = clamp(1 - (sr.top - vh * 0.15) / (vh * 0.65));
       win.style.setProperty('--p', p.toFixed(3)); stageEl.style.setProperty('--p', p.toFixed(3));
-      moonWrap.style.setProperty('--scrollMoon', `${y * 0.35}px`);
+      moonWrap.style.setProperty('--scrollMoon', `${y * 0.2}px`);
       const vr = video.getBoundingClientRect();
       video.style.setProperty('--v', clamp(1 - (vr.top - vh * 0.1) / (vh * 0.7)).toFixed(3));
       const cr = closing.getBoundingClientRect();
@@ -205,22 +148,6 @@
   /* ---------- Einblenden beim Scrollen ---------- */
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
   $$('.reveal').forEach((el) => io.observe(el));
-
-  // Zahlen zählen hoch
-  const cio = new IntersectionObserver((es) => es.forEach((e) => {
-    if (!e.isIntersecting) return; cio.unobserve(e.target);
-    const el = e.target, to = +el.dataset.count, suf = el.dataset.suffix || '';
-    if (reduce || to === 0) { el.textContent = to + suf; return; }
-    const t0 = performance.now();
-    (function step(now) { const k = clamp((now - t0) / 1600); el.textContent = Math.round(to * (1 - (1 - k) ** 4)) + suf; if (k < 1) requestAnimationFrame(step); })(t0);
-  }), { threshold: 0.6 });
-  $$('[data-count]').forEach((el) => cio.observe(el));
-
-  /* ---------- Ticker ---------- */
-  const words = ['theme', 'play bohemian rhapsody', 'spotify daft punk', 'chat', 'tab open youtube.com', t('einstellungen'), 'commands'];
-  const words2 = ['sonos', 'screenshot', 'notes', 'tab close', 'spotify queue', 'theme ozean', 'chat sira'];
-  const fill = (el, list) => { const html = list.map((w, i) => `<span${i % 3 === 0 ? ' class="hl"' : ''}>${w}</span>`).join(''); el.innerHTML = html.repeat(4); };
-  fill($('#tk1'), words); fill($('#tk2'), words2);
 
   /* ---------- Uhr & Begrüßung ---------- */
   function tickClock() {
@@ -305,10 +232,9 @@
     }
   })();
 
-  /* Musik: Zeit, Fortschritt, Visualizer, Lautstärke */
+  /* Musik: Zeit, Fortschritt, Lautstärke */
   (function music() {
-    const tNow = $('#tNow'), fillBar = $('#barFill'), viz = $('#viz');
-    const bars = Array.from({ length: 36 }, () => { const i = document.createElement('i'); i.style.height = '100%'; viz.append(i); return i; });
+    const tNow = $('#tNow'), fillBar = $('#barFill');
     let s = 72;
     setInterval(() => {
       if (document.hidden || scene !== 'music') return;
@@ -318,11 +244,6 @@
       const v = 45 + Math.sin(s / 4) * 20;
       $('.v1').style.setProperty('--v', `${v}%`); $('.v2').style.setProperty('--v', `${v}%`);
     }, 1000);
-    if (reduce) return;
-    (function frame(now) {
-      if (scene === 'music' && deviceVisible) bars.forEach((b, i) => { b.style.transform = `scaleY(${0.15 + Math.abs(Math.sin(now / 260 + i * 0.6) * Math.cos(now / 410 + i * 0.25))})`; });
-      requestAnimationFrame(frame);
-    })(0);
   })();
 
   /* Gesten: selbst zeichnen, S oder Kreis wird erkannt */
