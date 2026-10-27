@@ -141,7 +141,7 @@
     c.type = 'button'; c.className = 'tcard'; c.dataset.tcard = id; c.dataset.themeId = id; c.setAttribute('role', 'radio');
     c.innerHTML = `<div style="background:linear-gradient(160deg,hsl(${h} ${s}% 82%),hsl(${h + 20} ${s}% 70%))"></div>${name}`;
     c.onclick = () => {
-      userPicked = true; frame.removeAttribute('style');
+      userPicked = true; frame.removeAttribute('style'); frame.classList.add('picked');
       setTheme(id, true);
       $$('.tcard').forEach((x) => x.classList.toggle('on', x === c));
     };

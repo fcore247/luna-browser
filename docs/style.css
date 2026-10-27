@@ -133,6 +133,18 @@ h1 .soft{color:#ffffff9c}
 .tcard div::after{content:"";position:absolute;left:.6em;right:1.4em;bottom:.6em;height:.5em;border-radius:.3em;background:#ffffffa0}
 .tcard.on{border-color:var(--acc);transform:translateY(-.2em)}
 
+/* Schritt 1: kurz in Lunas Handschrift gekritzelt, dann wieder weg */
+.scribble{position:absolute;left:50%;top:70%;z-index:3;display:flex;align-items:flex-end;gap:.2em;transform:translate(-50%,-50%) rotate(-5deg);pointer-events:none;opacity:0}
+.scribble span{font:600 4.6em/1 Caveat,'Snell Roundhand',cursive;color:var(--acc);white-space:nowrap;text-shadow:0 .05em .4em color-mix(in srgb,var(--body) 80%,transparent);clip-path:inset(-20% 100% -20% 0)}
+.sc-arrow{width:6em;height:5em;margin:0 0 1.6em .2em;overflow:visible}
+.sc-arrow path{fill:none;stroke:var(--acc);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
+.frame[data-step="1"] .home{opacity:.3;filter:blur(2px)}
+.frame[data-step="1"]:not(.picked) .scribble{animation:scribble 4.2s .5s both}
+.frame[data-step="1"]:not(.picked) .scribble span{animation:write 1.3s .6s cubic-bezier(.4,.1,.5,1) forwards}
+.frame[data-step="1"]:not(.picked) .sc-arrow path{animation:draw .6s 1.9s ease-out forwards}
+@keyframes scribble{0%{opacity:0}4%{opacity:1}82%{opacity:1}100%{opacity:0}}
+@keyframes write{to{clip-path:inset(-20% -5% -20% 0)}}
+
 /* Schritt 2: Gesten */
 .gesture{position:absolute;left:50%;top:50%;width:26em;height:19em;transform:translate(-50%,-50%);pointer-events:none;overflow:visible}
 .gesture path{fill:none;stroke:var(--acc);stroke-width:7;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;filter:drop-shadow(0 0 6px var(--acc-l));opacity:0}

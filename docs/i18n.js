@@ -131,6 +131,7 @@
     "Zum Beispiel: „Mach mir aus dieser Wetterseite eine ruhige Übersicht.“ Deine KI liest die Seite und wählt, was wichtig ist.": "For example: “Turn this weather page into a calm overview for me.” Your AI reads the page and picks what matters.",
     "Luna baut deine Seite.": "Luna builds your page.",
     "Aus Lunas Bausteinen wie Kennzahlen, Karten, Diagrammen und Listen. Die Werte bleiben live, die Originalseite bleibt für Anmeldung und Navigation da.": "From Luna’s building blocks such as figures, cards, charts and lists. Values stay live, and the original page stays available for sign-in and navigation.",
+    "Probier es selbst aus!": "Try it yourself!",
     'Windows-Testversion · experimentell und instabil': 'Windows preview · experimental and unstable',
     'Luna Browser – Mach es dir im Web gemütlich': 'Luna Browser – Make yourself at home on the web',
     'Farbwelten': 'Color themes', 'Für Apple-Silicon-Macs · macOS 13+': 'For Apple Silicon Macs · macOS 13+',
