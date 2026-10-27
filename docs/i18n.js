@@ -82,6 +82,8 @@
     "Hallo, Luna.": "Hello, Luna.",
     "○ Notizzettel geöffnet": "○ Notes opened",
     "S · Screenshot gespeichert": "S · Screenshot saved",
+    "Klick eine Farbwelt an und probier sie aus.": "Click a color theme and try it out.",
+    "Farbwelt im Browser wählen": "Choose a color theme in the browser",
     'Windows-Testversion · experimentell und instabil': 'Windows preview · experimental and unstable',
     'Luna Browser – Mach es dir im Web gemütlich': 'Luna Browser – Make yourself at home on the web',
     'Farbwelten': 'Color themes', 'Für Apple-Silicon-Macs · macOS 13+': 'For Apple Silicon Macs · macOS 13+',
