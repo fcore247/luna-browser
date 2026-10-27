@@ -11,7 +11,7 @@
 <meta property="og:image" content="https://luna-browser.com/assets/media/poster.jpg">
 <link rel="icon" href="assets/luna-icon.svg">
 <link rel="preload" href="assets/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=pages-1">
+<link rel="stylesheet" href="style.css?v=magic-1">
 </head>
 <body>
 
@@ -134,7 +134,7 @@
                 <div class="pp-head"><b>Mein Wetter</b><span>Dein persönlicher Überblick</span><em>Original öffnen</em></div>
                 <div class="pp-grid">
                   <div class="pp-card pp-hero"><span>Jetzt</span><b>14°</b><em>Leicht bewölkt</em></div>
-                  <div class="pp-card pp-line"><span>Nächste Stunden</span><svg viewBox="0 0 200 60" preserveAspectRatio="none"><path d="M0 40 C20 30 35 22 55 26 S95 44 115 34 S160 12 200 18"/></svg></div>
+                  <div class="pp-card pp-line"><span>Nächste Stunden</span><svg viewBox="0 0 200 60" preserveAspectRatio="none"><path pathLength="1" d="M0 40 C20 30 35 22 55 26 S95 44 115 34 S160 12 200 18"/></svg></div>
                   <div class="pp-card pp-days"><span>Woche</span><div><i>Mo<b>15°</b></i><i>Di<b>12°</b></i><i>Mi<b>16°</b></i><i>Do<b>17°</b></i></div></div>
                   <div class="pp-card pp-note">☂ Regen ab 18 Uhr</div>
                 </div>
@@ -225,23 +225,40 @@
   </section>
 
   <!-- ============ EIGENE SEITEN ============ -->
-  <section class="block" id="seiten">
+  <section class="block magic" id="seiten">
+    <div class="magic-glow" aria-hidden="true"></div>
     <div class="wrap">
-      <div class="head reveal">
-        <h2>Deine KI räumt nervige Seiten auf.</h2>
-        <p>Verbinde deine eigene KI-App mit Luna. Sie baut aus überladenen Websites persönliche Seiten in deiner Farbwelt, ohne Werbung, Pop-ups und Gedränge.</p>
+      <div class="head center reveal">
+        <span class="kicker"><i></i>Deine KI · über MCP verbunden</span>
+        <h2>Deine KI räumt deinen Browser auf.</h2>
+        <p>Verbinde deine eigene KI-App mit Luna. Sie macht aus überladenen Websites persönliche Seiten in deiner Farbwelt, ohne Werbung, Pop-ups und Gedränge.</p>
       </div>
-      <div class="compare reveal" id="compare">
-        <div class="cmp-layer cmp-before" id="cmpBefore"></div>
-        <div class="cmp-layer cmp-after" id="cmpAfter"></div>
-        <div class="cmp-handle" aria-hidden="true"><i></i></div>
-        <span class="cmp-tag left">Vorher</span><span class="cmp-tag right">Mit Luna</span>
-        <input type="range" id="cmpRange" min="0" max="100" value="34" aria-label="Vorher und nachher vergleichen">
+
+      <div class="stage reveal" id="stage" data-phase="idle">
+        <div class="st-chrome">
+          <span class="lights"><i></i><i></i><i></i></span>
+          <div class="st-addr"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="stAddr">wetter-portal.example</span></div>
+          <div class="st-status" aria-live="polite"><i></i><span id="stStatus">Bereit</span></div>
+        </div>
+        <div class="st-view" id="stView">
+          <div class="st-scan" aria-hidden="true"></div>
+        </div>
+        <div class="st-prompt"><span class="st-avatar" aria-hidden="true">✦</span><span id="stPrompt">Mach mir aus dieser Wetterseite eine ruhige Übersicht.</span></div>
+        <div class="st-controls">
+          <div class="st-seg" role="group" aria-label="Ansicht"><button type="button" data-view="before">Vorher</button><button type="button" data-view="after">Nachher</button></div>
+          <button type="button" class="st-replay" id="stReplay"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Nochmal ansehen</span></button>
+        </div>
       </div>
+
+      <div class="blocks reveal">
+        <span class="blocks-label">Lunas Bausteine</span>
+        <span><i>42</i>Kennzahl</span><span><i>▤</i>Kartenreihe</span><span><i>⌇</i>Liniendiagramm</span><span><i>▮</i>Balken</span><span><i>◔</i>Ring</span><span><i>☰</i>Liste</span><span><i>▦</i>Tabelle</span><span><i>⋯</i>Zeitachse</span><span><i>!</i>Hinweis</span><span><i>▣</i>Bilder</span>
+      </div>
+
       <ol class="how reveal">
-        <li><b>Verbinde deine KI.</b><p>Jede KI-App, die MCP versteht, verbindet sich lokal mit Luna. Eingeschaltet wird nur mit Touch ID oder deinem Mac-Passwort.</p><code>"command": "…/Luna Browser", "args": ["--mcp"]</code></li>
-        <li><b>Sag, was dich nervt.</b><p>Zum Beispiel: „Mach mir aus dieser Wetterseite eine ruhige Übersicht.“ Deine KI liest die Seite und wählt, was wichtig ist.</p></li>
-        <li><b>Luna baut deine Seite.</b><p>Aus Lunas Bausteinen wie Kennzahlen, Karten, Diagrammen und Listen. Die Werte bleiben live, die Originalseite bleibt für Anmeldung und Navigation da.</p></li>
+        <li><span class="how-n">1</span><b>Verbinde deine KI.</b><p>Jede KI-App, die MCP versteht, verbindet sich lokal mit Luna. Eingeschaltet wird nur mit Touch ID oder deinem Mac-Passwort.</p><code>"command": "…/Luna Browser", "args": ["--mcp"]</code></li>
+        <li><span class="how-n">2</span><b>Sag, was dich nervt.</b><p>Zum Beispiel: „Mach mir aus dieser Wetterseite eine ruhige Übersicht.“ Deine KI liest die Seite und wählt, was wichtig ist.</p></li>
+        <li><span class="how-n">3</span><b>Luna baut deine Seite.</b><p>Aus Lunas Bausteinen, in deiner Farbwelt. Die Werte bleiben live, die Originalseite bleibt für Anmeldung und Navigation da.</p></li>
       </ol>
     </div>
   </section>
@@ -320,7 +337,7 @@
 <section class="windows-install"><h3>Windows installieren</h3><p>ZIP vollständig entpacken und Luna Browser.exe starten. Den Ordner native daneben lassen. WebView2 wird benötigt.</p><p>Experimentelle Version: noch instabil und nicht signiert. Windows kann einen unbekannten Herausgeber melden.</p><a href="https://github.com/fcore247/luna-browser/blob/main/docs/WINDOWS-TEST.md">Hinweise zur Windows-Version ↗</a></section>
 <section id="macInstall"><h3>macOS installieren</h3><p class="lead">Füge diesen Befehl ins Terminal ein und drücke Enter.</p><div class="command"><pre id="installCommand"></pre><button id="copy">Befehl kopieren</button></div><p id="copyStatus" role="status"></p><aside><b>Gut zu wissen</b><p>Apple Silicon (M1 oder neuer), macOS 13+. Die App ist noch nicht Apple-notarisiert. Falls macOS den ersten Start blockiert, prüfe die Meldung unter Systemeinstellungen → Datenschutz &amp; Sicherheit. Der Installer verändert keine Sicherheitseinstellungen. Beende eine bereits laufende Luna-Version vorher.</p></aside><div class="manual"><p><strong>Bitte nicht die DMG-Datei einzeln laden.</strong> Luna ist noch nicht von Apple notarisiert: Eine im Browser geladene DMG löst eine Sicherheitsmeldung aus. Der Befehl oben lädt Luna ohne diese Markierung.</p><a href="install.sh">Installationsskript ansehen ↗</a></div></section></dialog>
 
-<script src="i18n.js?v=pages-1"></script>
-<script src="site.js?v=pages-1"></script>
+<script src="i18n.js?v=magic-1"></script>
+<script src="site.js?v=magic-1"></script>
 </body>
 </html>

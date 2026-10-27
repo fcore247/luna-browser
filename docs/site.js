@@ -260,14 +260,41 @@
   addEventListener('resize', onScroll);
   onScroll();
 
-  /* ---------- Eigene Seiten: Vorher/Nachher zum Ziehen ---------- */
-  const compare = $('#compare');
-  const copy = (sel) => { const n = $(sel).cloneNode(true); n.removeAttribute('id'); return n; };
-  $('#cmpBefore').append(copy('#clutter'));
-  $('#cmpAfter').append(copy('#ppage'));
-  const cmpRange = $('#cmpRange');
-  const setCmp = () => compare.style.setProperty('--x', `${cmpRange.value}%`);
-  cmpRange.addEventListener('input', setCmp); setCmp();
+  /* ---------- Eigene Seiten: die KI scannt, markiert, räumt weg und baut neu ---------- */
+  const stage = $('#stage'), stView = $('#stView');
+  const copy = (sel) => { const n = $(sel).cloneNode(true); n.removeAttribute('id'); n.removeAttribute('aria-hidden'); return n; };
+  const before = copy('#clutter'), after = copy('#ppage');
+  stView.append(before, after);
+  stView.setAttribute('role', 'img');
+  stView.setAttribute('aria-label', t('Eine überladene Wetterseite wird zu einer ruhigen persönlichen Seite'));
+  [['.cl-ad', t('Werbung')], ['.cl-pop', t('Pop-up')], ['.cl-cookie', t('Cookie-Banner')], ['.cl-side', t('Werbung')]].forEach(([sel, label], i) => {
+    const tag = document.createElement('span'); tag.className = 'st-tag'; tag.style.setProperty('--i', i); tag.textContent = `✕ ${label}`;
+    $(sel, before).append(tag);
+  });
+  const good = document.createElement('span'); good.className = 'st-tag good'; good.style.setProperty('--i', 4); good.textContent = `✓ ${t('Wichtig')}`;
+  $('.cl-temp', before).append(good);
+  [$('.pp-head', after), ...$$('.pp-card', after)].forEach((el, i) => el.style.setProperty('--i', i));
+  const stAddr = $('#stAddr'), stStatus = $('#stStatus'), segBtns = $$('.st-seg button');
+  let stRun = 0;
+  function stShow(phase) {
+    stage.dataset.phase = phase;
+    const done = phase === 'build' || phase === 'done';
+    stAddr.textContent = done ? t('Mein Wetter · persönliche Seite') : 'wetter-portal.example';
+    stStatus.textContent = { idle: t('Bereit'), scan: t('Liest die Seite …'), tag: t('Markiert Störendes …'), sweep: t('Räumt auf …'), build: t('Baut deine Seite …'), done: t('Fertig') }[phase];
+    segBtns.forEach((b) => b.setAttribute('aria-pressed', b.dataset.view === (done ? 'after' : 'before')));
+  }
+  async function stPlay() {
+    const my = ++stRun;
+    if (reduce) { stShow('done'); return; }
+    for (const [phase, ms] of [['idle', 900], ['scan', 1700], ['tag', 1500], ['sweep', 1100], ['build', 1800], ['done', 0]]) {
+      if (my !== stRun) return;
+      stShow(phase); await sleep(ms);
+    }
+  }
+  stShow('idle');
+  new IntersectionObserver((es, obs) => { if (es[0].isIntersecting) { obs.disconnect(); stPlay(); } }, { threshold: 0.45 }).observe(stage);
+  $('#stReplay').addEventListener('click', stPlay);
+  segBtns.forEach((b) => b.addEventListener('click', () => { stRun++; stShow(b.dataset.view === 'after' ? 'done' : 'idle'); }));
 
   /* ---------- Einblenden ---------- */
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
