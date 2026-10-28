@@ -22,21 +22,31 @@ fetch https://api.github.com/repos/fcore247/luna-browser/releases/latest "$work/
 tag=$(/usr/bin/plutil -extract tag_name raw -o - "$work/release.json")
 [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Ungültige Versionsinformation.'
 asset=Luna-Browser-macos-arm64.dmg
+release_assets=$(/usr/bin/plutil -extract assets json -o - "$work/release.json")
+if ! grep -Fq "\"$asset\"" <<< "$release_assets"; then
+ asset="Luna-Browser-${tag#v}-macos-arm64.zip"
+ grep -Fq "\"$asset\"" <<< "$release_assets" || fail 'No macOS download found for this release.'
+fi
 printf 'Luna %s herunterladen …\n' "$tag"
 fetch "$repo/releases/download/$tag/$asset" "$work/$asset"
 fetch "$repo/releases/download/$tag/SHA256SUMS" "$work/SHA256SUMS"
-expected=$(awk '$2 == "Luna-Browser-macos-arm64.dmg" {print $1}' "$work/SHA256SUMS")
+expected=$(awk -v asset="$asset" '$2 == asset {print $1}' "$work/SHA256SUMS")
 [[ $expected =~ ^[a-f0-9]{64}$ ]] || fail 'Keine eindeutige Prüfsumme vorhanden.'
 actual=$(shasum -a 256 "$work/$asset" | awk '{print $1}')
 [[ $actual == "$expected" ]] || fail 'Prüfsumme stimmt nicht überein.'
 mkdir "$work/volume"
-hdiutil attach "$work/$asset" -readonly -nobrowse -mountpoint "$work/volume" -quiet
-mounted=true
+if [[ $asset == *.dmg ]]; then
+ hdiutil attach "$work/$asset" -readonly -nobrowse -mountpoint "$work/volume" -quiet
+ mounted=true
+else
+ ditto -x -k "$work/$asset" "$work/volume"
+fi
 # Ältere Downloads heißen noch browser-mac.app; installiert wird immer „Luna Browser.app“.
 source_app="$work/volume/Luna Browser.app"
 [[ -d $source_app ]] || source_app="$work/volume/browser-mac.app"
 [[ $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$source_app/Contents/Info.plist") == com.wails.browser-mac ]] || fail 'Unerwartete App im Download.'
 codesign --verify --deep --strict "$source_app" || fail 'App-Signatur ungültig.'
+[[ $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$source_app/Contents/Info.plist") == "${tag#v}" ]] || fail 'The downloaded app does not match the release version.'
 if [[ $mode == --verify-only ]]; then printf 'Download, Prüfsumme, DMG und App-Signatur erfolgreich geprüft. Nichts installiert.\n'; exit 0; fi
 if [[ $mode == install ]]; then
  # Das Installationsfenster öffnen: Der Nutzer zieht Luna selbst in den Programme-Ordner.
@@ -44,9 +54,15 @@ if [[ $mode == install ]]; then
  mkdir -p "$HOME/Downloads"
  dmg="$HOME/Downloads/$asset"
  new_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$source_app/Contents/Info.plist")
- cp -f "$work/$asset" "$dmg" || fail 'Das Installationsabbild konnte nicht gespeichert werden.'
- hdiutil detach "$work/volume" -quiet || true
- mounted=false
+ if [[ $asset == *.dmg ]]; then
+  cp -f "$work/$asset" "$dmg" || fail 'Das Installationsabbild konnte nicht gespeichert werden.'
+  hdiutil detach "$work/volume" -quiet || true
+  mounted=false
+ else
+  dmg=$(mktemp -d "$HOME/Downloads/Luna-Browser-$tag.XXXXXX")
+  ditto "$source_app" "$dmg/Luna Browser.app"
+  ln -s /Applications "$dmg/Applications"
+ fi
  printf '\nLuna ist bereit. Es öffnen sich zwei Fenster:\n'
  printf '  1. der Ordner „Programme“\n  2. ein Fenster mit dem Luna-Symbol\n'
  printf 'Ziehe „Luna Browser“ aus dem Luna-Fenster in den Ordner „Programme“.\n'
