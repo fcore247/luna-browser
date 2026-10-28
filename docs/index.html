@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Luna Browser – Mach es dir im Web gemütlich</title>
-<meta name="description" content="Luna ist ein gemütlicher Browser für macOS und Windows: zehn Farbwelten, Mausgesten, Spotify und eine KI, die auf Wunsch mitdenkt.">
+<title>Luna Browser – Make yourself at home on the web</title>
+<meta name="description" content="Luna is a cozy browser for macOS and Windows: ten color themes, mouse gestures, Spotify and optional AI assistance.">
 <meta name="theme-color" content="#f3e1ec">
-<meta property="og:title" content="Luna Browser – Mach es dir im Web gemütlich">
-<meta property="og:description" content="Zehn Farbwelten, Mausgesten, Spotify und KI – ein Browser, der sich nach dir richtet.">
+<meta property="og:title" content="Luna Browser – Make yourself at home on the web">
+<meta property="og:description" content="Ten color themes, mouse gestures, Spotify and AI – a browser that adapts to you.">
 <meta property="og:image" content="https://luna-browser.com/assets/media/poster.jpg">
 <link rel="icon" href="assets/luna-icon.svg">
 <link rel="preload" href="assets/fonts/manrope-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -177,9 +177,9 @@
   <section class="section trailer" id="trailer">
     <div class="sec-head reveal"><span class="eyebrow">In 30 Sekunden</span><h2>Luna im <span class="script">Schnelldurchlauf.</span></h2></div>
     <div class="video reveal" id="video">
-      <video id="vid" preload="none" playsinline poster="assets/media/poster.jpg" src="assets/media/trailer-de.mp4"></video>
+      <video id="vid" preload="none" playsinline poster="assets/media/poster.jpg" src="assets/media/trailer-en.mp4"></video>
       <button class="vplay" id="vplay" aria-label="Trailer abspielen"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
-      <div class="vlang" role="group" aria-label="Sprache"><button class="on" data-src="assets/media/trailer-de.mp4">DE</button><button data-src="assets/media/trailer-en.mp4">EN</button></div>
+      <div class="vlang" role="group" aria-label="Trailer language"><button data-src="assets/media/trailer-de.mp4">DE</button><button class="on" data-src="assets/media/trailer-en.mp4">EN</button></div>
     </div>
   </section>
 
@@ -218,12 +218,12 @@
 <dialog id="downloadDialog" aria-labelledby="installTitle"><button class="close" aria-label="Anleitung schließen">×</button><span class="eyebrow">Luna installieren</span><h2 id="installTitle">Hallo, <span class="script">Luna.</span></h2><p class="lead">Wähle deine Plattform. Luna ist jetzt auch für Windows verfügbar.</p>
 <div class="platform-options">
   <a class="platform-option" href="#macInstall" id="chooseMac"><strong>macOS</strong><span>Apple Silicon · macOS 13+</span><b>Installationsanleitung ↓</b></a>
-  <a class="platform-option" href="https://github.com/fcore247/luna-browser/releases/download/v1.2.8/Luna-Browser-1.2.8-windows-amd64.zip"><strong>Windows</strong><span>Windows 10/11 · x64 · ZIP</span><b>Für Windows herunterladen ↓</b></a>
+  <a class="platform-option" data-windows-download href="https://github.com/fcore247/luna-browser/releases/download/v1.3.1/Luna-Browser-1.3.1-windows-amd64.zip"><strong>Windows</strong><span>Windows 10/11 · x64 · ZIP</span><b>Für Windows herunterladen ↓</b></a>
 </div>
 <section class="windows-install"><h3>Windows installieren</h3><p>ZIP vollständig entpacken und Luna Browser.exe starten. Den Ordner native daneben lassen. WebView2 wird benötigt.</p><p>Experimentelle Version: noch instabil und nicht signiert. Windows kann einen unbekannten Herausgeber melden.</p><a href="https://github.com/fcore247/luna-browser/blob/main/docs/WINDOWS-TEST.md">Hinweise zur Windows-Version ↗</a></section>
 <section id="macInstall"><h3>macOS installieren</h3><p class="lead">Füge diesen Befehl ins Terminal ein und drücke Enter.</p><div class="command"><pre id="installCommand"></pre><button id="copy">Befehl kopieren</button></div><p id="copyStatus" role="status"></p><aside><b>Gut zu wissen</b><p>Apple Silicon (M1 oder neuer), macOS 13+. Die App ist noch nicht Apple-notarisiert. Falls macOS den ersten Start blockiert, prüfe die Meldung unter Systemeinstellungen → Datenschutz &amp; Sicherheit. Der Installer verändert keine Sicherheitseinstellungen. Beende eine bereits laufende Luna-Version vorher.</p></aside><div class="manual"><p><strong>Bitte nicht die DMG-Datei einzeln laden.</strong> Luna ist noch nicht von Apple notarisiert: Eine im Browser geladene DMG löst eine Sicherheitsmeldung aus. Der Befehl oben lädt Luna ohne diese Markierung.</p><a href="install.sh">Installationsskript ansehen ↗</a></div></section></dialog>
 
-<script src="i18n.js?v=windows-download-1"></script>
-<script src="site.js?v=i18n-1"></script>
+<script src="i18n.js?v=english-default-1"></script>
+<script src="site.js?v=latest-download-1"></script>
 </body>
 </html>

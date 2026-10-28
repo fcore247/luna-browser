@@ -7,6 +7,14 @@
   const locale = language === 'de' ? 'de-DE' : 'en-US';
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  // Keep the versioned fallback usable when GitHub's public API is unavailable.
+  fetch('https://api.github.com/repos/fcore247/luna-browser/releases/latest', { credentials: 'omit' })
+    .then(response => response.ok ? response.json() : null)
+    .then(release => {
+      const asset = release?.assets?.find(item => /^Luna-Browser-\d+\.\d+\.\d+-windows-amd64\.zip$/.test(item.name));
+      if (asset?.browser_download_url?.startsWith('https://github.com/fcore247/luna-browser/releases/download/'))
+        $$('[data-windows-download]').forEach(link => { link.href = asset.browser_download_url; });
+    }).catch(() => {});
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
