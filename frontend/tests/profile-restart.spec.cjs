@@ -31,6 +31,8 @@ test('saved access and deferred setup survive restarting the local browser', asy
   );
   await page.goto('http://127.0.0.1:5174');
   await expect(page.locator('.setup')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose your language' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue', exact: false }).click();
   await page.getByRole('button', { name: 'Später fortsetzen', exact: true }).click();
   await expect(page.locator('.setup')).toHaveCount(0);
   await expect(page.locator('.st-status')).toContainText('Luna Search · bereit');
