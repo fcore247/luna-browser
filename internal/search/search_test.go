@@ -67,6 +67,32 @@ func TestSearchData(t *testing.T) {
 	}
 }
 
+func TestSelectedLanguageIsSentToSearch(t *testing.T) {
+	for _, language := range []string{"de", "en"} {
+		t.Run(language, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.URL.Query().Get("search_lang"); got != language {
+					t.Errorf("search language: %s", got)
+				}
+				want := "de-DE"
+				if language == "en" {
+					want = "en-GB"
+				}
+				if got := r.URL.Query().Get("ui_lang"); got != want {
+					t.Errorf("UI language: %s", got)
+				}
+				io.WriteString(w, fake)
+			}))
+			defer srv.Close()
+			client := NewClient(func() (string, error) { return "KEY", nil })
+			client.Endpoint = srv.URL
+			if _, err := client.SearchInLanguage(context.Background(), "Luna", 0, language); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestErrorsAndRetry(t *testing.T) {
 	c, _ := brave(t, false)
 	c.Key = func() (string, error) { return "", nil }

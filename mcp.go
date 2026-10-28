@@ -38,7 +38,7 @@ func (a *App) MCPConfigure(on bool) (browsermcp.Status, error) {
 	// Einschalten gibt der KI Zugriff auf den Browser: erst Touch ID (oder Passwort) des Mac-Nutzers.
 	// Der Zugangsschlüssel entsteht pro Installation zufällig beim ersten Einschalten.
 	if on && !a.mcpServer.Status().Enabled {
-		ok, err := web.Authenticate("Luna: KI-Zugriff (MCP) einschalten")
+		ok, err := web.Authenticate(a.label("Luna: KI-Zugriff (MCP) einschalten"))
 		if err != nil {
 			return a.mcpServer.Status(), err
 		}

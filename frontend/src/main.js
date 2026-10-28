@@ -1,3 +1,8 @@
+import { t as l10n, msg as l10nMsg, locale } from './i18n.js';
+import { getLanguage, setLanguage } from './i18n.js';
+import { providerURL } from './search-provider.js';
+import { initSelectMenus } from './select-menu.js';
+initSelectMenus();
 import { initWindowChrome } from './window-chrome.js';
 import {
   browserName,
@@ -176,6 +181,7 @@ function nativeShow(id) {
 const S = {
   hasKey: false,
   googleSearch: false,
+  tavilySearch: true,
   onboardingComplete: false,
   onboardingDeferred: false,
   autoNextAlways: false,
@@ -284,7 +290,7 @@ function visit(t, input, options = {}) {
     try {
       openSearch(t, decodeURIComponent(input.slice(15)), 0, { provider: 'spotify', ...options });
     } catch {
-      toast('Ungültiger Suchbegriff');
+      toast(l10n('Ungültiger Suchbegriff'));
     }
     return;
   }
@@ -293,7 +299,10 @@ function visit(t, input, options = {}) {
     openSearch(t, spotifyQuery, 0, { provider: 'spotify', ...options });
     return;
   }
-  if (commandOn('settings') && String(input).trim().toLowerCase() === 'einstellungen') {
+  if (
+    commandOn('settings') &&
+    /^(einstellungen|settings)$/.test(String(input).trim().toLowerCase())
+  ) {
     askSettings(t, input);
     return;
   }
@@ -624,12 +633,14 @@ function saveSession() {
   }, 700);
 }
 async function restoreSession() {
-  if (!S.restore) {
+  const languageSession = sessionStorage.getItem('luna-language-session');
+  sessionStorage.removeItem('luna-language-session');
+  if (!S.restore && !languageSession) {
     newTab();
     return;
   } // Standard: Der Browser startet mit der Startseite
   try {
-    const s = JSON.parse((await api.sessionLoad()) || 'null');
+    const s = JSON.parse(languageSession || (await api.sessionLoad()) || 'null');
     if (s && s.tabs && s.tabs.length) {
       S.groups = Object.fromEntries(
         Object.entries(s.groups || {})
@@ -709,7 +720,7 @@ api.onWeb((e) => {
       closeTab(e.tab);
       break;
     case 'find':
-      $('#findStat').textContent = e.found ? '' : 'Nicht gefunden';
+      $('#findStat').textContent = e.found ? '' : l10n('Nicht gefunden');
       break;
     case 'dl':
       onDownload(e);
@@ -725,7 +736,7 @@ api.onWeb((e) => {
 function renderTabs() {
   if (closingTabs.size) return;
   const htmlTab = (t) => {
-    const label = t.title || (t.url ? hostOf(t.url) : 'Neuer Tab');
+    const label = t.title || (t.url ? hostOf(t.url) : l10n('Neuer Tab'));
     const ico = t.loading
       ? '<span class="spin"></span>'
       : t.mode === 'search'
@@ -735,7 +746,7 @@ function renderTabs() {
           : t.icon
             ? `<img class="fav" src="${esc(t.icon)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fav',innerHTML:window.__globe}))">`
             : `<span class="fav">${ICON.globe}</span>`;
-    return `<div class="tab ${t.id === S.active ? 'act' : ''} ${t.group ? 'grouped' : ''}" draggable="true" data-tab-id="${t.id}" title="${esc(label)}">${ico}<button class="tlab" role="tab" aria-selected="${t.id === S.active}" data-act="tab" data-id="${t.id}">${esc(label)}</button>${S.tabs.length > 1 ? `<button class="tx" data-act="close" data-id="${t.id}" aria-label="Tab schließen">${ICON.x}</button>` : ''}</div>`;
+    return `<div class="tab ${t.id === S.active ? 'act' : ''} ${t.group ? 'grouped' : ''}" draggable="true" data-tab-id="${t.id}" title="${esc(label)}">${ico}<button class="tlab" role="tab" aria-selected="${t.id === S.active}" data-act="tab" data-id="${t.id}">${esc(label)}</button>${S.tabs.length > 1 ? l10nMsg`<button class="tx" data-act="close" data-id="${t.id}" aria-label="Tab schließen">${ICON.x}</button>` : ''}</div>`;
   };
   const seen = new Set();
   $('#tabs').innerHTML =
@@ -746,10 +757,10 @@ function renderTabs() {
         seen.add(t.group);
         const g = S.groups[t.group],
           members = S.tabs.filter((x) => x.group === t.group);
-        return `<div class="tab-group ${g.collapsed ? 'collapsed' : ''}" data-tab-group="${esc(t.group)}"><button class="tab-group-label" data-act="tab-group-toggle" data-group="${esc(t.group)}" aria-expanded="${!g.collapsed}" title="${esc(g.title)} · Rechtsklick zum Bearbeiten"><i></i><span>${esc(g.title)}</span><small>${members.length}</small></button>${g.collapsed ? '' : members.map(htmlTab).join('')}</div>`;
+        return l10nMsg`<div class="tab-group ${g.collapsed ? 'collapsed' : ''}" data-tab-group="${esc(t.group)}"><button class="tab-group-label" data-act="tab-group-toggle" data-group="${esc(t.group)}" aria-expanded="${!g.collapsed}" title="${esc(g.title)} · Rechtsklick zum Bearbeiten"><i></i><span>${esc(g.title)}</span><small>${members.length}</small></button>${g.collapsed ? '' : members.map(htmlTab).join('')}</div>`;
       })
       .join('') +
-    `<button class="ib" id="newtab" data-act="new-tab" aria-label="Neuer Tab">${ICON.plus}</button>`;
+    l10nMsg`<button class="ib" id="newtab" data-act="new-tab" aria-label="Neuer Tab">${ICON.plus}</button>`;
   $('#body').style.borderRadius = '0';
 }
 window.__globe = ICON.globe;
@@ -775,14 +786,16 @@ function renderToolbar() {
   lunaView.hidden = !personalizedPages?.available(t);
   lunaView.setAttribute('aria-pressed', String(lunaOn));
   lunaView.title = !personalizedPages?.domainOn(t)
-    ? `Luna-Ansichten für ${lunaHost} sind aus${lunaCount ? ` (${lunaCount} gespeichert)` : ''} · Klicken schaltet alle ein`
+    ? l10nMsg`Luna-Ansichten für ${lunaHost} sind aus${lunaCount ? l10nMsg` (${lunaCount} gespeichert)` : ''} · Klicken schaltet alle ein`
     : !lunaOn
-      ? `Hier siehst du die Originalseite · Klicken schaltet alle Luna-Ansichten für ${lunaHost} ein`
+      ? l10nMsg`Hier siehst du die Originalseite · Klicken schaltet alle Luna-Ansichten für ${lunaHost} ein`
       : personalizedPages?.waiting(t)
-        ? 'Luna-Ansicht startet, sobald du angemeldet bist · Klicken schaltet alle Ansichten dieser Domain aus'
+        ? l10n(
+            'Luna-Ansicht startet, sobald du angemeldet bist · Klicken schaltet alle Ansichten dieser Domain aus',
+          )
         : personalizedPages?.owns(t)
-          ? `Luna-Ansichten für ${lunaHost} sind an (${lunaCount}) · Klicken schaltet alle aus`
-          : `Luna-Ansichten für ${lunaHost} sind an, für diese Seite gibt es keine · Klicken schaltet alle aus`;
+          ? l10nMsg`Luna-Ansichten für ${lunaHost} sind an (${lunaCount}) · Klicken schaltet alle aus`
+          : l10nMsg`Luna-Ansichten für ${lunaHost} sind an, für diese Seite gibt es keine · Klicken schaltet alle aus`;
   lunaView.setAttribute('aria-label', lunaView.title);
   $('#bBack').classList.toggle('off', !canBack(t));
   $('#bFwd').classList.toggle('off', !canFwd(t));
@@ -795,7 +808,7 @@ function renderToolbar() {
   if (document.activeElement !== input)
     input.value =
       t.mode === 'settings'
-        ? 'Einstellungen'
+        ? l10n('Einstellungen')
         : t.mode === 'chat'
           ? 'chat'
           : shownUrl(t.mode === 'start' ? '' : t.url);
@@ -837,43 +850,49 @@ function renderBar() {
           .slice(0, 16)
           .map(
             (b) =>
-              `<button class="chip" data-act="open-url" data-url="${esc(b.url)}" data-bm="${esc(b.url)}" title="${esc(b.title)} – Rechtsklick: bearbeiten oder löschen"><i class="dot">${esc(initial(b.title))}</i><span>${esc(b.title)}</span></button>`,
+              l10nMsg`<button class="chip" data-act="open-url" data-url="${esc(b.url)}" data-bm="${esc(b.url)}" title="${esc(b.title)} – Rechtsklick: bearbeiten oder löschen"><i class="dot">${esc(initial(b.title))}</i><span>${esc(b.title)}</span></button>`,
           )
           .join('')
-      : '<span class="bmhint">Noch keine Lesezeichen</span>') +
-    `<button class="chip add" data-act="bm-add" title="Lesezeichen hinzufügen" aria-label="Lesezeichen hinzufügen">${ICON.plus}<span>Hinzufügen</span></button>`;
+      : l10n('<span class="bmhint">Noch keine Lesezeichen</span>')) +
+    l10nMsg`<button class="chip add" data-act="bm-add" title="Lesezeichen hinzufügen" aria-label="Lesezeichen hinzufügen">${ICON.plus}<span>Hinzufügen</span></button>`;
   updateFrame();
 }
 /* ---------- Startseite ---------- */
 const GREET = () => {
   const h = new Date().getHours();
-  return h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
+  return h < 5
+    ? l10n('Gute Nacht')
+    : h < 11
+      ? l10n('Guten Morgen')
+      : h < 18
+        ? l10n('Guten Tag')
+        : l10n('Guten Abend');
 };
 const QUICK = [
   [
     'show-bookmarks',
-    'Lesezeichen',
+    l10n('Lesezeichen'),
     '<path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17l-5.4 2.8 1.1-6.1-4.5-4.3 6.1-.8z"/>',
   ],
-  ['show-history', 'Verlauf', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+  ['show-history', l10n('Verlauf'), '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
   ['show-downloads', 'Downloads', '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'],
   [
     'toggle-theme',
-    'Erscheinungsbild',
+    l10n('Erscheinungsbild'),
     '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   ],
   [
     'settings',
-    'Einstellungen',
+    l10n('Einstellungen'),
     '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2.2-1.3L14 3h-4l-.4 2.4a7 7 0 0 0-2.2 1.3l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .9.1 1.3l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2.2 1.3L10 21h4l.4-2.4a7 7 0 0 0 2.2-1.3l2.3.9 2-3.4-2-1.5c.1-.4.1-.9.1-1.3z"/>',
   ],
 ];
 function startHTML() {
   const bms = S.bookmarks.slice(0, 10);
   const d = new Date();
-  const date = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const date = d.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
   const delay = (i) => `style="--d:${120 + i * 55}ms"`;
-  return `${personal().background === 'waves' ? startBackgroundHTML : ''}
+  return l10nMsg`${personal().background === 'waves' ? startBackgroundHTML : ''}
   <div class="st-scroll"><div class="st-wrap">
     <header class="st-hero">
       <div class="st-logo-w"><img class="st-logo" src="${themeIconURL()}" alt="" draggable="false"><span class="st-halo"></span></div>
@@ -890,10 +909,10 @@ function startHTML() {
       <input id="startQ" type="text" placeholder="Mit ${S.googleSearch ? 'Google' : 'Luna Search'} suchen oder Adresse eingeben" spellcheck="false" autocomplete="off" aria-label="Suchen">
       <kbd>${shortcut('⌘L')}</kbd><span class="st-glow"></span>
     </form>
-    <div class="st-status">${S.googleSearch ? '<span class="pill ok"><i></i>Google · bereit</span>' : S.hasKey ? '<span class="pill ok"><i></i>Luna Search · bereit</span>' : '<button class="pill warn" data-act="settings"><i></i>Luna Search einrichten</button>'}</div>
+    <div class="st-status">${S.googleSearch ? l10n('<span class="pill ok"><i></i>Google · bereit</span>') : S.hasKey ? l10n('<span class="pill ok"><i></i>Luna Search · bereit</span>') : l10n('<button class="pill warn" data-act="settings"><i></i>Luna Search einrichten</button>')}</div>
     <div class="st-quick">${QUICK.map((q, i) => `<button class="qa" data-act="cmd" data-cmd="${q[0]}" ${delay(i + 3)}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${q[2]}</svg>${q[1]}</button>`).join('')}</div>
     <section id="widget-banner" hidden></section>
-    <section class="st-sec"><h3>Lesezeichen</h3><div class="st-tiles">${bms.map((b, i) => `<button class="st-card tile" data-act="open-url" data-url="${esc(b.url)}" data-bm="${esc(b.url)}" title="${esc(b.title)} – Rechtsklick: bearbeiten oder löschen" ${delay(i + 6)}><span class="st-glare"></span><span class="tdel" role="button" aria-label="Lesezeichen löschen" data-act="bm-del" data-url="${esc(b.url)}">${ICON.x}</span><div class="big" style="--h:${hueOf(b.title)}">${esc(initial(b.title))}</div><span class="tt">${esc(b.title)}</span><span class="th">${esc(hostOf(b.url))}</span></button>`).join('')}<button class="st-card tile addtile" data-act="bm-add" ${delay(bms.length + 6)}><span class="st-glare"></span><div class="big plus">${ICON.plus}</div><span class="tt">Hinzufügen</span><span class="th">&nbsp;</span></button></div></section>
+    <section class="st-sec"><h3>Lesezeichen</h3><div class="st-tiles">${bms.map((b, i) => l10nMsg`<button class="st-card tile" data-act="open-url" data-url="${esc(b.url)}" data-bm="${esc(b.url)}" title="${esc(b.title)} – Rechtsklick: bearbeiten oder löschen" ${delay(i + 6)}><span class="st-glare"></span><span class="tdel" role="button" aria-label="Lesezeichen löschen" data-act="bm-del" data-url="${esc(b.url)}">${ICON.x}</span><div class="big" style="--h:${hueOf(b.title)}">${esc(initial(b.title))}</div><span class="tt">${esc(b.title)}</span><span class="th">${esc(hostOf(b.url))}</span></button>`).join('')}<button class="st-card tile addtile" data-act="bm-add" ${delay(bms.length + 6)}><span class="st-glare"></span><div class="big plus">${ICON.plus}</div><span class="tt">Hinzufügen</span><span class="th">&nbsp;</span></button></div></section>
     <section class="st-sec" id="recent"><h3>Zuletzt besucht</h3><div class="st-recent"><div class="hint">Lade …</div></div></section>
   </div></div>`;
 }
@@ -1023,7 +1042,7 @@ async function renderStart() {
             `<button class="st-card rc" data-act="open-url" data-url="${esc(v.url)}" style="--d:${420 + i * 50}ms"><span class="st-glare"></span><span class="rl" style="--h:${hueOf(hostOf(v.url))}">${esc(initial(v.title || hostOf(v.url)))}</span><span class="rt"><b>${esc(v.title || hostOf(v.url))}</b><i>${esc(hostOf(v.url))}</i></span></button>`,
         )
         .join('')
-    : '<div class="hint">Noch nichts besucht – leg einfach los.</div>';
+    : l10n('<div class="hint">Noch nichts besucht – leg einfach los.</div>');
 }
 // Keep media outside view markup: replacing a view must not reload its player.
 let sharedBackground, sharedBackgroundKey, stopSharedBackground;
@@ -1203,8 +1222,8 @@ async function pollUpdate() {
     }
     toast(
       S.update.ready
-        ? `Luna ${version} ist bereit. Im Menü findest du „Update installieren“.`
-        : `Luna ${version} ist verfügbar und wird geladen.`,
+        ? l10nMsg`Luna ${version} ist bereit. Im Menü findest du „Update installieren“.`
+        : l10nMsg`Luna ${version} ist verfügbar und wird geladen.`,
     );
   }
 }
@@ -1245,32 +1264,32 @@ function openMenu() {
       ? [
           [
             S.update.ready
-              ? `Update ${S.update.version} installieren`
-              : `Update ${S.update.version} ansehen`,
-            S.update.ready ? 'Neustart' : '',
+              ? l10nMsg`Update ${S.update.version} installieren`
+              : l10nMsg`Update ${S.update.version} ansehen`,
+            S.update.ready ? l10n('Neustart') : '',
             'install-update',
           ],
           '-',
         ]
       : []),
-    ['Neuer Tab', shortcut('⌘T'), 'new-tab'],
-    ['Auf der Seite suchen', shortcut('⌘F'), 'find'],
+    [l10n('Neuer Tab'), shortcut('⌘T'), 'new-tab'],
+    [l10n('Auf der Seite suchen'), shortcut('⌘F'), 'find'],
     '-',
-    ['Vergrößern', shortcut('⌘+'), 'zoom-in'],
-    ['Verkleinern', shortcut('⌘−'), 'zoom-out'],
-    ['Tatsächliche Größe (' + z + ' %)', shortcut('⌘0'), 'zoom-reset'],
+    [l10n('Vergrößern'), shortcut('⌘+'), 'zoom-in'],
+    [l10n('Verkleinern'), shortcut('⌘−'), 'zoom-out'],
+    [l10n('Tatsächliche Größe (') + z + ' %)', shortcut('⌘0'), 'zoom-reset'],
     '-',
-    ['Einstellungen …', shortcut('⌘,'), 'settings'],
-    [isDark() ? 'Heller Modus' : 'Dunkelmodus', shortcut('⇧⌘D'), 'toggle-theme'],
+    [l10n('Einstellungen …'), shortcut('⌘,'), 'settings'],
+    [isDark() ? l10n('Heller Modus') : l10n('Dunkelmodus'), shortcut('⇧⌘D'), 'toggle-theme'],
     '-',
-    ['Notizzettel', shortcut('⌥⌘N'), 'toggle-notes'],
-    ['Screenshot kopieren', shortcut('⌥⌘S'), 'screenshot'],
-    ['Lesezeichen', shortcut('⌘⌥B'), 'show-bookmarks'],
-    ['Verlauf', shortcut('⌘Y'), 'show-history'],
+    [l10n('Notizzettel'), shortcut('⌥⌘N'), 'toggle-notes'],
+    [l10n('Screenshot kopieren'), shortcut('⌥⌘S'), 'screenshot'],
+    [l10n('Lesezeichen'), shortcut('⌘⌥B'), 'show-bookmarks'],
+    [l10n('Verlauf'), shortcut('⌘Y'), 'show-history'],
     ['Downloads', shortcut('⌘⌥L'), 'show-downloads'],
     '-',
     [
-      S.bar ? 'Lesezeichenleiste ausblenden' : 'Lesezeichenleiste einblenden',
+      S.bar ? l10n('Lesezeichenleiste ausblenden') : l10n('Lesezeichenleiste einblenden'),
       shortcut('⇧⌘B'),
       'toggle-bar',
     ],
@@ -1355,10 +1374,10 @@ async function openSugg(q) {
       label: text,
       sub:
         /^[^\s]+\.[a-z]{2,}/i.test(text) || /:\/\//.test(text)
-          ? 'Öffnen'
+          ? l10n('Öffnen')
           : S.googleSearch
-            ? 'Mit Google suchen'
-            : 'Mit Luna Search suchen',
+            ? l10n('Mit Google suchen')
+            : l10n('Mit Luna Search suchen'),
       url: text,
     },
   ];
@@ -1403,7 +1422,7 @@ $('#sugg').addEventListener('mousedown', (ev) => {
 let playCommandBusy = false;
 async function playFirstSpotifyResult(query) {
   if (!query) {
-    toast('Gib nach play einen Song oder Künstler ein.');
+    toast(l10n('Gib nach play einen Song oder Künstler ein.'));
     return;
   }
   if (playCommandBusy) return;
@@ -1412,11 +1431,11 @@ async function playFirstSpotifyResult(query) {
     const results = await api.spotifySearch(query);
     const track = results?.tracks?.items?.[0];
     if (!track?.uri) {
-      toast('Kein Song bei Spotify gefunden.');
+      toast(l10n('Kein Song bei Spotify gefunden.'));
       return;
     }
     await api.spotifyPlay(track.uri);
-    toast('Wiedergabe an Spotify übergeben: ' + track.name);
+    toast(l10n('Wiedergabe an Spotify übergeben: ') + track.name);
   } catch (error) {
     toast('Spotify: ' + String(error?.message || error));
   } finally {
@@ -1455,10 +1474,10 @@ function armQuickSite(input, ev) {
     return;
   }
   const target = commandOn('sites') ? QUICK_SITES[key] : undefined;
-  if (!target && !(key === 'einstellungen' && commandOn('settings'))) return;
+  if (!target && !(/^(einstellungen|settings)$/.test(key) && commandOn('settings'))) return;
   quickT = setTimeout(() => {
     if (input.value.trim().toLowerCase() !== key) return;
-    if (key === 'einstellungen') {
+    if (/^(einstellungen|settings)$/.test(key)) {
       askSettings(cur(), input.value);
       return;
     }
@@ -1500,10 +1519,10 @@ document.addEventListener(
       url.blur();
       const result = await runMCPCommand(command.name, command.args);
       if (command.name === 'browser_state') {
-        toast(result.tabs.map((tab) => `${tab.id}: ${tab.title || 'Neuer Tab'}`).join(' · '));
+        toast(result.tabs.map((tab) => `${tab.id}: ${tab.title || l10n('Neuer Tab')}`).join(' · '));
       }
       if (result.closed_domain)
-        toast(`${result.closed_tabs} Tabs von ${result.closed_domain} geschlossen.`);
+        toast(l10nMsg`${result.closed_tabs} Tabs von ${result.closed_domain} geschlossen.`);
       renderToolbar();
     } catch (error) {
       toast(String(error?.message || error));
@@ -1546,12 +1565,12 @@ async function askSettings(tab, query) {
   try {
     const choice = await notifications.ask({
       kind: 'settings',
-      title: 'Einstellungen öffnen?',
-      eyebrow: 'LUNA BROWSER · GANZ NACH DEINEM GESCHMACK',
-      message: 'Möchtest du die Einstellungen von Luna Browser öffnen?',
-      note: 'Farben, Startseite, Musik und mehr – mach Luna zu deinem Browser.',
-      confirmLabel: 'Einstellungen öffnen',
-      alternativeLabel: 'Stattdessen im Web suchen',
+      title: l10n('Einstellungen öffnen?'),
+      eyebrow: l10n('LUNA BROWSER · GANZ NACH DEINEM GESCHMACK'),
+      message: l10n('Möchtest du die Einstellungen von Luna Browser öffnen?'),
+      note: l10n('Farben, Startseite, Musik und mehr – mach Luna zu deinem Browser.'),
+      confirmLabel: l10n('Einstellungen öffnen'),
+      alternativeLabel: l10n('Stattdessen im Web suchen'),
     });
     if (choice === 'confirm') openSettings();
     else if (choice === 'alternative' && S.tabs.includes(tab)) openSearch(tab, query);
@@ -1563,10 +1582,10 @@ function confirmClearHistory() {
   return notifications
     .ask({
       kind: 'history',
-      title: 'Verlauf löschen?',
-      message: 'Möchtest du deinen gesamten Browserverlauf löschen?',
-      note: 'Diese Einträge können danach nicht wiederhergestellt werden.',
-      confirmLabel: 'Verlauf löschen',
+      title: l10n('Verlauf löschen?'),
+      message: l10n('Möchtest du deinen gesamten Browserverlauf löschen?'),
+      note: l10n('Diese Einträge können danach nicht wiederhergestellt werden.'),
+      confirmLabel: l10n('Verlauf löschen'),
     })
     .then((choice) => choice === 'confirm');
 }
@@ -1577,7 +1596,7 @@ function openFind() {
   if (cur()?.mode !== 'web') {
     url.focus();
     url.select();
-    toast('Neue Suche: einfach in die Adressleiste tippen');
+    toast(l10n('Neue Suche: einfach in die Adressleiste tippen'));
     return;
   }
   S.findOpen = true;
@@ -1616,12 +1635,12 @@ function fmtTime(ms) {
     n = new Date(),
     day = (x) => new Date(x).setHours(0, 0, 0, 0);
   const diff = Math.round((day(n) - day(d)) / 864e5),
-    hm = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    hm = d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
   return diff === 0
     ? hm
     : diff === 1
-      ? 'Gestern, ' + hm
-      : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ', ' + hm;
+      ? l10n('Gestern, ') + hm
+      : d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit' }) + ', ' + hm;
 }
 const fmtSize = (b) =>
   b < 1e6
@@ -1641,17 +1660,17 @@ function dayLabel(ms) {
     n = new Date(),
     day = (x) => new Date(x).setHours(0, 0, 0, 0);
   const diff = Math.round((day(n) - day(d)) / 864e5);
-  if (diff <= 0) return 'Heute';
-  if (diff === 1) return 'Gestern';
-  if (diff < 7) return d.toLocaleDateString('de-DE', { weekday: 'long' });
-  return d.toLocaleDateString('de-DE', {
+  if (diff <= 0) return l10n('Heute');
+  if (diff === 1) return l10n('Gestern');
+  if (diff < 7) return d.toLocaleDateString(locale(), { weekday: 'long' });
+  return d.toLocaleDateString(locale(), {
     day: 'numeric',
     month: 'long',
     year: d.getFullYear() === n.getFullYear() ? undefined : 'numeric',
   });
 }
 const hmOf = (ms) =>
-  new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  new Date(ms).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
 const EXT_COL = {
   pdf: '#c63f57',
   zip: '#8a5a2b',
@@ -1686,19 +1705,19 @@ function openSettingsAt(section) {
 
 registerPanel({
   id: 'bookmarks',
-  title: 'Lesezeichen',
-  desc: 'Deine gemerkten Seiten',
+  title: l10n('Lesezeichen'),
+  desc: l10n('Deine gemerkten Seiten'),
   order: 10,
   icon: '<path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17l-5.4 2.8 1.1-6.1-4.5-4.3 6.1-.8z"/>',
-  search: { placeholder: 'Lesezeichen durchsuchen' },
-  count: () => plural2(S.bookmarks.length, 'Lesezeichen', 'Lesezeichen'),
-  primary: () => ({ label: '+ Neu', onClick: () => openBmDialog(bmFromPage()) }),
+  search: { placeholder: l10n('Lesezeichen durchsuchen') },
+  count: () => plural2(S.bookmarks.length, l10n('Lesezeichen'), l10n('Lesezeichen')),
+  primary: () => ({ label: l10n('+ Neu'), onClick: () => openBmDialog(bmFromPage()) }),
   menu: () => [
     {
-      label: S.bar ? 'Lesezeichenleiste ausblenden' : 'Lesezeichenleiste einblenden',
+      label: S.bar ? l10n('Lesezeichenleiste ausblenden') : l10n('Lesezeichenleiste einblenden'),
       onClick: () => runCmd('toggle-bar'),
     },
-    { label: 'Alle verwalten …', onClick: () => openSettingsAt('bm') },
+    { label: l10n('Alle verwalten …'), onClick: () => openSettingsAt('bm') },
   ],
   render: ({ q, rawQ }) => {
     const list = S.bookmarks.filter((b) => !q || (b.title + ' ' + b.url).toLowerCase().includes(q));
@@ -1706,33 +1725,37 @@ registerPanel({
       return list
         .map(
           (b) =>
-            `<div class="si" data-bm="${esc(b.url)}"><button class="go" data-nav data-act="open-url" data-url="${esc(b.url)}" title="${esc(b.title)} – ${shortcut('⌘')}-Klick: neuer Tab"><span class="av" style="--h:${hueOf(b.title)}">${esc(initial(b.title))}</span><span class="stx"><b>${esc(b.title)}</b><small>${esc(hostOf(b.url) || shownUrl(b.url))}</small></span></button><span class="acts"><button class="ia" data-act="bm-edit" data-url="${esc(b.url)}" aria-label="Bearbeiten" title="Bearbeiten"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button><button class="ia" data-act="rm-bm" data-url="${esc(b.url)}" aria-label="Löschen" title="Löschen">${ICON.x}</button></span></div>`,
+            l10nMsg`<div class="si" data-bm="${esc(b.url)}"><button class="go" data-nav data-act="open-url" data-url="${esc(b.url)}" title="${esc(b.title)} – ${shortcut('⌘')}-Klick: neuer Tab"><span class="av" style="--h:${hueOf(b.title)}">${esc(initial(b.title))}</span><span class="stx"><b>${esc(b.title)}</b><small>${esc(hostOf(b.url) || shownUrl(b.url))}</small></span></button><span class="acts"><button class="ia" data-act="bm-edit" data-url="${esc(b.url)}" aria-label="Bearbeiten" title="Bearbeiten"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button><button class="ia" data-act="rm-bm" data-url="${esc(b.url)}" aria-label="Löschen" title="Löschen">${ICON.x}</button></span></div>`,
         )
         .join('');
     return q
-      ? emptyState(NO_HIT, 'Keine Treffer', `Für „${esc(rawQ)}“ gibt es kein Lesezeichen.`)
+      ? emptyState(
+          NO_HIT,
+          l10n('Keine Treffer'),
+          l10nMsg`Für „${esc(rawQ)}“ gibt es kein Lesezeichen.`,
+        )
       : emptyState(
           EMPTY_ICON(
             '<path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17l-5.4 2.8 1.1-6.1-4.5-4.3 6.1-.8z"/>',
           ),
-          'Noch keine Lesezeichen',
-          shortcut('Merke dir Seiten mit dem Stern in der Adressleiste (⌘D).'),
-          '<button class="btn pri" data-act="bm-add">+ Lesezeichen hinzufügen</button>',
+          l10n('Noch keine Lesezeichen'),
+          shortcut(l10n('Merke dir Seiten mit dem Stern in der Adressleiste (⌘D).')),
+          l10n('<button class="btn pri" data-act="bm-add">+ Lesezeichen hinzufügen</button>'),
         );
   },
 });
 
 registerPanel({
   id: 'history',
-  title: 'Verlauf',
-  desc: 'Besuchte Seiten und Suchen, nach Tagen geordnet',
+  title: l10n('Verlauf'),
+  desc: l10n('Besuchte Seiten und Suchen, nach Tagen geordnet'),
   order: 20,
   icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  search: { placeholder: 'Verlauf durchsuchen' },
-  count: () => (S.histN == null ? '' : plural2(S.histN, 'Eintrag', 'Einträge')),
+  search: { placeholder: l10n('Verlauf durchsuchen') },
+  count: () => (S.histN == null ? '' : plural2(S.histN, l10n('Eintrag'), l10n('Einträge'))),
   menu: () => [
     {
-      label: 'Gesamten Verlauf löschen …',
+      label: l10n('Gesamten Verlauf löschen …'),
       onClick: async () => {
         if (await confirmClearHistory()) runCmd('clear-history-now');
       },
@@ -1742,14 +1765,19 @@ registerPanel({
     const h = await api.history(rawQ || '', 300);
     S.histN = h.length;
     const c = document.getElementById('spCnt');
-    if (c && activePanel() === 'history') c.textContent = plural2(h.length, 'Eintrag', 'Einträge');
+    if (c && activePanel() === 'history')
+      c.textContent = plural2(h.length, l10n('Eintrag'), l10n('Einträge'));
     if (!h.length)
       return q
-        ? emptyState(NO_HIT, 'Keine Treffer', `Im Verlauf steht nichts zu „${esc(rawQ)}“.`)
+        ? emptyState(
+            NO_HIT,
+            l10n('Keine Treffer'),
+            l10nMsg`Im Verlauf steht nichts zu „${esc(rawQ)}“.`,
+          )
         : emptyState(
             EMPTY_ICON('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
-            'Noch kein Verlauf',
-            'Besuchte Seiten und Suchen erscheinen hier, nach Tagen geordnet.',
+            l10n('Noch kein Verlauf'),
+            l10n('Besuchte Seiten und Suchen erscheinen hier, nach Tagen geordnet.'),
           );
     let last = '';
     return h
@@ -1757,7 +1785,7 @@ registerPanel({
         const g = dayLabel(v.last),
           head = g !== last ? `<div class="sgh">${esc(g)}</div>` : '';
         last = g;
-        return `${head}<div class="si"><button class="go" data-nav data-act="open-url" data-url="${esc(v.url)}" title="${esc(shownUrl(v.url))} – ${shortcut('⌘')}-Klick: neuer Tab"><span class="av" style="--h:${hueOf(hostOf(v.url))}">${esc(initial(v.title || hostOf(v.url)))}</span><span class="stx"><b>${esc(v.title || hostOf(v.url))}</b><small>${esc(hmOf(v.last))} · ${esc(hostOf(v.url))}</small></span></button><span class="acts"><button class="ia" data-act="rm-hist" data-url="${esc(v.url)}" aria-label="Eintrag entfernen" title="Entfernen">${ICON.x}</button></span></div>`;
+        return l10nMsg`${head}<div class="si"><button class="go" data-nav data-act="open-url" data-url="${esc(v.url)}" title="${esc(shownUrl(v.url))} – ${shortcut('⌘')}-Klick: neuer Tab"><span class="av" style="--h:${hueOf(hostOf(v.url))}">${esc(initial(v.title || hostOf(v.url)))}</span><span class="stx"><b>${esc(v.title || hostOf(v.url))}</b><small>${esc(hmOf(v.last))} · ${esc(hostOf(v.url))}</small></span></button><span class="acts"><button class="ia" data-act="rm-hist" data-url="${esc(v.url)}" aria-label="Eintrag entfernen" title="Entfernen">${ICON.x}</button></span></div>`;
       })
       .join('');
   },
@@ -1766,17 +1794,19 @@ registerPanel({
 registerPanel({
   id: 'downloads',
   title: 'Downloads',
-  desc: 'Geladene Dateien',
+  desc: l10n('Geladene Dateien'),
   order: 30,
   icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
-  search: { placeholder: 'Downloads durchsuchen' },
+  search: { placeholder: l10n('Downloads durchsuchen') },
   count: () => plural2(S.downloads.length, 'Download', 'Downloads'),
   badge: () => {
     const n = S.downloads.filter((d) => d.state === 'progress').length;
     return n ? String(n) : '';
   },
   menu: () =>
-    S.downloads.length ? [{ label: 'Liste leeren', onClick: () => runCmd('clear-dl-now') }] : [],
+    S.downloads.length
+      ? [{ label: l10n('Liste leeren'), onClick: () => runCmd('clear-dl-now') }]
+      : [],
   render: ({ q, rawQ }) => {
     const L = S.downloads
       .slice()
@@ -1784,29 +1814,29 @@ registerPanel({
       .filter((d) => !q || d.name.toLowerCase().includes(q));
     if (!L.length)
       return q
-        ? emptyState(NO_HIT, 'Keine Treffer', `Kein Download passt zu „${esc(rawQ)}“.`)
+        ? emptyState(NO_HIT, l10n('Keine Treffer'), l10nMsg`Kein Download passt zu „${esc(rawQ)}“.`)
         : emptyState(
             EMPTY_ICON('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
-            'Keine Downloads',
-            'Geladene Dateien landen in „Downloads“ und erscheinen hier.',
+            l10n('Keine Downloads'),
+            l10n('Geladene Dateien landen in „Downloads“ und erscheinen hier.'),
           );
     return L.map((d) => {
       const ext = (d.name.split('.').pop() || '').toLowerCase().slice(0, 4),
         col = EXT_COL[ext] || '#7d6474';
       const pct = d.total > 0 ? Math.min(100, Math.round((d.received / d.total) * 100)) : 0,
         run = d.state === 'progress' || d.state === 'start';
-      return `<div class="si dl"><span class="fx" style="background:${col}">${esc(ext || 'Datei')}</span><div class="stx"><b title="${esc(d.name)}">${esc(d.name)}</b>${run ? `<div class="sbar"><div style="width:${d.total ? pct : 35}%"></div></div><small>${fmtSize(d.received || 0)}${d.total > 0 ? ' von ' + fmtSize(d.total) + ' · ' + pct + ' %' : ''}</small>` : d.state === 'failed' ? '<small class="bad">Fehlgeschlagen</small>' : `<small>${esc(d.path.replace(/^\/Users\/[^/]+/, '~'))}</small>`}</div>${d.state === 'done' ? `<span class="acts on"><button class="ia" data-act="dl-open" data-path="${esc(d.path)}" aria-label="Öffnen" title="Öffnen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg></button><button class="ia" data-act="dl-reveal" data-path="${esc(d.path)}" aria-label="Im Finder zeigen" title="Im Finder zeigen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></span>` : ''}</div>`;
+      return `<div class="si dl"><span class="fx" style="background:${col}">${esc(ext || l10n('Datei'))}</span><div class="stx"><b title="${esc(d.name)}">${esc(d.name)}</b>${run ? `<div class="sbar"><div style="width:${d.total ? pct : 35}%"></div></div><small>${fmtSize(d.received || 0)}${d.total > 0 ? ' von ' + fmtSize(d.total) + ' · ' + pct + ' %' : ''}</small>` : d.state === 'failed' ? l10n('<small class="bad">Fehlgeschlagen</small>') : `<small>${esc(d.path.replace(/^\/Users\/[^/]+/, '~'))}</small>`}</div>${d.state === 'done' ? l10nMsg`<span class="acts on"><button class="ia" data-act="dl-open" data-path="${esc(d.path)}" aria-label="Öffnen" title="Öffnen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg></button><button class="ia" data-act="dl-reveal" data-path="${esc(d.path)}" aria-label="Im Finder zeigen" title="Im Finder zeigen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></span>` : ''}</div>`;
     }).join('');
   },
 });
 
 registerPanel({
   id: 'notes',
-  title: 'Notizen',
-  desc: 'Notizzettel zur aktuellen Seite (auch per Kreis-Geste)',
+  title: l10n('Notizen'),
+  desc: l10n('Notizzettel zur aktuellen Seite (auch per Kreis-Geste)'),
   order: 40,
   icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
-  count: () => plural2(Object.keys(S.notes).length, 'Notiz', 'Notizen'),
+  count: () => plural2(Object.keys(S.notes).length, l10n('Notiz'), l10n('Notizen')),
   badge: () => {
     const k = noteKeyOf(cur());
     return k && S.notes[k] ? true : '';
@@ -1850,18 +1880,18 @@ function noteKeyOf(t) {
   return null;
 }
 const noteTitleOf = (t) =>
-  t.mode === 'search' ? t.q + ' – Suche' : t.webTitle || hostOf(t.webUrl) || '';
+  t.mode === 'search' ? t.q + l10n(' – Suche') : t.webTitle || hostOf(t.webUrl) || '';
 function notesPanelHTML() {
   const t = cur(),
     key = noteKeyOf(t),
     note = key ? S.notes[key] : null;
   const all = Object.values(S.notes).sort((a, b) => b.updated - a.updated);
-  return `<div class="notes">
-    <div class="npage">${key ? `<b>${esc(noteTitleOf(t) || hostOf(key))}</b><small>${esc(shownUrl(key))}</small>` : '<b>Keine Seite offen</b><small>Öffne eine Webseite oder Suche – dann erscheint hier der Notizzettel dieser Seite.</small>'}</div>
+  return l10nMsg`<div class="notes">
+    <div class="npage">${key ? `<b>${esc(noteTitleOf(t) || hostOf(key))}</b><small>${esc(shownUrl(key))}</small>` : l10n('<b>Keine Seite offen</b><small>Öffne eine Webseite oder Suche – dann erscheint hier der Notizzettel dieser Seite.</small>')}</div>
     ${
       key
-        ? `<div class="paper"><textarea id="noteText" placeholder="Notiz zu dieser Seite …" spellcheck="true">${esc(note ? note.text : '')}</textarea><i class="fold"></i></div>
-    <div class="nmeta"><span id="noteStat">${note ? 'Gespeichert · ' + esc(fmtTime(note.updated)) : 'Wird automatisch gespeichert'}</span><button class="link" data-act="note-del" ${note ? '' : 'disabled'}>Löschen</button></div>`
+        ? l10nMsg`<div class="paper"><textarea id="noteText" placeholder="Notiz zu dieser Seite …" spellcheck="true">${esc(note ? note.text : '')}</textarea><i class="fold"></i></div>
+    <div class="nmeta"><span id="noteStat">${note ? l10n('Gespeichert · ') + esc(fmtTime(note.updated)) : l10n('Wird automatisch gespeichert')}</span><button class="link" data-act="note-del" ${note ? '' : 'disabled'}>Löschen</button></div>`
         : ''
     }
     <h4 class="nh">Alle Notizen · ${all.length}</h4><div class="nlist" id="noteList">${noteListHTML(all)}</div></div>`;
@@ -1874,18 +1904,20 @@ function noteListHTML(all) {
             `<button class="nitem" data-act="open-url" data-url="${esc(n.key)}"><b>${esc(n.title || hostOf(n.key))}</b><span>${esc(n.text.replace(/\s+/g, ' ').slice(0, 90))}</span><small>${esc(fmtTime(n.updated))}</small></button>`,
         )
         .join('')
-    : '<div class="hint">Noch keine Notizen. Zeichne mit gedrückter linker Maustaste einen Kreis – oder öffne den Zettel über das Menü.</div>';
+    : l10n(
+        '<div class="hint">Noch keine Notizen. Zeichne mit gedrückter linker Maustaste einen Kreis – oder öffne den Zettel über das Menü.</div>',
+      );
 }
 function refreshNotesUI() {
   const all = Object.values(S.notes).sort((a, b) => b.updated - a.updated);
   const l = $('#noteList');
   if (l) l.innerHTML = noteListHTML(all);
   const h = document.querySelector('.nh');
-  if (h) h.textContent = 'Alle Notizen · ' + all.length;
+  if (h) h.textContent = l10n('Alle Notizen · ') + all.length;
   const key = noteKeyOf(cur()),
     n = key ? S.notes[key] : null;
   const st = $('#noteStat');
-  if (st) st.textContent = n ? 'Gespeichert · ' + fmtTime(n.updated) : 'Leer';
+  if (st) st.textContent = n ? l10n('Gespeichert · ') + fmtTime(n.updated) : l10n('Leer');
   const del = document.querySelector('[data-act=note-del]');
   if (del) del.disabled = !n;
   updateSideBadges();
@@ -1902,7 +1934,7 @@ async function saveNote(text) {
 document.addEventListener('input', (ev) => {
   if (ev.target.id !== 'noteText') return;
   const st = $('#noteStat');
-  if (st) st.textContent = 'Speichert …';
+  if (st) st.textContent = l10n('Speichert …');
   const v = ev.target.value;
   clearTimeout(noteT);
   noteT = setTimeout(() => saveNote(v), 450);
@@ -1958,7 +1990,7 @@ function onDownload(e) {
     if (e.state === 'done') {
       d.state = 'done';
       api.downloadAdd(d.name, d.path);
-      toast('Geladen: ' + d.name);
+      toast(l10n('Geladen: ') + d.name);
     }
     if (e.state === 'failed') {
       d.state = 'failed';
@@ -2076,11 +2108,11 @@ function openBmDialog(o = {}) {
   nativeShow(-1);
   const ov = $('#bm-ov');
   ov.hidden = false;
-  ov.innerHTML = `<div class="card bmcard" role="document"><header><b>${editing ? 'Lesezeichen bearbeiten' : 'Lesezeichen hinzufügen'}</b><button class="ib sm" data-act="bm-close" aria-label="Schließen">${ICON.x}</button></header>
+  ov.innerHTML = l10nMsg`<div class="card bmcard" role="document"><header><b>${editing ? l10n('Lesezeichen bearbeiten') : l10n('Lesezeichen hinzufügen')}</b><button class="ib sm" data-act="bm-close" aria-label="Schließen">${ICON.x}</button></header>
     <div class="cbody"><label class="fld"><span>Name</span><input id="bmTitle" type="text" value="${esc(o.title || '')}" placeholder="z. B. Wikipedia" spellcheck="false" autocomplete="off"></label>
     <label class="fld"><span>Adresse</span><input id="bmUrl" type="text" value="${esc(o.url || '')}" placeholder="https://…" spellcheck="false" autocomplete="off" autocapitalize="off"></label>
     <div id="bmErr" class="kmsg err"></div>
-    <div class="row"><button class="btn pri" data-act="bm-save">Speichern</button><button class="btn" data-act="bm-close">Abbrechen</button>${editing ? '<button class="btn danger" data-act="bm-del-dlg">Löschen</button>' : ''}</div></div></div>`;
+    <div class="row"><button class="btn pri" data-act="bm-save">Speichern</button><button class="btn" data-act="bm-close">Abbrechen</button>${editing ? l10n('<button class="btn danger" data-act="bm-del-dlg">Löschen</button>') : ''}</div></div></div>`;
   setTimeout(() => {
     const i = $(o.url ? '#bmTitle' : '#bmUrl');
     i?.focus();
@@ -2091,7 +2123,10 @@ function bmFromPage() {
   // Vorbelegung: die Seite, die gerade offen ist
   const t = cur();
   if (t && (t.mode === 'web' || t.mode === 'search') && t.url)
-    return { url: t.url, title: t.mode === 'search' ? t.q + ' – Suche' : t.title || hostOf(t.url) };
+    return {
+      url: t.url,
+      title: t.mode === 'search' ? t.q + l10n(' – Suche') : t.title || hostOf(t.url),
+    };
   return {};
 }
 async function saveBm() {
@@ -2101,11 +2136,11 @@ async function saveBm() {
   };
   const raw = $('#bmUrl').value.trim();
   let title = $('#bmTitle').value.trim();
-  if (!raw) return err('Bitte eine Adresse eingeben.');
+  if (!raw) return err(l10n('Bitte eine Adresse eingeben.'));
   const u = isSearchUrl(raw) ? raw : toURL(raw);
   if (!u)
     return err(
-      'Das sieht nicht nach einer Adresse aus (z. B. beispiel.de oder https://beispiel.de).',
+      l10n('Das sieht nicht nach einer Adresse aus (z. B. beispiel.de oder https://beispiel.de).'),
     );
   if (!title) title = hostOf(u) || u;
   const old = bmDlg?.oldUrl;
@@ -2118,12 +2153,12 @@ async function saveBm() {
   }
   closeBmDialog();
   refreshBookmarks();
-  toast(old ? 'Lesezeichen gespeichert' : 'Lesezeichen hinzugefügt');
+  toast(old ? l10n('Lesezeichen gespeichert') : l10n('Lesezeichen hinzugefügt'));
 }
 async function deleteBm(u) {
   S.bookmarks = await api.setBookmark(u, '', false);
   refreshBookmarks();
-  toast('Lesezeichen gelöscht');
+  toast(l10n('Lesezeichen gelöscht'));
 }
 const bmByUrl = (u) => S.bookmarks.find((b) => b.url === u);
 function editBm(u) {
@@ -2164,11 +2199,11 @@ document.addEventListener('contextmenu', (ev) => {
   const u = el.dataset.bm;
   showCtx(
     [
-      { label: 'Öffnen', act: () => visit(cur(), u) },
-      { label: 'In neuem Tab öffnen', act: () => newTab(u, { background: true }) },
+      { label: l10n('Öffnen'), act: () => visit(cur(), u) },
+      { label: l10n('In neuem Tab öffnen'), act: () => newTab(u, { background: true }) },
       '-',
-      { label: 'Bearbeiten …', act: () => editBm(u) },
-      { label: 'Löschen', act: () => deleteBm(u) },
+      { label: l10n('Bearbeiten …'), act: () => editBm(u) },
+      { label: l10n('Löschen'), act: () => deleteBm(u) },
     ],
     ev.clientX,
     ev.clientY,
@@ -2192,10 +2227,10 @@ async function toggleBookmark() {
   const on = !isBookmarked(t.url);
   S.bookmarks = await api.setBookmark(
     t.url,
-    t.mode === 'search' ? t.q + ' – Suche' : t.title || hostOf(t.url),
+    t.mode === 'search' ? t.q + l10n(' – Suche') : t.title || hostOf(t.url),
     on,
   );
-  toast(on ? 'Lesezeichen hinzugefügt' : 'Lesezeichen entfernt');
+  toast(on ? l10n('Lesezeichen hinzugefügt') : l10n('Lesezeichen entfernt'));
   renderToolbar();
   renderBar();
   renderSide();
@@ -2271,7 +2306,7 @@ async function runCmd(c) {
       openSide('bookmarks');
       break;
     case 'install-update':
-      toast('Luna startet mit dem Update neu …');
+      toast(l10n('Luna startet mit dem Update neu …'));
       await api.installUpdate();
       break;
     case 'show-downloads':
@@ -2289,13 +2324,13 @@ async function runCmd(c) {
       renderSide();
       startSig = '';
       renderStart();
-      toast('Verlauf gelöscht');
+      toast(l10n('Verlauf gelöscht'));
       break;
     case 'clear-dl-now':
       S.downloads = [];
       await api.downloadsClear();
       renderSide();
-      toast('Download-Liste geleert');
+      toast(l10n('Download-Liste geleert'));
       break;
     case 'screenshot':
       takeShot();
@@ -2358,8 +2393,8 @@ document.addEventListener('click', async (ev) => {
       renderSettingsView();
       toast(
         allow
-          ? 'Dein Agent darf Ansichten jetzt ohne Nachfrage löschen.'
-          : 'Dein Agent fragt vor dem Löschen wieder nach.',
+          ? l10n('Dein Agent darf Ansichten jetzt ohne Nachfrage löschen.')
+          : l10n('Dein Agent fragt vor dem Löschen wieder nach.'),
       );
       break;
     }
@@ -2376,17 +2411,17 @@ document.addEventListener('click', async (ev) => {
       ev.preventDefault();
       if (ev.metaKey || ev.ctrlKey) {
         newTab(d.url, { background: true });
-        toast('In neuem Tab geöffnet');
+        toast(l10n('In neuem Tab geöffnet'));
       } else openWeb(t, d.url);
       break;
     case 'sr-tab':
       newTab(d.url, { background: true });
-      toast('In neuem Tab geöffnet');
+      toast(l10n('In neuem Tab geöffnet'));
       break;
     case 'sr-bm': {
       const on = !isBookmarked(d.url);
       S.bookmarks = await api.setBookmark(d.url, d.title, on);
-      toast(on ? 'Lesezeichen hinzugefügt' : 'Lesezeichen entfernt');
+      toast(on ? l10n('Lesezeichen hinzugefügt') : l10n('Lesezeichen entfernt'));
       renderBar();
       renderSearchView();
       renderSide();
@@ -2425,7 +2460,7 @@ document.addEventListener('click', async (ev) => {
         api.setGesture(S.gesture);
       } catch {
         S.gesture = !S.gesture;
-        toast('Konnte nicht gespeichert werden');
+        toast(l10n('Konnte nicht gespeichert werden'));
       }
       renderSettingsView();
       break;
@@ -2455,7 +2490,7 @@ document.addEventListener('click', async (ev) => {
         await api.setPref('showBookmarkBar', S.bar);
       } catch {
         S.bar = !S.bar;
-        toast('Konnte nicht gespeichert werden');
+        toast(l10n('Konnte nicht gespeichert werden'));
       }
       renderBar();
       renderSettingsView();
@@ -2468,11 +2503,14 @@ document.addEventListener('click', async (ev) => {
     case 'reset-browser': {
       const choice = await notifications.ask({
         kind: 'history',
-        title: 'Luna auf Standard zurücksetzen?',
-        message:
+        title: l10n('Luna auf Standard zurücksetzen?'),
+        message: l10n(
           'Farben, Seitenleiste, Mausgesten und Browser-Einstellungen werden zurückgesetzt. Danach lädt Luna die Oberfläche neu und zeigt die Ersteinrichtung.',
-        note: 'Lesezeichen, Verlauf, Notizen, Chats, API-Schlüssel, Dienstverbindungen und Website-Anmeldungen bleiben erhalten. Dies ist keine vollständige Datenlöschung.',
-        confirmLabel: 'Jetzt zurücksetzen',
+        ),
+        note: l10n(
+          'Lesezeichen, Verlauf, Notizen, Chats, API-Schlüssel, Dienstverbindungen und Website-Anmeldungen bleiben erhalten. Dies ist keine vollständige Datenlöschung.',
+        ),
+        confirmLabel: l10n('Jetzt zurücksetzen'),
       });
       if (choice !== 'confirm') break;
       a.disabled = true;
@@ -2489,13 +2527,15 @@ document.addEventListener('click', async (ev) => {
           'fm-sp-collapsed',
           'luna-chat-collapsed',
           'luna-onboarding-step',
+          'luna-language',
+          'luna-setup-language-confirmed',
         ])
           localStorage.removeItem(key);
         clearTimeout(sessT);
         location.reload();
       } catch (error) {
         a.disabled = false;
-        toast('Zurücksetzen nicht abgeschlossen: ' + String(error));
+        toast(l10n('Zurücksetzen nicht abgeschlossen: ') + String(error));
       }
       break;
     }
@@ -2506,11 +2546,11 @@ document.addEventListener('click', async (ev) => {
       renderSide();
       startSig = '';
       renderStart();
-      toast('Verlauf gelöscht');
+      toast(l10n('Verlauf gelöscht'));
       break;
     case 'spp-toggle': {
       const hide = !isPanelHidden(d.id);
-      if (!setPanelHidden(d.id, hide)) toast('Mindestens ein Bereich muss sichtbar bleiben');
+      if (!setPanelHidden(d.id, hide)) toast(l10n('Mindestens ein Bereich muss sichtbar bleiben'));
       renderSettingsView();
       renderSide();
       break;
@@ -2544,7 +2584,7 @@ document.addEventListener('click', async (ev) => {
       S.downloads = [];
       await api.downloadsClear();
       renderSide();
-      toast('Download-Liste geleert');
+      toast(l10n('Download-Liste geleert'));
       break;
     case 'dl-open':
       api.openFile(d.path, false);
@@ -2570,7 +2610,7 @@ document.addEventListener('click', async (ev) => {
         await api.setPref('restoreSession', S.restore);
       } catch (e) {
         S.restore = !S.restore;
-        toast('Konnte nicht gespeichert werden');
+        toast(l10n('Konnte nicht gespeichert werden'));
       }
       if (S.restore) {
         saveSession();
@@ -2594,10 +2634,10 @@ document.addEventListener('click', async (ev) => {
       card.classList.toggle('off', !on);
       const sw = card.querySelector('.cmd-switch');
       sw.setAttribute('aria-checked', String(on));
-      sw.querySelector('.cmd-switch-label').textContent = on ? 'An' : 'Aus';
+      sw.querySelector('.cmd-switch-label').textContent = on ? l10n('An') : l10n('Aus');
       const total = document.querySelectorAll('.cmd-set-card').length;
       $('.cmd-count').textContent =
-        `${document.querySelectorAll('.cmd-set-card.on').length} von ${total} Befehlen aktiv`;
+        l10nMsg`${document.querySelectorAll('.cmd-set-card.on').length} von ${total} Befehlen aktiv`;
       break;
     }
     case 'cmd-all':
@@ -2639,7 +2679,7 @@ document.addEventListener('click', async (ev) => {
     case 'mcp-copy':
       try {
         await api.mcpCopySetup();
-        toast('Einrichtungsprompt kopiert');
+        toast(l10n('Einrichtungsprompt kopiert'));
       } catch (e) {
         toast(String(e));
       }
@@ -2648,7 +2688,7 @@ document.addEventListener('click', async (ev) => {
       clearLegacyMCPColors();
       applyColorTheme('luna', true);
       renderSettingsView();
-      toast('Luna-Farben wiederhergestellt');
+      toast(l10n('Luna-Farben wiederhergestellt'));
       break;
     case 'tab-group-toggle':
       toggleTabGroup(d.group);
@@ -2681,7 +2721,7 @@ document.addEventListener('click', async (ev) => {
         const prefs = await api.setPref('spotifyAutoNextAlways', !S.autoNextAlways);
         S.autoNextAlways = !!prefs.spotifyAutoNextAlways;
       } catch {
-        toast('Die Einstellung konnte nicht gespeichert werden.');
+        toast(l10n('Die Einstellung konnte nicht gespeichert werden.'));
       } finally {
         a.disabled = false;
       }
@@ -2721,7 +2761,7 @@ document.addEventListener('click', async (ev) => {
       try {
         await api.spotifyCommand('open', 0);
       } catch (e) {
-        toast('Spotify konnte nicht geöffnet werden: ' + String(e?.message || e));
+        toast(l10n('Spotify konnte nicht geöffnet werden: ') + String(e?.message || e));
       } finally {
         a.disabled = false;
       }
@@ -2731,7 +2771,7 @@ document.addEventListener('click', async (ev) => {
       a.disabled = true;
       try {
         await api.spotifyPlay(d.uri);
-        toast('Wiedergabe an Spotify übergeben');
+        toast(l10n('Wiedergabe an Spotify übergeben'));
       } catch (e) {
         toast(String(e?.message || e));
       } finally {
@@ -2760,12 +2800,17 @@ document.addEventListener('click', async (ev) => {
       onboarding.start().catch((e) => toast(String(e)));
       break;
     case 'search-provider':
+      if (d.provider !== 'google') {
+        await api.setPref('tavilySearch', d.provider === 'tavily');
+        S.tavilySearch = d.provider === 'tavily';
+      }
       await api.setPref('googleSearch', d.provider === 'google');
       S.googleSearch = d.provider === 'google';
+      S.hasKey = await api.keyStatus();
       renderAll();
       break;
     case 'open-brave':
-      newTab('https://brave.com/search/api/');
+      newTab(providerURL(S.tavilySearch));
       break;
     case 'key-save':
       saveKey();
@@ -2776,7 +2821,7 @@ document.addEventListener('click', async (ev) => {
     case 'key-clear':
       await api.keyClear();
       S.hasKey = false;
-      settings.message = { text: 'Schlüssel entfernt.', kind: '' };
+      settings.message = { text: l10n('Schlüssel entfernt.'), kind: '' };
       renderSettingsView();
       startSig = '';
       renderStart();
@@ -2852,7 +2897,7 @@ document.addEventListener('keydown', (ev) => {
       const r = t.data.results[t.sel];
       if (r) {
         newTab(r.url, { background: true });
-        toast('In neuem Tab geöffnet');
+        toast(l10n('In neuem Tab geöffnet'));
       }
     } else if (ev.key === '/') {
       ev.preventDefault();
@@ -2911,10 +2956,51 @@ function dismissSplash() {
   return splashDismissal;
 }
 
+async function changeLanguage(language, settings = false) {
+  if (language === getLanguage()) return;
+  // Keep native menus in sync. Existing profiles without this preference stay German.
+  if (IS_NATIVE) await api.setPref('englishUI', language === 'en');
+  setLanguage(language);
+  if (settings) sessionStorage.setItem('luna-language-settings', 'look');
+  clearTimeout(sessT);
+  const tabs = S.tabs.filter((tab) => !tab.error && tab.mode !== 'settings');
+  sessionStorage.setItem(
+    'luna-language-session',
+    JSON.stringify({
+      tabs: tabs.map((tab) => ({
+        url: tab.mode === 'web' ? tab.webUrl || tab.url : tab.url,
+        title: tab.title,
+        group: tab.group || '',
+      })),
+      active: Math.max(
+        0,
+        tabs.findIndex((tab) => tab.id === S.active),
+      ),
+      groups: S.groups,
+    }),
+  );
+  location.reload();
+}
+document.addEventListener('change', async (event) => {
+  const select = event.target.closest('[data-language-picker]');
+  if (!select || select.closest('.setup')) return;
+  select.disabled = true;
+  try {
+    await changeLanguage(select.value, true);
+  } catch {
+    select.value = getLanguage();
+    select.disabled = false;
+    toast(l10n('Die Sprache konnte nicht gespeichert werden.'));
+  }
+});
+
 onboarding = createOnboarding({
+  onLanguageChange: (language) => changeLanguage(language),
   async refreshSearch() {
     S.hasKey = await api.keyStatus();
-    S.googleSearch = !!(await api.prefs()).googleSearch;
+    const p = await api.prefs();
+    S.googleSearch = !!p.googleSearch;
+    S.tavilySearch = p.tavilySearch !== false;
   },
   onFinish() {
     refreshChatStatus();
@@ -2932,13 +3018,14 @@ onboarding = createOnboarding({
   const step = (label, frac, work) => (work ? work() : Promise.resolve());
   try {
     [S.hasKey, S.restore, S.bar, S.gesture] = await step(
-      'Einstellungen laden …',
+      l10n('Einstellungen laden …'),
       0.14,
       async () => {
         await loadGestures();
         const p = await api.prefs();
         S.autoNextAlways = !!p.spotifyAutoNextAlways;
         S.googleSearch = !!p.googleSearch;
+        S.tavilySearch = p.tavilySearch !== false;
         S.onboardingComplete = !!p.onboardingComplete;
         S.onboardingDeferred = !!p.onboardingDeferred;
         if (S.onboardingComplete || S.onboardingDeferred) startupWatchdog.stop();
@@ -2951,7 +3038,7 @@ onboarding = createOnboarding({
       },
     );
     let noteList;
-    [S.bookmarks, S.downloads, noteList] = await step('Lesezeichen & Verlauf …', 0.36, () =>
+    [S.bookmarks, S.downloads, noteList] = await step(l10n('Lesezeichen & Verlauf …'), 0.36, () =>
       Promise.all([api.bookmarks(), api.downloads(), api.notes()]),
     );
     S.notes = Object.fromEntries((noteList || []).map((n) => [n.key, n]));
@@ -2979,21 +3066,26 @@ onboarding = createOnboarding({
     });
     // Optional Windows media-session discovery must never gate first-run setup.
     if (WINDOWS)
-      initSpotify().catch((error) => console.warn('Spotify ist noch nicht bereit:', error));
-    else await step('Spotify verbinden …', 0.58, () => initSpotify());
+      initSpotify().catch((error) => console.warn(l10n('Spotify ist noch nicht bereit:'), error));
+    else await step(l10n('Spotify verbinden …'), 0.58, () => initSpotify());
     await step(
-      S.restore ? 'Tabs wiederherstellen …' : 'Startseite vorbereiten …',
+      S.restore ? l10n('Tabs wiederherstellen …') : l10n('Startseite vorbereiten …'),
       0.8,
       async () => {
         await restoreSession();
         updateFrame();
       },
     );
-    if (S.onboardingComplete) await step('Seite wird geladen …', 0.94, () => waitLoaded(cur()));
+    if (S.onboardingComplete)
+      await step(l10n('Seite wird geladen …'), 0.94, () => waitLoaded(cur()));
   } catch (e) {
     console.error(e);
   }
   await dismissSplash();
+  if (sessionStorage.getItem('luna-language-settings')) {
+    sessionStorage.removeItem('luna-language-settings');
+    openSettingsAt('look');
+  }
   if (IS_NATIVE && !S.onboardingComplete && !S.onboardingDeferred)
     onboarding.start().catch((e) => toast(String(e)));
 })();
@@ -3001,7 +3093,7 @@ onboarding = createOnboarding({
 document.addEventListener('change', (ev) => {
   if (!ev.target.matches('[data-panel-parent]')) return;
   if (!assignPanel(ev.target.dataset.panelParent, ev.target.value))
-    toast('Ein Menü kann nicht in sich selbst liegen.');
+    toast(l10n('Ein Menü kann nicht in sich selbst liegen.'));
   renderSettingsView();
   renderSide();
 });
@@ -3040,13 +3132,13 @@ function mcpState() {
 }
 function mcpTab(id) {
   const t = id === undefined ? cur() : S.tabs.find((t) => t.id === id);
-  if (!t) throw Error('Tab nicht gefunden.');
+  if (!t) throw Error(l10n('Tab nicht gefunden.'));
   return t;
 }
 function mcpURL(url) {
-  if (typeof url !== 'string' || !url.trim()) throw Error('URL ist erforderlich.');
+  if (typeof url !== 'string' || !url.trim()) throw Error(l10n('URL ist erforderlich.'));
   if (!/^(https?:\/\/|about:blank$|chat:$|search:|spotify-search:)/i.test(url))
-    throw Error('Nur HTTP(S), about:blank oder interne Suchadressen sind erlaubt.');
+    throw Error(l10n('Nur HTTP(S), about:blank oder interne Suchadressen sind erlaubt.'));
   return url;
 }
 const MCP_COLORS = 'luna-mcp-colors';
@@ -3070,12 +3162,12 @@ async function runMCPCommand(name, a) {
   if (name === 'browser_state') return mcpState();
   if (name === 'browser_design_skill') return personalizedPages.designSkill();
   if (name === 'browser_personalized_pages') return personalizedPages.command(a, mcpTab(a.tab_id));
-  if (splashing) throw Error('Luna startet noch. Bitte kurz warten.');
+  if (splashing) throw Error(l10n('Luna startet noch. Bitte kurz warten.'));
   switch (name) {
     case 'browser_tab': {
       if (a.domain !== undefined) {
         if (a.action !== 'close' || a.tab_id !== undefined)
-          throw Error('Domain nur zum Schließen ohne Tab-ID angeben.');
+          throw Error(l10n('Domain nur zum Schließen ohne Tab-ID angeben.'));
         const domain = tabDomain(a.domain);
         const targets = S.tabs.filter((t) => tabMatchesDomain(t.url, domain)).map((t) => t.id);
         for (const id of targets) {
@@ -3116,12 +3208,12 @@ async function runMCPCommand(name, a) {
           if (t.native) await api.stop(t.id);
           break;
         case 'zoom':
-          if (!Number.isFinite(a.zoom)) throw Error('zoom ist erforderlich.');
+          if (!Number.isFinite(a.zoom)) throw Error(l10n('zoom ist erforderlich.'));
           t.zoom = Math.max(0.5, Math.min(3, a.zoom));
           if (t.native) await api.zoom(t.id, t.zoom);
           break;
         default:
-          throw Error('Unbekannte Tab-Aktion.');
+          throw Error(l10n('Unbekannte Tab-Aktion.'));
       }
       return mcpState();
     }
@@ -3130,9 +3222,9 @@ async function runMCPCommand(name, a) {
         const id = createTabGroup(a.title, mcpTab(a.tab_id).id);
         return { group_id: id, ...mcpState() };
       }
-      if (!S.groups[a.group_id]) throw Error('Gruppe nicht gefunden.');
+      if (!S.groups[a.group_id]) throw Error(l10n('Gruppe nicht gefunden.'));
       if (a.action === 'rename') {
-        if (!a.title?.trim()) throw Error('Titel fehlt.');
+        if (!a.title?.trim()) throw Error(l10n('Titel fehlt.'));
         S.groups[a.group_id].title = a.title.trim().slice(0, 40);
       } else if (a.action === 'remove') removeTabGroup(a.group_id);
       else if (a.action === 'assign') moveTab(mcpTab(a.tab_id).id, null, a.group_id);
@@ -3151,11 +3243,11 @@ async function runMCPCommand(name, a) {
       if (a.action === 'wait_ready') {
         const end = Date.now() + 15000;
         while (t.loading && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
-        if (t.loading) throw Error('Seite lädt noch.');
+        if (t.loading) throw Error(l10n('Seite lädt noch.'));
         return mcpState();
       }
       if (a.action === 'find') {
-        if (!t.native) throw Error('Textsuche ist für Webseiten verfügbar.');
+        if (!t.native) throw Error(l10n('Textsuche ist für Webseiten verfügbar.'));
         await api.find(t.id, String(a.text || ''), true);
         return { ok: true };
       }
@@ -3177,10 +3269,12 @@ async function runMCPCommand(name, a) {
     case 'browser_customize': {
       if ('colors' in a)
         throw Error(
-          'Freie Farben sind nicht erlaubt. Bitte color_theme aus den eingebauten Farbthemen wählen.',
+          l10n(
+            'Freie Farben sind nicht erlaubt. Bitte color_theme aus den eingebauten Farbthemen wählen.',
+          ),
         );
       if (a.color_theme !== undefined && !COLOR_THEMES.some(([id]) => id === a.color_theme))
-        throw Error('Unbekanntes Farbthema. Bitte eine eingebaute Farbwelt wählen.');
+        throw Error(l10n('Unbekanntes Farbthema. Bitte eine eingebaute Farbwelt wählen.'));
       if (a.theme) applyTheme(a.theme, true);
       if (a.color_theme !== undefined || a.reset_colors) {
         clearLegacyMCPColors();
@@ -3205,31 +3299,33 @@ async function runMCPCommand(name, a) {
       if (a.panel_action) {
         const p = allPanels().find((p) => p.id === a.id);
         if (!['create_group', 'reset', 'close'].includes(a.panel_action) && !p)
-          throw Error('Menü-ID nicht gefunden.');
+          throw Error(l10n('Menü-ID nicht gefunden.'));
         switch (a.panel_action) {
           case 'create_group':
-            if (!addPanelGroup(String(a.title || ''))) throw Error('Menütitel ist erforderlich.');
+            if (!addPanelGroup(String(a.title || '')))
+              throw Error(l10n('Menütitel ist erforderlich.'));
             break;
           case 'rename_group':
-            if (!p.custom || !a.title?.trim()) throw Error('Eigenes Menü und Titel erforderlich.');
+            if (!p.custom || !a.title?.trim())
+              throw Error(l10n('Eigenes Menü und Titel erforderlich.'));
             renamePanelGroup(a.id, a.title);
             break;
           case 'delete_group':
-            if (!p.custom) throw Error('Nur eigene Menüs können gelöscht werden.');
+            if (!p.custom) throw Error(l10n('Nur eigene Menüs können gelöscht werden.'));
             removePanelGroup(a.id);
             break;
           case 'assign':
-            if (!assignPanel(a.id, a.parent || '')) throw Error('Ungültige Menüzuordnung.');
+            if (!assignPanel(a.id, a.parent || '')) throw Error(l10n('Ungültige Menüzuordnung.'));
             break;
           case 'hide':
             if (!setPanelHidden(a.id, true))
-              throw Error('Mindestens ein Menü muss sichtbar bleiben.');
+              throw Error(l10n('Mindestens ein Menü muss sichtbar bleiben.'));
             break;
           case 'show':
             setPanelHidden(a.id, false);
             break;
           case 'move':
-            if (![-1, 1].includes(a.direction)) throw Error('direction muss -1 oder 1 sein.');
+            if (![-1, 1].includes(a.direction)) throw Error(l10n('direction muss -1 oder 1 sein.'));
             movePanel(a.id, a.direction);
             break;
           case 'open':
@@ -3257,7 +3353,8 @@ async function runMCPCommand(name, a) {
     }
     case 'browser_notes': {
       if (a.action === 'list') return api.notes();
-      if (!a.key || typeof a.text !== 'string') throw Error('key und text sind erforderlich.');
+      if (!a.key || typeof a.text !== 'string')
+        throw Error(l10n('key und text sind erforderlich.'));
       const notes = await api.setNote(a.key, String(a.title || a.key), a.text);
       S.notes = Object.fromEntries(notes.map((n) => [n.key, n]));
       renderSide();
@@ -3266,7 +3363,7 @@ async function runMCPCommand(name, a) {
     case 'browser_history':
       if (a.action === 'clear') await api.historyClear();
       else if (a.action === 'remove') {
-        if (!a.url) throw Error('url ist erforderlich.');
+        if (!a.url) throw Error(l10n('url ist erforderlich.'));
         await api.historyRemove(a.url);
       }
       startSig = '';
@@ -3281,7 +3378,7 @@ async function runMCPCommand(name, a) {
       }
       return api.downloads();
     case 'browser_search': {
-      if (!a.query?.trim()) throw Error('Suchbegriff fehlt.');
+      if (!a.query?.trim()) throw Error(l10n('Suchbegriff fehlt.'));
       if (a.open_results) {
         newTab(
           (a.provider === 'spotify' ? 'spotify-search:' : 'search:') + encodeURIComponent(a.query),
@@ -3291,7 +3388,7 @@ async function runMCPCommand(name, a) {
       return a.provider === 'spotify' ? api.spotifySearch(a.query) : api.search(a.query, 0);
     }
     default:
-      throw Error('Unbekanntes MCP-Werkzeug.');
+      throw Error(l10n('Unbekanntes MCP-Werkzeug.'));
   }
 }
 let mcpCommandQueue = Promise.resolve();

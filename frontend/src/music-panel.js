@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import { lunaMusicWordmark } from './branding.js';
 
@@ -88,15 +89,15 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
 
   /* ── Player ─────────────────────────────────────────────── */
   function playerHTML() {
-    return `<div class="lm-bg"></div>
+    return l10nMsg`<div class="lm-bg"></div>
       <input class="lm-seek" aria-label="Songposition" data-music-range="seek" type="range" min="0" max="1" value="0" step="1">
       <div class="lm-mini">
         <div class="lm-cover"><div class="lm-cover-in"></div></div>
         <div class="lm-meta"><b class="lm-title"></b><span class="lm-artist"></span></div>
         <div class="lm-controls">
-          ${btn('previous', 'Vorheriger Titel', icon('prev', 17), 'class="lm-skip"')}
-          ${btn('playpause', 'Abspielen / Pause', '', 'class="lm-play"')}
-          ${btn('next', 'Nächster Titel', icon('next', 17), 'class="lm-skip"')}
+          ${btn('previous', l10n('Vorheriger Titel'), icon('prev', 17), 'class="lm-skip"')}
+          ${btn('playpause', l10n('Abspielen / Pause'), '', 'class="lm-play"')}
+          ${btn('next', l10n('Nächster Titel'), icon('next', 17), 'class="lm-skip"')}
         </div>
       </div>`;
   }
@@ -115,8 +116,10 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
         ? `<img src="${esc(art)}" alt="" draggable="false">`
         : `<div class="ph">${icon('note', 18)}</div>`;
     }
-    q('.lm-title').textContent = state.title || (on ? '' : 'Nichts läuft gerade');
-    q('.lm-artist').textContent = on ? state.artist || '' : state.message || 'Spotify starten';
+    q('.lm-title').textContent = state.title || (on ? '' : l10n('Nichts läuft gerade'));
+    q('.lm-artist').textContent = on
+      ? state.artist || ''
+      : state.message || l10n('Spotify starten');
     const seek = q('[data-music-range=seek]');
     if (dragging !== 'seek') {
       seek.max = state.duration || 1;
@@ -129,8 +132,8 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
     pp.title = pp.ariaLabel = on
       ? state.status === 'playing'
         ? 'Pause'
-        : 'Abspielen'
-      : 'Spotify starten';
+        : l10n('Abspielen')
+      : l10n('Spotify starten');
     const wantIcon = state.status === 'playing' ? 'pause' : 'play';
     if (pp.dataset.ic !== wantIcon) {
       pp.dataset.ic = wantIcon;
@@ -146,13 +149,13 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
       ${cover(art)}
       <div class="lm-rt"><b>${esc(t.name)}</b><small>${esc(sub)}</small></div>
       <div class="lm-ra">
-        ${add ? btn('add', 'Zur Warteschlange: ' + t.name, icon('add', 17), `data-uri="${esc(t.uri)}" data-title="${esc(t.name)}"`) : ''}
-        ${btn('play', 'Abspielen: ' + t.name, icon('play', 15), `class="go" data-uri="${esc(t.uri)}"`)}
+        ${add ? btn('add', l10n('Zur Warteschlange: ') + t.name, icon('add', 17), `data-uri="${esc(t.uri)}" data-title="${esc(t.name)}"`) : ''}
+        ${btn('play', l10n('Abspielen: ') + t.name, icon('play', 15), `class="go" data-uri="${esc(t.uri)}"`)}
       </div></div>`;
   }
   function card(it, round) {
-    const sub = round ? 'Künstler' : (it.artists || []).map((a) => a.name).join(', ');
-    return `<button type="button" class="lm-card${round ? ' round' : ''}" data-music="play" data-uri="${esc(it.uri)}" title="Abspielen: ${esc(it.name)}">
+    const sub = round ? l10n('Künstler') : (it.artists || []).map((a) => a.name).join(', ');
+    return l10nMsg`<button type="button" class="lm-card${round ? ' round' : ''}" data-music="play" data-uri="${esc(it.uri)}" title="Abspielen: ${esc(it.name)}">
       ${cover(pickImg(it.images), round ? 'rd' : 'sq')}<b>${esc(it.name)}</b><small>${esc(sub)}</small></button>`;
   }
   const empty = (ic, h, p, extra = '') =>
@@ -168,15 +171,17 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
     else if (error)
       html = empty(
         'x',
-        'Das hat nicht geklappt',
+        l10n('Das hat nicht geklappt'),
         esc(error),
-        btn('settings', 'Spotify verbinden', 'Verbindung prüfen', 'class="lm-cta"'),
+        btn('settings', l10n('Spotify verbinden'), l10n('Verbindung prüfen'), 'class="lm-cta"'),
       );
     else if (!result)
       html = empty(
         'search',
-        'Was möchtest du hören?',
-        'Suche nach Songs, Künstlern und Alben. Mit + legst du einen Song in die Warteschlange, per Ziehen geht es auch.',
+        l10n('Was möchtest du hören?'),
+        l10n(
+          'Suche nach Songs, Künstlern und Alben. Mit + legst du einen Song in die Warteschlange, per Ziehen geht es auch.',
+        ),
       );
     else {
       const t = result.tracks?.items || [],
@@ -185,12 +190,13 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
       html =
         (t.length ? `<h3>Songs</h3>${t.map((x) => track(x)).join('')}` : '') +
         (a.length
-          ? `<h3>Künstler</h3><div class="lm-rail">${a.map((x) => card(x, true)).join('')}</div>`
+          ? l10nMsg`<h3>Künstler</h3><div class="lm-rail">${a.map((x) => card(x, true)).join('')}</div>`
           : '') +
         (al.length
-          ? `<h3>Alben</h3><div class="lm-rail">${al.map((x) => card(x, false)).join('')}</div>`
+          ? l10nMsg`<h3>Alben</h3><div class="lm-rail">${al.map((x) => card(x, false)).join('')}</div>`
           : '');
-      if (!html) html = empty('search', 'Keine Treffer', 'Versuche einen anderen Suchbegriff.');
+      if (!html)
+        html = empty('search', l10n('Keine Treffer'), l10n('Versuche einen anderen Suchbegriff.'));
     }
     if (el.innerHTML !== html) el.innerHTML = html;
   }
@@ -201,22 +207,28 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
     if (queueError)
       html = empty(
         'x',
-        'Warteschlange nicht verfügbar',
+        l10n('Warteschlange nicht verfügbar'),
         esc(queueError),
-        btn('settings', 'Spotify verbinden', 'Spotify verbinden', 'class="lm-cta"'),
+        btn('settings', l10n('Spotify verbinden'), l10n('Spotify verbinden'), 'class="lm-cta"'),
       );
     else if (!queue) html = skeleton();
     else {
       const n = queue.queue?.length || 0;
       html =
         (queue.currently_playing
-          ? `<h3>Läuft gerade</h3>${track(queue.currently_playing, { add: false, now: true })}`
+          ? l10nMsg`<h3>Läuft gerade</h3>${track(queue.currently_playing, { add: false, now: true })}`
           : '') +
-        `<h3>Als Nächstes <em>${n}</em></h3>` +
+        l10nMsg`<h3>Als Nächstes <em>${n}</em></h3>` +
         (n
           ? queue.queue.map((x) => track(x, { add: false })).join('')
-          : empty('queue', 'Warteschlange ist leer', 'Füge über die Suche Songs hinzu.')) +
-        '<p class="lm-note">Die Reihenfolge bestimmt Spotify. Entfernen und Umsortieren bietet die Spotify-API nicht an.</p>';
+          : empty(
+              'queue',
+              l10n('Warteschlange ist leer'),
+              l10n('Füge über die Suche Songs hinzu.'),
+            )) +
+        l10n(
+          '<p class="lm-note">Die Reihenfolge bestimmt Spotify. Entfernen und Umsortieren bietet die Spotify-API nicht an.</p>',
+        );
     }
     if (el.innerHTML !== html) el.innerHTML = html;
   }
@@ -274,14 +286,14 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
   registerPanel({
     id: 'spotify',
     title: 'Luna Music',
-    desc: 'Spotify steuern und durchsuchen',
+    desc: l10n('Spotify steuern und durchsuchen'),
     order: 50,
     icon: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
     keep: () => !!root(),
     render: () => {
       requestAnimationFrame(mount);
-      return `<div id="lunaMusicPanel" data-section="${section}">
-        <header class="lm-header">${lunaMusicWordmark}${btn('settings', 'Spotify-Einstellungen', icon('gear', 17), 'class="lm-gear"')}</header>
+      return l10nMsg`<div id="lunaMusicPanel" data-section="${section}">
+        <header class="lm-header">${lunaMusicWordmark}${btn('settings', l10n('Spotify-Einstellungen'), icon('gear', 17), 'class="lm-gear"')}</header>
         <nav class="lm-tabs" role="tablist" aria-label="Musik">
           <i class="lm-pill"></i>
           <button type="button" role="tab" data-music-tab="search">${icon('search', 15)}Suche</button>
@@ -295,7 +307,7 @@ export function initMusicPanel({ enqueue, registerPanel, activePanel, isOpen, to
           <div class="lm-results"></div>
         </div>
         <div class="lm-queue-area" hidden>
-          <div class="lm-qbar">${btn('refresh', 'Aktualisieren', icon('refresh', 15) + 'Aktualisieren')}</div>
+          <div class="lm-qbar">${btn('refresh', l10n('Aktualisieren'), icon('refresh', 15) + l10n('Aktualisieren'))}</div>
           <div class="lm-queue-list"></div>
         </div>
         </div>

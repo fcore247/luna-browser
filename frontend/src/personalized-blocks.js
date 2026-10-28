@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { esc } from './ui.js';
 
 const number = (value) => {
@@ -108,8 +109,8 @@ function itemHTML(value) {
 export function renderPersonalizedBlock(field, source, loading, blockIndex) {
   const values = (source?.values || []).slice(0, field.limit || 20);
   const missing = loading
-    ? `<div class="pp-skeleton pp-skeleton-${esc(field.kind)}" role="status" aria-busy="true" aria-label="Wird geladen …"><i></i><i></i><i></i></div>`
-    : `<p class="pp-missing">Auf der Originalseite nicht gefunden</p>`;
+    ? l10nMsg`<div class="pp-skeleton pp-skeleton-${esc(field.kind)}" role="status" aria-busy="true" aria-label="Wird geladen …"><i></i><i></i><i></i></div>`
+    : l10nMsg`<p class="pp-missing">Auf der Originalseite nicht gefunden</p>`;
   const proseKinds = ['text', 'notice', 'accordion'];
   const rich =
     !field.format && Array.isArray(source?.rich) && source.rich.length
@@ -126,7 +127,7 @@ export function renderPersonalizedBlock(field, source, loading, blockIndex) {
   // check that the row on the source page is still the one the user saw.
   const openAttrs = (position, name) =>
     field.open && blockIndex !== undefined && source?.sigs
-      ? ` class="pp-openable" data-pp-open="${blockIndex}:${position}" tabindex="0" role="button" aria-label="${esc('Öffnen: ' + name)}"`
+      ? ` class="pp-openable" data-pp-open="${blockIndex}:${position}" tabindex="0" role="button" aria-label="${esc(l10n('Öffnen: ') + name)}"`
       : '';
   const valuePosition = (k) => source?.valueIdx?.[k] ?? k;
   const label = `<div class="pp-card-label"><span aria-hidden="true">${esc(field.icon || '✧')}</span><h2>${esc(field.title)}</h2></div>`;
@@ -177,8 +178,8 @@ export function renderPersonalizedBlock(field, source, loading, blockIndex) {
         percent === null
           ? missing
           : field.kind === 'gauge'
-            ? `<div class="pp-gauge-ring" style="--pp-value:${percent}%"><span>${esc(values[0])}</span></div><p class="pp-scale">Skala 0–${esc(max)}</p>`
-            : `${text}<progress max="${max}" value="${Math.max(0, Math.min(max, value))}" aria-label="${esc(field.title)}"></progress><p class="pp-scale">Skala 0–${esc(max)}</p>`;
+            ? l10nMsg`<div class="pp-gauge-ring" style="--pp-value:${percent}%"><span>${esc(values[0])}</span></div><p class="pp-scale">Skala 0–${esc(max)}</p>`
+            : l10nMsg`${text}<progress max="${max}" value="${Math.max(0, Math.min(max, value))}" aria-label="${esc(field.title)}"></progress><p class="pp-scale">Skala 0–${esc(max)}</p>`;
       break;
     }
     case 'bars':

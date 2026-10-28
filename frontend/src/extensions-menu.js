@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import { esc } from './ui.js';
 import { extensionIcon } from './extensions-view.js';
@@ -10,7 +11,7 @@ export function createExtensionsMenu({ cover, currentTab, manage, toast, closeOt
   panel.className = 'extensions-menu';
   panel.hidden = true;
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'Erweiterungen');
+  panel.setAttribute('aria-label', l10n('Erweiterungen'));
   document.body.append(panel);
   anchor.setAttribute('aria-haspopup', 'dialog');
   anchor.setAttribute('aria-controls', panel.id);
@@ -41,9 +42,9 @@ export function createExtensionsMenu({ cover, currentTab, manage, toast, closeOt
     try {
       if (t?.mode === 'web') host = new URL(t.url).hostname;
     } catch {}
-    panel.innerHTML = `<header><h2>Erweiterungen</h2><button type="button" class="ib" data-ext-close aria-label="Erweiterungsliste schließen">×</button></header>
-      <p class="extensions-context">${esc(host || 'Deine Erweiterungen und ihre Steuerung')}</p>
-      <div class="extensions-list">${entries.map((e) => `<button type="button" class="extension-item" data-ext-open="${esc(e.id)}" ${!e.enabled || e.error || e.unsupported ? 'disabled' : ''}><span class="extension-monogram" aria-hidden="true">${extensionIcon(e)}</span><span><b>${esc(e.name)}</b><small>${esc(e.compatibility || e.error || (e.enabled ? 'Steuerung öffnen' : 'Deaktiviert'))}</small></span><span aria-hidden="true">›</span></button>`).join('') || '<p class="extensions-empty">Noch keine Erweiterungen installiert.</p>'}</div>
+    panel.innerHTML = l10nMsg`<header><h2>Erweiterungen</h2><button type="button" class="ib" data-ext-close aria-label="Erweiterungsliste schließen">×</button></header>
+      <p class="extensions-context">${esc(host || l10n('Deine Erweiterungen und ihre Steuerung'))}</p>
+      <div class="extensions-list">${entries.map((e) => `<button type="button" class="extension-item" data-ext-open="${esc(e.id)}" ${!e.enabled || e.error || e.unsupported ? 'disabled' : ''}><span class="extension-monogram" aria-hidden="true">${extensionIcon(e)}</span><span><b>${esc(e.name)}</b><small>${esc(e.compatibility || e.error || (e.enabled ? l10n('Steuerung öffnen') : l10n('Deaktiviert')))}</small></span><span aria-hidden="true">›</span></button>`).join('') || l10n('<p class="extensions-empty">Noch keine Erweiterungen installiert.</p>')}</div>
       <button type="button" class="extensions-manage" data-ext-manage>Erweiterungen verwalten <span aria-hidden="true">↗</span></button>`;
     position();
   }
@@ -54,8 +55,9 @@ export function createExtensionsMenu({ cover, currentTab, manage, toast, closeOt
     const token = ++generation;
     panel.hidden = false;
     anchor.setAttribute('aria-expanded', 'true');
-    panel.innerHTML =
-      '<header><h2>Erweiterungen</h2></header><p role="status" class="extensions-empty">Wird geladen …</p>';
+    panel.innerHTML = l10n(
+      '<header><h2>Erweiterungen</h2></header><p role="status" class="extensions-empty">Wird geladen …</p>',
+    );
     position();
     try {
       const [status] = await Promise.all([api.extensionsStatus(), cover(true)]);

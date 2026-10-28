@@ -3,7 +3,8 @@ const harness = `<!doctype html><html data-theme="dark"><head><link rel="stylesh
 async function setup(page, initial = {}) {
   page.on('pageerror', (error) => console.error('SETUP PAGE ERROR:', error.message));
   await page.addInitScript((initial) => {
-    window.preferences = initial.prefs || {};
+    localStorage.setItem('luna-setup-language-confirmed', '1');
+    window.preferences = { tavilySearch: false, ...(initial.prefs || {}) };
     window.clip = {
       count: 4,
       eligible: false,
@@ -59,7 +60,7 @@ test('every setup step can be skipped without saving provider drafts', async ({ 
       page.getByRole('button', { name: 'Diesen Schritt überspringen', exact: true }),
     ).toBeVisible();
     if (step === 0) {
-      await page.getByRole('button', { name: 'Luna Search öffnen' }).click();
+      await page.getByRole('button', { name: 'Dashboard öffnen' }).click();
       await expect(page.locator('.setup.portal')).toBeVisible();
     }
     await page.getByRole('button', { name: 'Diesen Schritt überspringen', exact: true }).click();
@@ -77,8 +78,8 @@ test('every setup step can be skipped without saving provider drafts', async ({ 
 test('Brave clipboard metadata, Enter, recovery split and preserved provider', async ({ page }) => {
   await setup(page);
   await page.getByRole('button', { name: 'Luna kennenlernen' }).click();
-  await expect(page.getByText('Ohne Brave-API-Key', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Luna Search öffnen' }).click();
+  await expect(page.getByText('Verbinde deinen Brave-API-Key', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Dashboard öffnen' }).click();
   await expect(page.locator('.setup.portal')).toBeVisible();
   // Copying on a login page or another application does not hide it.
   await page.evaluate(() => {
@@ -117,7 +118,7 @@ test('Brave clipboard metadata, Enter, recovery split and preserved provider', a
 test('Google without keys, optional providers, completion and resume', async ({ page }) => {
   await setup(page);
   await page.getByRole('button', { name: 'Luna kennenlernen' }).click();
-  await page.getByRole('button', { name: 'Google · ohne Key' }).click();
+  await page.getByRole('radio', { name: 'Google', exact: true }).click();
   await expect(page.locator('#setupKey')).toHaveCount(0);
   await page.getByRole('button', { name: 'Mit Google weiter' }).click();
   await page.getByRole('button', { name: 'Diesen Schritt überspringen' }).click();
@@ -131,6 +132,7 @@ test('Google without keys, optional providers, completion and resume', async ({ 
   await page.getByRole('button', { name: 'Los geht’s' }).click();
   await expect(page.locator('.setup')).toHaveCount(0);
   expect(await page.evaluate(() => window.preferences)).toEqual({
+    tavilySearch: false,
     googleSearch: true,
     onboardingComplete: true,
   });
@@ -282,7 +284,7 @@ test('slow Brave load warns after two seconds and continue preserves setup', asy
   await page.clock.install({ time: new Date(0) });
   await page.clock.pauseAt(new Date(1000));
   await page.getByRole('button', { name: 'Luna kennenlernen' }).click();
-  await page.getByRole('button', { name: 'Luna Search öffnen' }).click();
+  await page.getByRole('button', { name: 'Dashboard öffnen' }).click();
   await page.clock.runFor(1999);
   await expect(page.locator('.slow-setup')).toHaveCount(0);
   await page.clock.runFor(1);
@@ -307,7 +309,7 @@ test('Brave load completion cancels warning and leaving step cancels timer', asy
   await page.clock.install({ time: new Date(0) });
   await page.clock.pauseAt(new Date(1000));
   await page.getByRole('button', { name: 'Luna kennenlernen' }).click();
-  await page.getByRole('button', { name: 'Luna Search öffnen' }).click();
+  await page.getByRole('button', { name: 'Dashboard öffnen' }).click();
   await page.clock.runFor(1000);
   await page.evaluate(() => window.wizard.handleWeb({ t: 'state', tab: 910000, loading: false }));
   await page.clock.runFor(2000);
@@ -325,7 +327,7 @@ test('cold WebView2 startup leaves provider controls and exit responsive', async
     window.clip.loading = true;
   });
   await page.getByRole('button', { name: 'Luna kennenlernen' }).click();
-  await page.getByRole('button', { name: 'Luna Search öffnen' }).click();
+  await page.getByRole('button', { name: 'Dashboard öffnen' }).click();
   await expect(page.getByRole('button', { name: 'Key eingeben', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Später fortsetzen' }).click();
   await expect(page.locator('.setup')).toHaveCount(0);

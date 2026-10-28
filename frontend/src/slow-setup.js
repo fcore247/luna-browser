@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import './styles/slow-setup.css';
 
@@ -9,7 +10,7 @@ export function showSlowSetup({ hideNative = () => {}, resume = () => {} } = {})
   const previous = document.activeElement;
   const dialog = document.createElement('dialog');
   dialog.className = 'slow-setup';
-  dialog.innerHTML = `<h1>Wir sind uns nicht sicher, ob Luna auf deinem Rechner Spaß macht.</h1><p>Die Einrichtung braucht gerade länger als erwartet. Das kann auch an der Verbindung liegen.</p><div><button type="button" data-continue>Ich will es trotzdem probieren</button><button type="button" data-remove>Luna entfernen</button></div><p role="status"></p>`;
+  dialog.innerHTML = l10nMsg`<h1>Wir sind uns nicht sicher, ob Luna auf deinem Rechner Spaß macht.</h1><p>Die Einrichtung braucht gerade länger als erwartet. Das kann auch an der Verbindung liegen.</p><div><button type="button" data-continue>Ich will es trotzdem probieren</button><button type="button" data-remove>Luna entfernen</button></div><p role="status"></p>`;
   document.body.append(dialog);
   current = dialog;
   hideNative();
@@ -33,10 +34,10 @@ export function showSlowSetup({ hideNative = () => {}, resume = () => {} } = {})
     button.disabled = true;
     try {
       const result = await api.removeLuna();
-      dialog.querySelector('[role=status]').textContent = result || 'Luna wird entfernt …';
+      dialog.querySelector('[role=status]').textContent = result || l10n('Luna wird entfernt …');
     } catch (error) {
       dialog.querySelector('[role=status]').textContent =
-        `Luna konnte nicht entfernt werden: ${String(error)}`;
+        l10nMsg`Luna konnte nicht entfernt werden: ${String(error)}`;
     } finally {
       button.disabled = false;
     }

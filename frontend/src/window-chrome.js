@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { WINDOWS } from './platform.js';
 import {
   WindowMinimise,
@@ -15,12 +16,12 @@ export function initWindowChrome() {
   const controls = document.createElement('div');
   controls.className = 'window-controls';
   controls.setAttribute('role', 'group');
-  controls.setAttribute('aria-label', 'Fenster');
+  controls.setAttribute('aria-label', l10n('Fenster'));
   const icon = (path) =>
     `<svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="${path}"/></svg>`;
   const maximize = icon('M1.5 1.5h9v9h-9Z');
   const restore = icon('M3.5 1.5h7v7M1.5 3.5h7v7h-7Z');
-  controls.innerHTML = `<button type="button" data-window="minimize" aria-label="Fenster minimieren" title="Minimieren">${icon('M1 6.5h10')}</button><button type="button" data-window="maximize" aria-label="Fenster maximieren" title="Maximieren">${maximize}</button><button type="button" data-window="close" aria-label="Fenster schließen" title="Schließen">${icon('m1.5 1.5 9 9m0-9-9 9')}</button>`;
+  controls.innerHTML = l10nMsg`<button type="button" data-window="minimize" aria-label="Fenster minimieren" title="Minimieren">${icon('M1 6.5h10')}</button><button type="button" data-window="maximize" aria-label="Fenster maximieren" title="Maximieren">${maximize}</button><button type="button" data-window="close" aria-label="Fenster schließen" title="Schließen">${icon('m1.5 1.5 9 9m0-9-9 9')}</button>`;
   bar.append(controls);
   const maxButton = controls.querySelector('[data-window=maximize]');
   async function sync() {
@@ -28,8 +29,11 @@ export function initWindowChrome() {
     try {
       const on = await WindowIsMaximised();
       maxButton.innerHTML = on ? restore : maximize;
-      maxButton.setAttribute('aria-label', on ? 'Fenster wiederherstellen' : 'Fenster maximieren');
-      maxButton.title = on ? 'Wiederherstellen' : 'Maximieren';
+      maxButton.setAttribute(
+        'aria-label',
+        on ? l10n('Fenster wiederherstellen') : l10n('Fenster maximieren'),
+      );
+      maxButton.title = on ? l10n('Wiederherstellen') : l10n('Maximieren');
     } catch {
       /* Runtime may still be starting. A resize/focus retries. */
     }

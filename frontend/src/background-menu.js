@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg, locale } from './i18n.js';
 import {
   personal,
   savePersonal,
@@ -9,9 +10,9 @@ import { esc } from './ui.js';
 
 export function backgroundMenuHTML() {
   const p = personal();
-  return `<nav class="bg-tabs" role="tablist" aria-label="Hintergrundquelle">${[
-    ['motifs', 'Luna-Motive'],
-    ['media', 'Foto & Video'],
+  return l10nMsg`<nav class="bg-tabs" role="tablist" aria-label="Hintergrundquelle">${[
+    ['motifs', l10n('Luna-Motive')],
+    ['media', l10n('Foto & Video')],
     ['youtube', 'YouTube'],
   ]
     .map(
@@ -22,9 +23,9 @@ export function backgroundMenuHTML() {
   <div class="bg-island">
     <section id="bg-motifs" role="tabpanel" aria-labelledby="bg-tab-motifs">
       <div class="bg-motifs">${[
-        ['waves', 'Luna-Wellen'],
-        ['aurora', 'Nordlicht'],
-        ['stars', 'Sternenstaub'],
+        ['waves', l10n('Luna-Wellen')],
+        ['aurora', l10n('Nordlicht')],
+        ['stars', l10n('Sternenstaub')],
       ]
         .map(
           ([id, label]) =>
@@ -49,9 +50,9 @@ export function backgroundMenuHTML() {
       <p class="bg-youtube-status" role="status" data-youtube-status>Dein Video als Hintergrund. Mit dem Pfeil übernehmen.</p>
     </section>
     <details class="bg-options"><summary>Kontrast & Schrift</summary><label class="personal-contrast">Kontrast<input type="range" min="0" max="85" data-personal-contrast value="${p.contrast}"><output>${p.contrast}%</output></label><label class="personal-text">Schrift<select data-personal-text aria-label="Schriftkontrast">${[
-      ['auto', 'Automatisch'],
-      ['dark', 'Hell'],
-      ['light', 'Dunkel'],
+      ['auto', l10n('Automatisch')],
+      ['dark', l10n('Hell')],
+      ['light', l10n('Dunkel')],
     ]
       .map(
         ([v, l]) => `<option value="${v}" ${p.textContrast === v ? 'selected' : ''}>${l}</option>`,
@@ -117,7 +118,7 @@ export function wireBackgroundMenu(root) {
         el.loop = true;
         el.playsInline = true;
         el.preload = 'metadata';
-      } else el.alt = 'Vorschau deines Hintergrunds';
+      } else el.alt = l10n('Vorschau deines Hintergrunds');
       mediaArt.append(el);
       if (video)
         stopMediaVisibility = watchStartVisibility(root.querySelector('#bg-media'), (active) => {
@@ -129,15 +130,16 @@ export function wireBackgroundMenu(root) {
             el.play().catch(() => {});
           else el.pause();
         });
-      root.querySelector('.bg-type').textContent = video ? 'Video' : 'Foto';
+      root.querySelector('.bg-type').textContent = video ? 'Video' : l10n('Foto');
       root.querySelector('[data-media-summary]').textContent =
-        `${video ? 'Video' : 'Foto'} · ${personal().fileName || file.name || 'Hintergrund'}`;
+        `${video ? 'Video' : l10n('Foto')} · ${personal().fileName || file.name || l10n('Hintergrund')}`;
       root.querySelector('.bg-file-size').textContent =
-        (file.size / 1024 / 1024).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' MB';
+        (file.size / 1024 / 1024).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' MB';
     } catch {
       if (!disposed)
-        root.querySelector('[data-personal-feedback]').textContent =
-          'Die Vorschau konnte nicht geladen werden.';
+        root.querySelector('[data-personal-feedback]').textContent = l10n(
+          'Die Vorschau konnte nicht geladen werden.',
+        );
     }
   }
   function suspend() {
@@ -186,27 +188,30 @@ export function wireBackgroundMenu(root) {
     submit.innerHTML = arrow;
     submit.classList.remove('is-applied');
     status.textContent = id
-      ? 'Vorschau · Erst der Pfeil übernimmt deinen Hintergrund.'
+      ? l10n('Vorschau · Erst der Pfeil übernimmt deinen Hintergrund.')
       : input.value.trim()
-        ? 'Bitte einen gültigen YouTube-Link einfügen.'
-        : 'Dein Video als Hintergrund. Mit dem Pfeil übernehmen.';
+        ? l10n('Bitte einen gültigen YouTube-Link einfügen.')
+        : l10n('Dein Video als Hintergrund. Mit dem Pfeil übernehmen.');
     if (id === previewID) return;
     suspend();
     if (!id) return;
     timer = setTimeout(() => {
       previewID = id;
-      root.querySelector('.bg-preview-loading').innerHTML = '<span></span>Vorschau wird geladen';
+      root.querySelector('.bg-preview-loading').innerHTML = l10n(
+        '<span></span>Vorschau wird geladen',
+      );
       const frame = document.createElement('iframe');
       frame.src = `https://luna-browser.com/youtube-background.html?v=${encodeURIComponent(id)}`;
-      frame.title = 'YouTube-Vorschau';
+      frame.title = l10n('YouTube-Vorschau');
       frame.allow = 'autoplay; encrypted-media';
       const before = root.offsetHeight;
       screen.append(frame);
       preview.hidden = false;
       animateSize(before);
       loadTimer = setTimeout(() => {
-        status.textContent =
-          'Die Vorschau braucht länger. Prüfe deine Verbindung oder einen anderen Link.';
+        status.textContent = l10n(
+          'Die Vorschau braucht länger. Prüfe deine Verbindung oder einen anderen Link.',
+        );
       }, 15000);
     }, 300);
   });
@@ -217,7 +222,7 @@ export function wireBackgroundMenu(root) {
     suspend();
     animateSize(before);
     savePersonal({ background: 'youtube', youtube: input.value.trim() });
-    status.textContent = 'Übernommen · youtu.be/' + youtubeID(input.value);
+    status.textContent = l10n('Übernommen · youtu.be/') + youtubeID(input.value);
     submit.classList.add('is-applied');
     submit.innerHTML =
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>';
@@ -256,8 +261,9 @@ export function wireBackgroundMenu(root) {
       await mediaFile(null);
       savePersonal({ background: 'waves', fileName: '', mediaRevision: Date.now() });
     } catch {
-      root.querySelector('[data-personal-feedback]').textContent =
-        'Die Datei konnte nicht entfernt werden.';
+      root.querySelector('[data-personal-feedback]').textContent = l10n(
+        'Die Datei konnte nicht entfernt werden.',
+      );
     }
   });
   mediaCard.addEventListener('dragover', (e) => {
@@ -294,14 +300,15 @@ export function wireBackgroundMenu(root) {
     if (event.data?.type === 'luna-youtube-ready') {
       clearTimeout(loadTimer);
       preview.classList.add('is-ready');
-      status.textContent = 'Gefällt dir der Hintergrund? Mit dem Pfeil übernehmen.';
+      status.textContent = l10n('Gefällt dir der Hintergrund? Mit dem Pfeil übernehmen.');
     }
     if (event.data?.type === 'luna-youtube-error') {
       clearTimeout(loadTimer);
       preview.classList.add('is-error');
-      root.querySelector('.bg-preview-loading').textContent = 'Keine Vorschau verfügbar';
-      root.querySelector('[data-youtube-status]').textContent =
-        'Dieses Video erlaubt keine Vorschau. Bitte wähle einen anderen Link.';
+      root.querySelector('.bg-preview-loading').textContent = l10n('Keine Vorschau verfügbar');
+      root.querySelector('[data-youtube-status]').textContent = l10n(
+        'Dieses Video erlaubt keine Vorschau. Bitte wähle einen anderen Link.',
+      );
       submit.disabled = true;
     }
   }

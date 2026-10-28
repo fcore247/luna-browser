@@ -1,3 +1,5 @@
+import { getLanguage } from './i18n.js';
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 // Suchansicht: Ergebnisse der eigenen Suche (Brave) als eingebaute Browser-Seite,
 // im selben Design wie Startseite und Seitenleiste (kein fremdes Web-Layout, keine Kopfzeile).
 const esc = (s) =>
@@ -29,7 +31,7 @@ const thumb = (u, cls) =>
 
 function result(r, i, sel, bm) {
   const on = bm(r.url);
-  return `<article class="sr ${i === sel ? 'sel' : ''}" data-i="${i}" style="animation-delay:${Math.min(i, 8) * 28}ms">
+  return l10nMsg`<article class="sr ${i === sel ? 'sel' : ''}" data-i="${i}" style="animation-delay:${Math.min(i, 8) * 28}ms">
     ${fav(r.favicon, r.host)}
     <div class="sr-body">
       <div class="sr-site"><b>${esc(r.host)}</b><span>${esc(r.path)}</span>${r.age ? `<em>${esc(r.age)}</em>` : ''}</div>
@@ -47,7 +49,7 @@ function strips(d, filter) {
   const news = d.news || [],
     vids = d.videos || [];
   if (news.length && (filter === 'all' || filter === 'news')) {
-    h += `<h3 class="sv-h">Nachrichten</h3><div class="${filter === 'news' ? 'sv-grid3' : 'strip'}">${news.map((n) => `<a class="nc" href="${esc(n.url)}" data-act="sr-open" data-url="${esc(n.url)}"><div class="im">${thumb(n.thumb, '')}</div><div class="cb"><div class="ct">${esc(n.title)}</div><div class="cm">${fav(n.favicon, n.host)}<span>${esc(n.host)}${n.age ? ' · ' + esc(n.age) : ''}</span></div></div></a>`).join('')}</div>`;
+    h += l10nMsg`<h3 class="sv-h">${getLanguage() === 'en' ? 'News' : 'Nachrichten'}</h3><div class="${filter === 'news' ? 'sv-grid3' : 'strip'}">${news.map((n) => `<a class="nc" href="${esc(n.url)}" data-act="sr-open" data-url="${esc(n.url)}"><div class="im">${thumb(n.thumb, '')}</div><div class="cb"><div class="ct">${esc(n.title)}</div><div class="cm">${fav(n.favicon, n.host)}<span>${esc(n.host)}${n.age ? ' · ' + esc(n.age) : ''}</span></div></div></a>`).join('')}</div>`;
   }
   if (vids.length && (filter === 'all' || filter === 'video')) {
     h += `<h3 class="sv-h">Videos</h3><div class="${filter === 'video' ? 'sv-grid3' : 'strip'}">${vids.map((v) => `<a class="nc" href="${esc(v.url)}" data-act="sr-open" data-url="${esc(v.url)}"><div class="im">${thumb(v.thumb, '')}${v.duration ? `<span class="du">${esc(v.duration)}</span>` : ''}</div><div class="cb"><div class="ct">${esc(v.title)}</div><div class="cm"><span>${esc(v.host)}${v.age ? ' · ' + esc(v.age) : ''}</span></div></div></a>`).join('')}</div>`;
@@ -62,7 +64,9 @@ function pager(t, d) {
   const start = Math.max(0, last - 6);
   const out = [];
   if (cur > 0)
-    out.push(`<button data-act="sv-page" data-p="${cur - 1}" aria-label="Zurück">←</button>`);
+    out.push(
+      l10nMsg`<button data-act="sv-page" data-p="${cur - 1}" aria-label="Zurück">←</button>`,
+    );
   for (let i = start; i <= last; i++)
     out.push(
       i === cur
@@ -70,8 +74,12 @@ function pager(t, d) {
         : `<button data-act="sv-page" data-p="${i}">${i + 1}</button>`,
     );
   if (d.more && cur < 9)
-    out.push(`<button data-act="sv-page" data-p="${cur + 1}" aria-label="Weiter">→</button>`);
-  return out.length > 1 ? `<nav class="sv-pg" aria-label="Seiten">${out.join('')}</nav>` : '';
+    out.push(
+      l10nMsg`<button data-act="sv-page" data-p="${cur + 1}" aria-label="Weiter">→</button>`,
+    );
+  return out.length > 1
+    ? l10nMsg`<nav class="sv-pg" aria-label="Seiten">${out.join('')}</nav>`
+    : '';
 }
 
 function skeleton() {
@@ -85,17 +93,17 @@ function skeleton() {
 function problem(t) {
   const e = t.sErr;
   const key = e === 'NOKEY' || /Schlüssel/.test(e);
-  return `<div class="sv-msg">${key ? I.key : I.warn}<h2>${e === 'NOKEY' ? 'Luna Search einrichten' : key ? 'Schlüssel wird abgelehnt' : 'Suche nicht möglich'}</h2>
-    <p>${e === 'NOKEY' ? 'Hinterlege deinen Brave-API-Schlüssel, dann sucht dieser Browser direkt über Brave – ohne Umweg über eine fremde Webseite.' : esc(e)}</p>
-    <div class="row">${key ? '<button class="btn pri" data-act="settings">Einstellungen öffnen</button><button class="btn" data-act="open-brave">Schlüssel bei Brave holen</button>' : '<button class="btn pri" data-act="sv-retry">Erneut versuchen</button>'}</div></div>`;
+  return `<div class="sv-msg">${key ? I.key : I.warn}<h2>${e === 'NOKEY' ? l10n('Luna Search einrichten') : key ? l10n('Schlüssel wird abgelehnt') : l10n('Suche nicht möglich')}</h2>
+    <p>${e === 'NOKEY' ? (getLanguage() === 'en' ? 'Connect your search provider in Settings to use Luna Search.' : 'Verbinde deinen Suchanbieter in den Einstellungen, um Luna Search zu nutzen.') : esc(e)}</p>
+    <div class="row">${key ? l10n('<button class="btn pri" data-act="settings">Einstellungen öffnen</button><button class="btn" data-act="open-brave">API-Key holen</button>') : l10n('<button class="btn pri" data-act="sv-retry">Erneut versuchen</button>')}</div></div>`;
 }
 
 // t: Tab mit q, page, data, sErr, sLoading, sel, filter; bm(url) sagt, ob ein Lesezeichen existiert.
 export function searchHTML(t, bm) {
   const d = t.data;
-  const head = `<div class="sv-top"><div class="sv-title"><div class="luna-search-brand">Luna Search</div><h1>${esc(t.q)}</h1><span class="sv-meta">${t.sLoading ? 'Suche läuft …' : d ? `Seite ${t.page + 1} · ${secs(d.millis)} s · Brave` : ''}</span></div>${
+  const head = `<div class="sv-top"><div class="sv-title"><div class="luna-search-brand">Luna Search</div><h1>${esc(t.q)}</h1><span class="sv-meta">${t.sLoading ? l10n('Suche läuft …') : d ? l10nMsg`Seite ${t.page + 1} · ${secs(d.millis)} s · ${esc(d.provider || 'Brave')}` : ''}</span></div>${
     d && !t.sErr
-      ? `<div class="stabs sv-filter" role="tablist">
+      ? l10nMsg`<div class="stabs sv-filter" role="tablist">
     <button class="${t.filter === 'all' ? 'on' : ''}" data-act="sv-filter" data-k="all">Alle</button>
     <button class="${t.filter === 'news' ? 'on' : ''}" data-act="sv-filter" data-k="news">Nachrichten${d.news?.length ? ' · ' + d.news.length : ''}</button>
     <button class="${t.filter === 'video' ? 'on' : ''}" data-act="sv-filter" data-k="video">Videos${d.videos?.length ? ' · ' + d.videos.length : ''}</button></div>`
@@ -105,7 +113,7 @@ export function searchHTML(t, bm) {
   if (t.sLoading || !d)
     return `<div class="sv">${head}<div class="sv-grid"><div class="sv-main">${skeleton()}</div></div></div>`;
   const alt = d.altered
-    ? `<div class="sv-alt">Ergebnisse für <b>${esc(d.altered)}</b>. <button class="link" data-act="sv-alt" data-q="${esc(d.altered)}">Stattdessen „${esc(t.q)}“ suchen</button></div>`
+    ? l10nMsg`<div class="sv-alt">Ergebnisse für <b>${esc(d.altered)}</b>. <button class="link" data-act="sv-alt" data-q="${esc(d.altered)}">Stattdessen „${esc(t.q)}“ suchen</button></div>`
     : '';
   let main = '';
   if (t.filter === 'all') {
@@ -119,15 +127,15 @@ export function searchHTML(t, bm) {
       .map((r, i) => result(r, i + 3, t.sel, bm))
       .join('');
     const faq = (d.faq || []).length
-      ? `<h3 class="sv-h">Häufige Fragen</h3><div class="sv-faq">${d.faq.map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join('')}</div>`
+      ? l10nMsg`<h3 class="sv-h">Häufige Fragen</h3><div class="sv-faq">${d.faq.map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join('')}</div>`
       : '';
     main = res.length
       ? first + strips(d, 'all') + faq + rest
-      : `<div class="sv-msg"><h2>Keine Treffer</h2><p>Zu „${esc(t.q)}“ hat Luna Search nichts gefunden.</p></div>`;
+      : l10nMsg`<div class="sv-msg"><h2>Keine Treffer</h2><p>Zu „${esc(t.q)}“ hat Luna Search nichts gefunden.</p></div>`;
   } else {
     main =
       strips(d, t.filter) ||
-      `<div class="sv-msg"><h2>Nichts gefunden</h2><p>Für diese Suche gibt es hier keine ${t.filter === 'news' ? 'Nachrichten' : 'Videos'}.</p></div>`;
+      l10nMsg`<div class="sv-msg"><h2>Nichts gefunden</h2><p>Für diese Suche gibt es hier keine ${t.filter === 'news' ? (getLanguage() === 'en' ? 'news' : 'Nachrichten') : 'Videos'}.</p></div>`;
   }
   const info =
     d.info && t.filter === 'all' && t.page === 0

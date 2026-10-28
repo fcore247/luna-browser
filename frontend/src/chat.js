@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg, locale } from './i18n.js';
 import { renderThemeCards } from './chat-themes.js';
 import { renderMusicCards } from './chat-music.js';
 import * as api from './api.js';
@@ -75,17 +76,19 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
     q('[data-chat="toggle"]').setAttribute('aria-expanded', String(!collapsed));
     q('[data-chat="toggle"]').setAttribute(
       'aria-label',
-      collapsed ? 'Chatverlauf ausklappen' : 'Chatverlauf einklappen',
+      collapsed ? l10n('Chatverlauf ausklappen') : l10n('Chatverlauf einklappen'),
     );
     q('#chatHistory').hidden = collapsed;
     q('#chatHistoryList').innerHTML = summaries.length
       ? summaries
           .map(
             (c) =>
-              `<div class="chat-history-item ${c.id === active ? 'selected' : ''}"><button data-chat="select" data-id="${esc(c.id)}" title="${esc(c.title)}"><span>${esc(c.title)}</span><small>${c.status === 'streaming' ? 'Antwort läuft …' : new Date(c.updated).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}</small></button><button class="chat-delete" data-chat="delete" data-id="${esc(c.id)}" aria-label="Chat löschen: ${esc(c.title)}" ${c.status === 'streaming' ? 'disabled' : ''}>${icons.trash}</button></div>`,
+              l10nMsg`<div class="chat-history-item ${c.id === active ? 'selected' : ''}"><button data-chat="select" data-id="${esc(c.id)}" title="${esc(c.title)}"><span>${esc(c.title)}</span><small>${c.status === 'streaming' ? l10n('Antwort läuft …') : new Date(c.updated).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })}</small></button><button class="chat-delete" data-chat="delete" data-id="${esc(c.id)}" aria-label="Chat löschen: ${esc(c.title)}" ${c.status === 'streaming' ? 'disabled' : ''}>${icons.trash}</button></div>`,
           )
           .join('')
-      : '<p class="chat-history-empty">Deine Gespräche erscheinen hier, sobald du loslegst.</p>';
+      : l10n(
+          '<p class="chat-history-empty">Deine Gespräche erscheinen hier, sobald du loslegst.</p>',
+        );
   }
   function composer() {
     if (!mounted) return;
@@ -108,18 +111,22 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
     if (caption)
       caption.textContent =
         modelName() +
-        ' · bis ' +
-        Number(config.max_tokens || 30000).toLocaleString('de-DE') +
+        l10n(' · bis ') +
+        Number(config.max_tokens || 30000).toLocaleString(locale()) +
         ' Tokens';
     q('#chatPrompt').disabled = sending;
     q('#chatSend').disabled = sending || streaming || !q('#chatPrompt').value.trim();
     q('#chatStop').hidden = !streaming;
     q('#chatSend').hidden = streaming;
     q('#chatNotice').textContent = !config.configured
-      ? 'Zum Loslegen: Anbieter verbinden und ein Modell unter KI & MCP hinzufügen.'
+      ? l10n('Zum Loslegen: Anbieter verbinden und ein Modell unter KI & MCP hinzufügen.')
       : config.selected === 2
-        ? 'Apple Intelligence antwortet lokal auf diesem Mac. Browser-Werkzeuge können angeforderte Onlinedienste nutzen.'
-        : 'Antworten können Fehler enthalten. Beim Modellwechsel wird der Chatverlauf an den gewählten Anbieter gesendet.';
+        ? l10n(
+            'Apple Intelligence antwortet lokal auf diesem Mac. Browser-Werkzeuge können angeforderte Onlinedienste nutzen.',
+          )
+        : l10n(
+            'Antworten können Fehler enthalten. Beim Modellwechsel wird der Chatverlauf an den gewählten Anbieter gesendet.',
+          );
   }
   function messages(reset = false) {
     if (!mounted) return;
@@ -129,14 +136,14 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
     const follow = reset || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 90;
     const items = c?.messages || [];
     q('#chatWelcome').hidden = items.length > 0;
-    q('#chatTitle').textContent = c?.title || 'Neuer Chat';
+    q('#chatTitle').textContent = c?.title || l10n('Neuer Chat');
     if (reset || list.children.length > items.length) list.innerHTML = '';
     items.forEach((m, i) => {
       let item = list.children[i];
       if (!item) {
         item = document.createElement('article');
         item.className = 'chat-message ' + m.role;
-        item.innerHTML = `<div class="chat-message-meta"><b>${m.role === 'user' ? 'Du' : m.provider === 'apple' ? 'Sira' : 'Luna'}${m.role === 'assistant' && m.provider === 'apple' ? '<span class="chat-origin">Apple Intelligence · lokal</span>' : ''}</b><button class="chat-icon" data-chat="copy" data-index="${i}" aria-label="Nachricht kopieren">${icons.copy}</button></div><div class="chat-message-text"></div>`;
+        item.innerHTML = l10nMsg`<div class="chat-message-meta"><b>${m.role === 'user' ? l10n('Du') : m.provider === 'apple' ? 'Sira' : 'Luna'}${m.role === 'assistant' && m.provider === 'apple' ? l10n('<span class="chat-origin">Apple Intelligence · lokal</span>') : ''}</b><button class="chat-icon" data-chat="copy" data-index="${i}" aria-label="Nachricht kopieren">${icons.copy}</button></div><div class="chat-message-text"></div>`;
         list.append(item);
       }
       item.hidden = m.role === 'tool';
@@ -150,12 +157,15 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
         activity.textContent = m.tool_calls
           .map((call) => {
             const result = items.find((x) => x.role === 'tool' && x.tool_call_id === call.id);
-            let status = c?.status === 'streaming' ? 'Wird ausgeführt …' : 'Unterbrochen';
+            let status =
+              c?.status === 'streaming' ? l10n('Wird ausgeführt …') : l10n('Unterbrochen');
             if (result) {
               try {
-                status = JSON.parse(result.content).isError ? 'Fehlgeschlagen' : 'Abgeschlossen';
+                status = JSON.parse(result.content).isError
+                  ? l10n('Fehlgeschlagen')
+                  : l10n('Abgeschlossen');
               } catch {
-                status = 'Abgeschlossen';
+                status = l10n('Abgeschlossen');
               }
             }
             return call.function.name + ' · ' + status;
@@ -167,7 +177,9 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
         if (!details) {
           details = document.createElement('details');
           details.className = 'sira-tool-details';
-          details.innerHTML = '<summary>Werkzeugdetails · Anfrage & Antwort</summary><pre></pre>';
+          details.innerHTML = l10n(
+            '<summary>Werkzeugdetails · Anfrage & Antwort</summary><pre></pre>',
+          );
           item.append(details);
         }
         const trace = m.tool_calls
@@ -181,13 +193,15 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
               }
             };
             return (
-              (call.trace?.length ? 'PARAMETERDIALOG\n' + call.trace.join('\n\n') + '\n\n' : '') +
-              'ANFRAGE · ' +
+              (call.trace?.length
+                ? l10n('PARAMETERDIALOG\n') + call.trace.join('\n\n') + '\n\n'
+                : '') +
+              l10n('ANFRAGE · ') +
               call.function.name +
               '\n' +
               pretty(call.function.arguments) +
-              '\n\nANTWORT\n' +
-              (result ? pretty(result.content) : 'Wird ausgeführt …')
+              l10n('\n\nANTWORT\n') +
+              (result ? pretty(result.content) : l10n('Wird ausgeführt …'))
             );
           })
           .join('\n\n');
@@ -204,13 +218,14 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
     renderThemeCards(list, items);
     q('#chatBusy').hidden = c?.status !== 'streaming';
     q('#chatBusy span').textContent =
-      c?.activity || (items.at(-1)?.provider === 'apple' ? 'Sira antwortet …' : 'Luna antwortet …');
+      c?.activity ||
+      (items.at(-1)?.provider === 'apple' ? l10n('Sira antwortet …') : l10n('Luna antwortet …'));
     const error =
       c?.error ||
       (c?.finish === 'length'
-        ? 'Die Antwort hat das aktuelle Ausgabelimit erreicht.'
+        ? l10n('Die Antwort hat das aktuelle Ausgabelimit erreicht.')
         : c?.status === 'stopped'
-          ? 'Antwort gestoppt.'
+          ? l10n('Antwort gestoppt.')
           : '');
     q('#chatContextNotice').textContent = c?.context_notice || '';
     q('#chatContextNotice').hidden = !c?.context_notice;
@@ -263,7 +278,7 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
   function mount() {
     if (mounted) return;
     mounted = true;
-    root.innerHTML = `<div class="chat-shell"><aside id="chatHistory" class="chat-history" aria-label="Letzte Chats"><div class="chat-history-top"><span>Deine Gespräche</span><button class="chat-icon" data-chat="new" aria-label="Neuer Chat">${icons.plus}</button></div><div id="chatHistoryList"></div><button class="chat-config-link" data-chat="settings">Modelle & Einstellungen ↗</button></aside><main class="chat-main"><header class="chat-topbar"><button class="chat-icon" data-chat="toggle" aria-controls="chatHistory" aria-expanded="true">${icons.side}</button><div><span class="chat-brand">Luna Chat</span><small id="chatTitle">Neuer Chat</small></div><button class="chat-icon" data-chat="new" aria-label="Neues Gespräch">${icons.plus}</button></header><div id="chatScroll" class="chat-scroll"><div id="chatWelcome" class="chat-welcome"><span class="chat-spark" aria-hidden="true">✳</span><span class="chat-eyebrow">RAUM FÜR DEINE GEDANKEN</span><h1>Was beschäftigt dich?</h1><p>Eine Frage, eine Idee oder der nächste große Plan.<br>Lass uns zusammen weiterdenken.</p><div class="chat-starters"><button data-chat="starter" data-text="Hilf mir, eine Idee weiterzuentwickeln.">Eine Idee entwickeln <span>↗</span></button><button data-chat="starter" data-text="Erkläre mir ein Thema verständlich.">Etwas verstehen <span>↗</span></button><button data-chat="starter" data-text="Hilf mir, einen Text zu schreiben.">Einen Text schreiben <span>↗</span></button></div></div><div id="chatMessages" class="chat-messages" aria-label="Nachrichten"></div><div id="chatBusy" class="chat-busy" role="status" hidden><i></i><i></i><i></i><span>Luna antwortet …</span></div><p id="chatContextNotice" class="chat-context-notice" role="status" hidden></p><p id="chatError" class="chat-error" role="status" hidden></p></div><footer class="chat-composer-wrap"><form id="chatForm" class="chat-composer"><textarea id="chatPrompt" rows="2" maxlength="100000" aria-label="Nachricht an Luna" placeholder="Schreib Luna eine Nachricht …"></textarea><div class="chat-composer-bottom"><div class="chat-picker">${pickerHTML()}</div><button id="chatSend" type="submit" aria-label="Nachricht senden">${icons.send}</button><button id="chatStop" type="button" data-chat="stop" aria-label="Antwort stoppen" hidden>${icons.stop}</button></div></form><p id="chatNotice"></p></footer></main></div>`;
+    root.innerHTML = l10nMsg`<div class="chat-shell"><aside id="chatHistory" class="chat-history" aria-label="Letzte Chats"><div class="chat-history-top"><span>Deine Gespräche</span><button class="chat-icon" data-chat="new" aria-label="Neuer Chat">${icons.plus}</button></div><div id="chatHistoryList"></div><button class="chat-config-link" data-chat="settings">Modelle & Einstellungen ↗</button></aside><main class="chat-main"><header class="chat-topbar"><button class="chat-icon" data-chat="toggle" aria-controls="chatHistory" aria-expanded="true">${icons.side}</button><div><span class="chat-brand">Luna Chat</span><small id="chatTitle">Neuer Chat</small></div><button class="chat-icon" data-chat="new" aria-label="Neues Gespräch">${icons.plus}</button></header><div id="chatScroll" class="chat-scroll"><div id="chatWelcome" class="chat-welcome"><span class="chat-spark" aria-hidden="true">✳</span><span class="chat-eyebrow">RAUM FÜR DEINE GEDANKEN</span><h1>Was beschäftigt dich?</h1><p>Eine Frage, eine Idee oder der nächste große Plan.<br>Lass uns zusammen weiterdenken.</p><div class="chat-starters"><button data-chat="starter" data-text="Hilf mir, eine Idee weiterzuentwickeln.">Eine Idee entwickeln <span>↗</span></button><button data-chat="starter" data-text="Erkläre mir ein Thema verständlich.">Etwas verstehen <span>↗</span></button><button data-chat="starter" data-text="Hilf mir, einen Text zu schreiben.">Einen Text schreiben <span>↗</span></button></div></div><div id="chatMessages" class="chat-messages" aria-label="Nachrichten"></div><div id="chatBusy" class="chat-busy" role="status" hidden><i></i><i></i><i></i><span>Luna antwortet …</span></div><p id="chatContextNotice" class="chat-context-notice" role="status" hidden></p><p id="chatError" class="chat-error" role="status" hidden></p></div><footer class="chat-composer-wrap"><form id="chatForm" class="chat-composer"><textarea id="chatPrompt" rows="2" maxlength="100000" aria-label="Nachricht an Luna" placeholder="Schreib Luna eine Nachricht …"></textarea><div class="chat-composer-bottom"><div class="chat-picker">${pickerHTML()}</div><button id="chatSend" type="submit" aria-label="Nachricht senden">${icons.send}</button><button id="chatStop" type="button" data-chat="stop" aria-label="Antwort stoppen" hidden>${icons.stop}</button></div></form><p id="chatNotice"></p></footer></main></div>`;
     q('#chatPrompt').addEventListener('input', () => {
       drafts.set(active, q('#chatPrompt').value);
       composer();
@@ -342,7 +357,7 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
         button.disabled = true;
         try {
           await api.spotifyPlay(button.dataset.uri);
-          toast('Song an Spotify übergeben');
+          toast(l10n('Song an Spotify übergeben'));
         } finally {
           button.disabled = false;
         }
@@ -352,15 +367,15 @@ export function initChat({ openSettings, renderSettings, toast, notifications, o
         await navigator.clipboard.writeText(
           current()?.messages[+button.dataset.index]?.content || '',
         );
-        toast('Nachricht kopiert');
+        toast(l10n('Nachricht kopiert'));
       }
       if (action === 'delete') {
         const id = button.dataset.id;
         await notifications.ask({
           kind: 'history',
-          title: 'Diesen Chat löschen?',
-          message: 'Die Unterhaltung wird von diesem Mac entfernt.',
-          confirmLabel: 'Chat löschen',
+          title: l10n('Diesen Chat löschen?'),
+          message: l10n('Die Unterhaltung wird von diesem Mac entfernt.'),
+          confirmLabel: l10n('Chat löschen'),
           onConfirm: async () => {
             await api.chatDelete(id);
             summaries = summaries.filter((c) => c.id !== id);

@@ -1,5 +1,6 @@
+import { t as l10n } from './i18n.js';
 export function tabDomain(value) {
-  if (typeof value !== 'string' || /\s/.test(value)) throw Error('Ungültige Website.');
+  if (typeof value !== 'string' || /\s/.test(value)) throw Error(l10n('Ungültige Website.'));
   const url = new URL(value.includes('://') ? value : 'https://' + value);
   const host = url.hostname
     .toLowerCase()
@@ -11,7 +12,7 @@ export function tabDomain(value) {
     url.password ||
     (!host.includes('.') && host !== 'localhost')
   )
-    throw Error('Bitte eine vollständige Domain wie youtube.com angeben.');
+    throw Error(l10n('Bitte eine vollständige Domain wie youtube.com angeben.'));
   return host;
 }
 export function tabMatchesDomain(address, domain) {
@@ -27,7 +28,7 @@ export function parseTabCommand(text) {
   const fields = text.trim().split(/\s+/);
   if (fields[0]?.toLowerCase() !== 'tab') return null;
   const invalid = () => {
-    throw Error('Nutze z. B. tab open youtube.com, tab close, tab reload oder tab list.');
+    throw Error(l10n('Nutze z. B. tab open youtube.com, tab close, tab reload oder tab list.'));
   };
   if (/[\r\n]/.test(text) || fields.length < 2) invalid();
   const action = fields[1].toLowerCase();

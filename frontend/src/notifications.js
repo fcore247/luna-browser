@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 const icons = {
   music:
     '<path d="M20 33V12l20-4v21M20 18l20-4"/><ellipse cx="14" cy="34" rx="6" ry="4"/><ellipse cx="34" cy="30" rx="6" ry="4"/><path d="M6 13v8M2 17h8"/>',
@@ -25,7 +26,7 @@ export function createBrowserNotifications({ cover }) {
   toastElement.setAttribute('popover', 'manual');
   toastElement.setAttribute('role', 'status');
   toastElement.setAttribute('aria-live', 'polite');
-  toastElement.innerHTML = `<span class="luna-toast-icon" aria-hidden="true">${icon('info')}</span><span class="luna-toast-message"></span><button type="button" aria-label="Meldung schließen">×</button>`;
+  toastElement.innerHTML = l10nMsg`<span class="luna-toast-icon" aria-hidden="true">${icon('info')}</span><span class="luna-toast-message"></span><button type="button" aria-label="Meldung schließen">×</button>`;
   document.body.append(toastElement);
   const hideToast = () => {
     clearTimeout(timer);
@@ -65,7 +66,7 @@ export function createBrowserNotifications({ cover }) {
     if (options.blur) dialog.dataset.blur = 'true';
     dialog.setAttribute('aria-labelledby', `${id}-title`);
     dialog.setAttribute('aria-describedby', `${id}-description`);
-    dialog.innerHTML = `<div class="luna-notice-aura" aria-hidden="true"><i></i><i></i><i></i></div><section class="luna-notice-content">
+    dialog.innerHTML = l10nMsg`<div class="luna-notice-aura" aria-hidden="true"><i></i><i></i><i></i></div><section class="luna-notice-content">
       <div class="luna-notice-symbol" aria-hidden="true">${icon(options.kind)}</div>
       <span class="luna-notice-eyebrow"></span><h1 id="${id}-title"></h1><p id="${id}-description" class="luna-notice-description"></p>
       <div class="luna-notice-highlight" hidden><span></span><strong></strong></div>
@@ -101,8 +102,8 @@ export function createBrowserNotifications({ cover }) {
     const cancel = q('[data-choice="cancel"]'),
       confirm = q('[data-choice="confirm"]'),
       alternative = q('.luna-notice-alternative');
-    cancel.textContent = options.cancelLabel || 'Abbrechen';
-    confirm.textContent = options.confirmLabel || 'Weiter';
+    cancel.textContent = options.cancelLabel || l10n('Abbrechen');
+    confirm.textContent = options.confirmLabel || l10n('Weiter');
     if (options.alternativeLabel) {
       alternative.hidden = false;
       alternative.textContent = options.alternativeLabel;

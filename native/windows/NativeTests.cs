@@ -6,6 +6,15 @@ using System.Text.Json;
 namespace Luna.Windows;
 static class NativeTests
 {
+    public static void TestKeyPagePolicy()
+    {
+        Assert(Host.TrustedKeyPage(new Uri("https://app.tavily.com/home"), "tavily"), "Tavily dashboard rejected");
+        Assert(Host.TrustedKeyPage(new Uri("https://app.tavily.com/home/?tab=keys"), "tavily"), "Tavily dashboard query rejected");
+        foreach (var url in new[] { "http://app.tavily.com/home", "https://app.tavily.com.evil.invalid/home", "https://evil.invalid/home", "https://app.tavily.com/login", "https://app.tavily.com/home/other" })
+            Assert(!Host.TrustedKeyPage(new Uri(url), "tavily"), "Untrusted Tavily page accepted: " + url);
+        Assert(!Host.TrustedKeyPage(new Uri("https://app.tavily.com/home"), "brave"), "Provider boundary ignored");
+        Assert(Host.TrustedKeyPage(new Uri("https://api-dashboard.search.brave.com/app/keys"), "brave"), "Brave regression");
+    }
     public static void Run()
     {
         var parent = new Form { Width = 1000, Height = 700, Text = "Luna Native Tests" };
@@ -55,6 +64,7 @@ static class NativeTests
         release.SetResult(); await Task.WhenAll(slow,next);
         Assert(order.SequenceEqual(new[] { 0,1,2 }), "Browser operation ordering changed");
         Assert(Host.TrustedKeyPage(new Uri("https://console.groq.com/keys"), "groq"), "Trusted provider rejected");
+        TestKeyPagePolicy();
         Assert(!Host.TrustedKeyPage(new Uri("https://console.groq.com.evil.invalid/keys"), "groq"), "Spoofed provider accepted");
         Assert(!Host.TrustedKeyPage(new Uri("http://console.groq.com/keys"), "groq"), "Insecure provider accepted");
         Assert(Host.Shortcut(0x4c, true, false, false) == "focus-url", "Ctrl+L mapping");

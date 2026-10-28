@@ -12,6 +12,7 @@ void fmwFind(int id, const char *text, int forward);
 void fmwZoom(int id, double factor);
 void fmwSnapshot(int id, int req);
 void fmwFocusUI(void);
+void fmwSetLanguage(const char *messages);
 void fmwSetAppearance(int mode); // 0 System, 1 Hell, 2 Dunkel
 void fmwPlaySound(const void *bytes, int len);
 void fmwSetWriteSound(const void *bytes, int len);

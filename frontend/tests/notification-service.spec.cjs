@@ -9,6 +9,16 @@ test('notification-service', async ({ browser }) => {
   const root = path.join(__dirname, '../src/');
   await p.route('http://luna.test/**', (r) => {
     const path = new URL(r.request().url()).pathname;
+    if (path === '/i18n.js')
+      return r.fulfill({
+        contentType: 'text/javascript',
+        body: fs
+          .readFileSync(root + 'i18n.js', 'utf8')
+          .replace(
+            "import english from './locales/en.json';",
+            `const english = ${fs.readFileSync(root + 'locales/en.json', 'utf8')};`,
+          ),
+      });
     if (path === '/notifications.js' || path === '/style.css' || path.startsWith('/styles/'))
       return r.fulfill({
         contentType: path.endsWith('css') ? 'text/css' : 'text/javascript',

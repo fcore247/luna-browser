@@ -256,7 +256,7 @@ test('global-notifications', async ({ browser }) => {
   await p.waitForFunction(() => window.autoUpdates === false);
   if (await p.locator('#set-look').count()) throw Error('updates chapter not isolated');
   await call('browser_settings', { section: 'search' });
-  await p.getByRole('button', { name: 'Google', exact: true }).click();
+  await p.getByRole('radio', { name: 'Google', exact: true }).click();
   await address.fill('test search with spaces & umlaut ä');
   await address.press('Enter');
   await p.waitForFunction(() =>
@@ -267,7 +267,7 @@ test('global-notifications', async ({ browser }) => {
   )
     throw Error('Google query lost');
   await call('browser_settings', { section: 'search' });
-  await p.getByRole('button', { name: 'Luna Search', exact: true }).click();
+  await p.getByRole('radio', { name: 'Tavily', exact: true }).click();
   if (await p.evaluate(() => window.preferences.googleSearch))
     throw Error('search provider not saved');
   await call('browser_settings', { section: 'data' });

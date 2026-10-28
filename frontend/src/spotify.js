@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 // Spotify-Widget: Chip in der Werkzeugleiste, Banner auf der Startseite und Vollbild-Overlay innerhalb des Fensters.
 // Der Zustand kommt per AppleScript aus Go (api.spotifyState); nichts ist simuliert.
 import * as api from './api.js';
@@ -72,21 +73,21 @@ function statusText() {
   const s = M.st;
   return (
     {
-      off: 'Spotify ist nicht geöffnet',
-      stopped: 'Keine Wiedergabe',
-      playing: 'Läuft gerade',
-      paused: 'Pausiert',
-      denied: 'Zugriff nicht erlaubt',
-      error: 'Fehler',
+      off: l10n('Spotify ist nicht geöffnet'),
+      stopped: l10n('Keine Wiedergabe'),
+      playing: l10n('Läuft gerade'),
+      paused: l10n('Pausiert'),
+      denied: l10n('Zugriff nicht erlaubt'),
+      error: l10n('Fehler'),
     }[s.status] || ''
   );
 }
 const toggleBtn = (n, cls) =>
-  `<button class="${cls}" data-sp-act="toggle" data-sp="toggle" aria-label="Abspielen/Pause">${playing() ? I.pause(n) : I.play(n)}</button>`;
+  l10nMsg`<button class="${cls}" data-sp-act="toggle" data-sp="toggle" aria-label="Abspielen/Pause">${playing() ? I.pause(n) : I.play(n)}</button>`;
 
 function sideHTML() {
   const s = M.st;
-  return `<div class="spChip" data-sp-act="open-ov" role="button" tabindex="0" aria-label="Spotify öffnen" title="Spotify">
+  return l10nMsg`<div class="spChip" data-sp-act="open-ov" role="button" tabindex="0" aria-label="Spotify öffnen" title="Spotify">
     ${art(26, 7, 11)}
     <div class="spChipT"><div class="spT1">${esc(active() ? s.title : 'Spotify')}</div><div class="spT2">${esc(active() ? s.artist : statusText())}</div></div>
     ${active() ? toggleBtn(12, 'spPlay sm') : ''}</div>`;
@@ -94,12 +95,12 @@ function sideHTML() {
 function bannerHTML() {
   const s = M.st;
   const mini = active() ? `${s.title} · ${s.artist}` : statusText();
-  return `<div class="banner ${M.collapsed ? 'collapsed' : ''}"><div class="bh"><button class="bhT" data-sp-act="toggle-banner" aria-expanded="${!M.collapsed}" aria-label="Spotify ein- oder ausklappen"><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg><span>${esc(M.bannerLabel)}</span><em class="bhMini">${esc(mini)}</em></button><span class="bhHint">${M.collapsed ? 'Ausklappen' : 'Einklappen'}</span></div>
+  return l10nMsg`<div class="banner ${M.collapsed ? 'collapsed' : ''}"><div class="bh"><button class="bhT" data-sp-act="toggle-banner" aria-expanded="${!M.collapsed}" aria-label="Spotify ein- oder ausklappen"><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg><span>${esc(M.bannerLabel)}</span><em class="bhMini">${esc(mini)}</em></button><span class="bhHint">${M.collapsed ? l10n('Ausklappen') : l10n('Einklappen')}</span></div>
   <div class="spCollapse"><div class="spCI"><div class="spBan" data-sp-act="open-ov" role="button" tabindex="0" aria-label="Spotify öffnen">${art(96, 14, 28)}
     <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;justify-content:space-between;gap:12px"><div style="min-width:0"><div class="spS">${esc(statusText())}</div><div class="spB1">${esc(active() ? s.title : 'Spotify')}</div><div class="spS" style="font-size:13px;font-weight:600">${esc(active() ? s.artist : s.message || '')}</div></div><span class="spTag">Spotify</span></div>
       <div style="display:flex;align-items:center;gap:10px;font-size:11px;font-weight:700;color:#d9bccd"><span data-sp="pos" style="width:32px"></span><div class="spBar" style="flex:1;height:4px;margin:0"><div data-sp="pct"></div></div><span data-sp="dur" style="width:32px;text-align:right"></span></div></div>
-    ${active() ? `<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="spBtn" data-sp-act="prev" aria-label="Vorheriger Titel">${I.prev(16)}</button>${toggleBtn(18, 'spPlay')}<button class="spBtn" data-sp-act="next" aria-label="Nächster Titel">${I.next(16)}</button></div>` : ''}
+    ${active() ? l10nMsg`<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="spBtn" data-sp-act="prev" aria-label="Vorheriger Titel">${I.prev(16)}</button>${toggleBtn(18, 'spPlay')}<button class="spBtn" data-sp-act="next" aria-label="Nächster Titel">${I.next(16)}</button></div>` : ''}
   </div></div></div></div>`;
 }
 /* ---------- Mini-Player (Popover beim Überfahren des Chips) ---------- */
@@ -121,9 +122,9 @@ function popHTML() {
   if (!active()) {
     const off = s.status === 'off',
       stop = s.status === 'stopped';
-    return `${bg}<div class="pc"><div class="pMsg"><div class="pT">${esc(statusText())}</div><div class="pA">${esc(s.message || (off ? 'Starte Spotify, um hier Titel zu steuern.' : stop ? 'Wähle in Spotify einen Titel aus.' : ''))}</div>${off || stop ? `<button class="pBtn" data-sp-act="${off ? 'open-app' : 'toggle'}">${off ? 'Spotify starten' : 'Wiedergabe starten'}</button>` : ''}</div></div>`;
+    return `${bg}<div class="pc"><div class="pMsg"><div class="pT">${esc(statusText())}</div><div class="pA">${esc(s.message || (off ? l10n('Starte Spotify, um hier Titel zu steuern.') : stop ? l10n('Wähle in Spotify einen Titel aus.') : ''))}</div>${off || stop ? `<button class="pBtn" data-sp-act="${off ? 'open-app' : 'toggle'}">${off ? l10n('Spotify starten') : l10n('Wiedergabe starten')}</button>` : ''}</div></div>`;
   }
-  return `${bg}<div class="pc">
+  return l10nMsg`${bg}<div class="pc">
   <div class="pTop"><button class="pArt" data-sp-act="open-ov" aria-label="Vollbild öffnen" title="Vollbild">${art(66, 12, 22)}<span class="pExp">${EXPAND}</span></button>
     <div class="pInfo"><div class="pT">${esc(s.title)}</div><div class="pA">${esc(s.artist)}</div><div class="pAl">${esc(s.album)}</div></div></div>
   <div class="pSeek"><span data-sp="pos"></span><input type="range" min="0" max="${s.duration}" step="1" value="0" data-sp="seek" aria-label="Position"><span data-sp="dur"></span></div>
@@ -273,7 +274,7 @@ function ovHTML() {
   const s = M.st;
   let body;
   if (active()) {
-    body = `<div class="ovArt">${art(320, 24, 96)}</div>
+    body = l10nMsg`<div class="ovArt">${art(320, 24, 96)}</div>
       <div class="ovInfo"><div class="ovTitle">${esc(s.title)}</div><div class="ovArtist">${esc(s.artist)}</div><div class="ovAlbum">${esc(s.album)}</div></div>
       <div class="ovSeek"><span data-sp="pos"></span><input type="range" min="0" max="${s.duration}" step="1" value="0" data-sp="seek" aria-label="Position"><span data-sp="dur"></span></div>
       <div class="ovCtl"><button class="ovBtn ${s.shuffle ? 'on' : ''}" data-sp-act="shuffle" aria-label="Zufall" aria-pressed="${s.shuffle}">${I.shuffle}</button>
@@ -285,10 +286,10 @@ function ovHTML() {
     const off = s.status === 'off',
       stop = s.status === 'stopped';
     body = `<div class="ovMsg"><div style="font-size:22px;font-weight:800;margin-bottom:8px">${esc(statusText())}</div>
-      <div style="max-width:420px;line-height:1.5;color:#d9bccd">${esc(s.message || (off ? 'Starte Spotify, um Titel hier zu sehen und zu steuern.' : stop ? 'Wähle in Spotify einen Titel aus oder starte die Wiedergabe.' : ''))}</div>
-      ${off || stop ? `<button class="btn pri" style="margin-top:18px" data-sp-act="${off ? 'open-app' : 'toggle'}">${off ? 'Spotify starten' : 'Wiedergabe starten'}</button>` : ''}</div>`;
+      <div style="max-width:420px;line-height:1.5;color:#d9bccd">${esc(s.message || (off ? l10n('Starte Spotify, um Titel hier zu sehen und zu steuern.') : stop ? l10n('Wähle in Spotify einen Titel aus oder starte die Wiedergabe.') : ''))}</div>
+      ${off || stop ? `<button class="btn pri" style="margin-top:18px" data-sp-act="${off ? 'open-app' : 'toggle'}">${off ? l10n('Spotify starten') : l10n('Wiedergabe starten')}</button>` : ''}</div>`;
   }
-  return `<div class="ovBg" style="${s.artwork ? `background-image:url('${esc(s.artwork)}')` : ''}"></div>
+  return l10nMsg`<div class="ovBg" style="${s.artwork ? `background-image:url('${esc(s.artwork)}')` : ''}"></div>
     <div class="ovTop"><span>Spotify</span><button class="ovX" data-sp-act="close-ov" aria-label="Schließen">${I.close}</button></div>
     <div class="ovMain">${body}</div>`;
 }
@@ -474,7 +475,7 @@ document.addEventListener(
           b.classList.toggle('collapsed', M.collapsed);
           b.querySelector('.bhT')?.setAttribute('aria-expanded', String(!M.collapsed));
           const h = b.querySelector('.bhHint');
-          if (h) h.textContent = M.collapsed ? 'Ausklappen' : 'Einklappen';
+          if (h) h.textContent = M.collapsed ? l10n('Ausklappen') : l10n('Einklappen');
         }
         break;
       }

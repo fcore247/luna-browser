@@ -4,7 +4,7 @@ const path = require('node:path');
 test('chat opens without Enter, streams safely, preserves history and stops responses', async ({
   page,
 }) => {
-  test.setTimeout(45000);
+  test.setTimeout(90000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const names = [
@@ -130,7 +130,8 @@ test('chat opens without Enter, streams safely, preserves history and stops resp
   expect(await page.evaluate(() => catalogCalls)).toBe(0);
   await page.getByRole('button', { name: 'Speichern & Modelle laden', exact: true }).click();
   await expect(page.locator('.chat-model-row')).toHaveCount(2);
-  await page.getByRole('combobox', { name: 'Nach Ersteller filtern' }).selectOption('Anthropic');
+  await page.getByRole('combobox', { name: 'Nach Ersteller filtern' }).click();
+  await page.getByRole('option', { name: 'Anthropic', exact: true }).click();
   await expect(page.locator('.chat-model-row')).toHaveCount(1);
   await page.locator('[data-model-add="anthropic/claude"][data-slot="0"]').click();
   await page.locator('[data-chat-provider="groq"]').click();

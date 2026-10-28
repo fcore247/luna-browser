@@ -60,46 +60,46 @@ func buildMenu(app *App) *menu.Menu {
 	m := menu.NewMenu()
 	m.Append(menu.AppMenu())
 
-	file := m.AddSubmenu("Ablage")
-	file.AddText("Neuer Tab", keys.CmdOrCtrl("t"), cmd("new-tab"))
-	file.AddText("Tab schließen", keys.CmdOrCtrl("w"), cmd("close-tab"))
+	file := m.AddSubmenu(app.label("Ablage"))
+	file.AddText(app.label("Neuer Tab"), keys.CmdOrCtrl("t"), cmd("new-tab"))
+	file.AddText(app.label("Tab schließen"), keys.CmdOrCtrl("w"), cmd("close-tab"))
 	file.AddSeparator()
-	file.AddText("Einstellungen …", keys.CmdOrCtrl(","), cmd("settings"))
+	file.AddText(app.label("Einstellungen …"), keys.CmdOrCtrl(","), cmd("settings"))
 	file.AddSeparator()
-	file.AddText("Adresse öffnen", keys.CmdOrCtrl("l"), cmd("focus-url"))
-	file.AddText("Auf der Seite suchen", keys.CmdOrCtrl("f"), cmd("find"))
+	file.AddText(app.label("Adresse öffnen"), keys.CmdOrCtrl("l"), cmd("focus-url"))
+	file.AddText(app.label("Auf der Seite suchen"), keys.CmdOrCtrl("f"), cmd("find"))
 
 	m.Append(menu.EditMenu())
 
-	view := m.AddSubmenu("Darstellung")
-	view.AddText("Seite neu laden", keys.CmdOrCtrl("r"), cmd("reload"))
-	view.AddText("Laden stoppen", keys.CmdOrCtrl("."), cmd("stop"))
+	view := m.AddSubmenu(app.label("Darstellung"))
+	view.AddText(app.label("Seite neu laden"), keys.CmdOrCtrl("r"), cmd("reload"))
+	view.AddText(app.label("Laden stoppen"), keys.CmdOrCtrl("."), cmd("stop"))
 	view.AddSeparator()
-	view.AddText("Größer", keys.CmdOrCtrl("="), cmd("zoom-in"))
-	view.AddText("Kleiner", keys.CmdOrCtrl("-"), cmd("zoom-out"))
-	view.AddText("Tatsächliche Größe", keys.CmdOrCtrl("0"), cmd("zoom-reset"))
-	view.AddText("Dunkelmodus umschalten", keys.Combo("d", keys.CmdOrCtrlKey, keys.ShiftKey), cmd("toggle-theme"))
+	view.AddText(app.label("Größer"), keys.CmdOrCtrl("="), cmd("zoom-in"))
+	view.AddText(app.label("Kleiner"), keys.CmdOrCtrl("-"), cmd("zoom-out"))
+	view.AddText(app.label("Tatsächliche Größe"), keys.CmdOrCtrl("0"), cmd("zoom-reset"))
+	view.AddText(app.label("Dunkelmodus umschalten"), keys.Combo("d", keys.CmdOrCtrlKey, keys.ShiftKey), cmd("toggle-theme"))
 	view.AddSeparator()
-	view.AddText("Seitenleiste ein/aus", keys.CmdOrCtrl("\\"), cmd("toggle-side"))
-	view.AddText("Lesezeichenleiste ein/aus", keys.Combo("b", keys.CmdOrCtrlKey, keys.ShiftKey), cmd("toggle-bar"))
+	view.AddText(app.label("Seitenleiste ein/aus"), keys.CmdOrCtrl("\\"), cmd("toggle-side"))
+	view.AddText(app.label("Lesezeichenleiste ein/aus"), keys.Combo("b", keys.CmdOrCtrlKey, keys.ShiftKey), cmd("toggle-bar"))
 
-	hist := m.AddSubmenu("Verlauf")
-	hist.AddText("Zurück", keys.CmdOrCtrl("["), cmd("back"))
-	hist.AddText("Vorwärts", keys.CmdOrCtrl("]"), cmd("forward"))
+	hist := m.AddSubmenu(app.label("Verlauf"))
+	hist.AddText(app.label("Zurück"), keys.CmdOrCtrl("["), cmd("back"))
+	hist.AddText(app.label("Vorwärts"), keys.CmdOrCtrl("]"), cmd("forward"))
 	hist.AddSeparator()
-	hist.AddText("Verlauf anzeigen", keys.CmdOrCtrl("y"), cmd("show-history"))
-	hist.AddText("Downloads anzeigen", keys.Combo("l", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("show-downloads"))
+	hist.AddText(app.label("Verlauf anzeigen"), keys.CmdOrCtrl("y"), cmd("show-history"))
+	hist.AddText(app.label("Downloads anzeigen"), keys.Combo("l", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("show-downloads"))
 
-	view.AddText("Screenshot der Seite kopieren", keys.Combo("s", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("screenshot"))
-	view.AddText("Notizzettel ein/aus", keys.Combo("n", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("toggle-notes"))
+	view.AddText(app.label("Screenshot der Seite kopieren"), keys.Combo("s", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("screenshot"))
+	view.AddText(app.label("Notizzettel ein/aus"), keys.Combo("n", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("toggle-notes"))
 
-	bm := m.AddSubmenu("Lesezeichen")
-	bm.AddText("Lesezeichen hinzufügen", keys.CmdOrCtrl("d"), cmd("bookmark"))
-	bm.AddText("Lesezeichen anzeigen", keys.Combo("b", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("show-bookmarks"))
+	bm := m.AddSubmenu(app.label("Lesezeichen"))
+	bm.AddText(app.label("Lesezeichen hinzufügen"), keys.CmdOrCtrl("d"), cmd("bookmark"))
+	bm.AddText(app.label("Lesezeichen anzeigen"), keys.Combo("b", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("show-bookmarks"))
 
-	win := m.AddSubmenu("Fenster")
-	win.AddText("Nächster Tab", keys.Combo("\uf703", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("next-tab"))
-	win.AddText("Vorheriger Tab", keys.Combo("\uf702", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("prev-tab"))
+	win := m.AddSubmenu(app.label("Fenster"))
+	win.AddText(app.label("Nächster Tab"), keys.Combo("\uf703", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("next-tab"))
+	win.AddText(app.label("Vorheriger Tab"), keys.Combo("\uf702", keys.CmdOrCtrlKey, keys.OptionOrAltKey), cmd("prev-tab"))
 	win.AddSeparator()
 	for i := 1; i <= 9; i++ {
 		win.AddText(fmt.Sprintf("Tab %d", i), keys.CmdOrCtrl(fmt.Sprint(i)), cmd(fmt.Sprintf("tab-%d", i)))
@@ -135,9 +135,11 @@ func main() {
 	app := NewApp()
 	width, height := platformWindowSize()
 	err := wails.Run(&options.App{
-		Title:            platformTitle(),
-		Frameless:        runtime.GOOS == "windows",
-		StartHidden:      runtime.GOOS == "windows",
+		Title:     platformTitle(),
+		Frameless: runtime.GOOS == "windows",
+		// WebView2 must have a visible parent before Windows can focus its
+		// controller. Starting hidden races the first native focus request.
+		StartHidden:      false,
 		Width:            width,
 		Height:           height,
 		MinWidth:         min(760, width),

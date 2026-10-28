@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { backgroundMenuHTML, wireBackgroundMenu } from './background-menu.js';
 // Befehls-Seite („commands“) und Theme-Leiste („theme“) für die Adressleiste.
 // Beide erscheinen sofort beim Tippen, ohne Enter, und übernehmen die Farben des gewählten Themes über CSS-Variablen.
@@ -60,7 +61,7 @@ export function createCommandUI({
     ).join('');
   }
   function cardHTML(c, i) {
-    return `<article class="cmd-card ${commandOn(c.id) ? 'on' : 'off'}" style="--i:${i}" data-id="${c.id}" data-demo="${esc(c.demo)}" data-i="${i}">
+    return l10nMsg`<article class="cmd-card ${commandOn(c.id) ? 'on' : 'off'}" style="--i:${i}" data-id="${c.id}" data-demo="${esc(c.demo)}" data-i="${i}">
       <div class="cmd-card-top"><div class="cmd-word">${esc(c.word)}</div>${commandSwitchHTML(c)}</div>
       <h2>${esc(c.title)}</h2>
       <p>${esc(c.text)}</p>
@@ -86,8 +87,8 @@ export function createCommandUI({
     pageEl = document.createElement('div');
     pageEl.id = 'cmdPage';
     pageEl.setAttribute('role', 'dialog');
-    pageEl.setAttribute('aria-label', 'Befehle');
-    pageEl.innerHTML = `<div class="cmd-inner"><button type="button" class="cmd-close" data-close aria-label="Schließen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><header><span class="cmd-eyebrow">LUNA · BEFEHLE</span><h1>Tippen statt klicken.</h1><p>Gib einen Befehl oben in die Adressleiste ein. Viele starten sofort, ganz ohne Enter. Klicke eine Leiste an, um die Demo erneut zu sehen.</p></header><div class="cmd-grid">${COMMANDS.map(cardHTML).join('')}</div></div>`;
+    pageEl.setAttribute('aria-label', l10n('Befehle'));
+    pageEl.innerHTML = l10nMsg`<div class="cmd-inner"><button type="button" class="cmd-close" data-close aria-label="Schließen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><header><span class="cmd-eyebrow">LUNA · BEFEHLE</span><h1>Tippen statt klicken.</h1><p>Gib einen Befehl oben in die Adressleiste ein. Viele starten sofort, ganz ohne Enter. Klicke eine Leiste an, um die Demo erneut zu sehen.</p></header><div class="cmd-grid">${COMMANDS.map(cardHTML).join('')}</div></div>`;
     document.body.append(pageEl);
     placePage();
     pageObserver = new ResizeObserver(placePage);
@@ -103,7 +104,7 @@ export function createCommandUI({
         card.classList.toggle('off', !on);
         const sw = card.querySelector('.cmd-switch');
         sw.setAttribute('aria-checked', String(on));
-        sw.querySelector('.cmd-switch-label').textContent = on ? 'An' : 'Aus';
+        sw.querySelector('.cmd-switch-label').textContent = on ? l10n('An') : l10n('Aus');
         card.querySelector('[data-try]').disabled = !on;
         return;
       }
@@ -165,15 +166,15 @@ export function createCommandUI({
   function dropHTML() {
     const mode = getMode();
     const themes = colorThemesHTML().replace(/data-act="color-theme" data-color=/g, 'data-pick=');
-    return `<div class="td-head"><b>Dein Design</b><button type="button" class="td-close" data-close aria-label="Schließen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    return l10nMsg`<div class="td-head"><b>Dein Design</b><button type="button" class="td-close" data-close aria-label="Schließen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="td-tabs" role="tablist" aria-label="Designbereiche">
       <button role="tab" id="td-colors-tab" aria-controls="td-colors" aria-selected="true" data-design-tab="colors">Farben</button>
       <button role="tab" id="td-background-tab" aria-controls="td-background" aria-selected="false" tabindex="-1" data-design-tab="background">Hintergrund</button>
     </div>
     <section id="td-colors" role="tabpanel" aria-labelledby="td-colors-tab">
       <div class="td-modes" role="group" aria-label="Darstellung">${[
-        ['light', 'Hell'],
-        ['dark', 'Dunkel'],
+        ['light', l10n('Hell')],
+        ['dark', l10n('Dunkel')],
         ['auto', 'Auto'],
       ]
         .map(
@@ -221,7 +222,7 @@ export function createCommandUI({
     dropEl = document.createElement('div');
     dropEl.id = 'themeDrop';
     dropEl.setAttribute('role', 'dialog');
-    dropEl.setAttribute('aria-label', 'Farbwelt wählen');
+    dropEl.setAttribute('aria-label', l10n('Farbwelt wählen'));
     dropEl.innerHTML = dropHTML();
     backgroundMenu = wireBackgroundMenu(dropEl.querySelector('#td-background'));
     applyDropBlur();

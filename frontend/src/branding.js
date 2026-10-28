@@ -1,3 +1,4 @@
+import { getLanguage } from './i18n.js';
 // Gemeinsamer handgezeichneter Schriftzug, passend zum Startbildschirm.
 export const lunaWordmark = `<svg class="luna-wordmark" viewBox="-8 0 420 96" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="luna browser">
       <path transform="translate(0 0)" d="M5 65 C17 54 34 26 29 15 C24 4 15 23 14 44 C12 61 12 77 23 72 L32 64"/>
@@ -46,7 +47,10 @@ const settingsPaths = [...'Einstellungen']
     return `<path transform="translate(${x} 0)" d="${path}"/>`;
   })
   .join('');
-export const settingsWordmark = `<svg class="settings-wordmark" viewBox="-8 4 ${settingsX + 18} 108" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${settingsPaths}</svg>`;
+export const settingsWordmark =
+  getLanguage() === 'en'
+    ? '<svg class="settings-wordmark" viewBox="0 0 320 100" aria-hidden="true"><text x="0" y="74" fill="currentColor" font-size="70" font-family="Manrope,system-ui,sans-serif" font-weight="500">Settings</text></svg>'
+    : `<svg class="settings-wordmark" viewBox="-8 4 ${settingsX + 18} 108" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${settingsPaths}</svg>`;
 
 // Reuse the start page's monoline letterforms for the full-page gesture invitation.
 const practiceLetters = {

@@ -1,3 +1,4 @@
+import { msg as l10nMsg } from './i18n.js';
 import { esc } from './ui.js';
 
 // Build cards only from successful tool responses, never from assistant prose.
@@ -62,7 +63,7 @@ export function renderMusicCards(list, messages) {
         const cover = coverURL(track),
           artists = (track.artists || []).map((a) => a.name).join(', ');
         const seconds = Math.floor((Number(track.duration_ms) || 0) / 1000);
-        return `<section class="chat-song" aria-label="Song: ${esc(track.name)}"><div class="chat-song-art">${cover ? `<img src="${esc(cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span aria-hidden="true">♫</span>'}</div><div class="chat-song-info"><div class="chat-song-eyebrow">LUNA MUSIC <span>via Spotify</span></div><b>${esc(track.name)}</b><p>${esc(artists)}</p><small>${esc(track.album?.name || '')}${seconds ? ` · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : ''}</small><span class="chat-song-status">An Spotify übergeben</span></div><button type="button" class="chat-song-play" data-chat="play-song" data-uri="${esc(track.uri)}" aria-label="${esc(track.name)} erneut abspielen" title="Erneut abspielen"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg></button></section>`;
+        return l10nMsg`<section class="chat-song" aria-label="Song: ${esc(track.name)}"><div class="chat-song-art">${cover ? `<img src="${esc(cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span aria-hidden="true">♫</span>'}</div><div class="chat-song-info"><div class="chat-song-eyebrow">LUNA MUSIC <span>via Spotify</span></div><b>${esc(track.name)}</b><p>${esc(artists)}</p><small>${esc(track.album?.name || '')}${seconds ? ` · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : ''}</small><span class="chat-song-status">An Spotify übergeben</span></div><button type="button" class="chat-song-play" data-chat="play-song" data-uri="${esc(track.uri)}" aria-label="${esc(track.name)} erneut abspielen" title="Erneut abspielen"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg></button></section>`;
       })
       .join('');
     box.querySelectorAll('img').forEach((img) =>

@@ -1,17 +1,18 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import iconSVG from './assets/luna-icon.svg?raw';
 import { setDockIcon, setErrorPalette } from './api.js';
 // Farbwelten bleiben unabhängig von Hell/Dunkel ; KI und MCP wählen aus derselben Liste.
 export const COLOR_THEMES = [
   ['luna', 'Luna Rosé', 325, 38],
-  ['lavender', 'Lavendel', 265, 42],
-  ['ocean', 'Ozean', 210, 55],
-  ['mint', 'Minze', 163, 40],
-  ['forest', 'Wald', 140, 30],
+  ['lavender', l10n('Lavendel'), 265, 42],
+  ['ocean', l10n('Ozean'), 210, 55],
+  ['mint', l10n('Minze'), 163, 40],
+  ['forest', l10n('Wald'), 140, 30],
   ['sand', 'Sand', 38, 42],
-  ['peach', 'Pfirsich', 22, 58],
-  ['cherry', 'Kirschblüte', 350, 46],
-  ['arctic', 'Arktis', 188, 43],
-  ['graphite', 'Graphit', 220, 5],
+  ['peach', l10n('Pfirsich'), 22, 58],
+  ['cherry', l10n('Kirschblüte'), 350, 46],
+  ['arctic', l10n('Arktis'), 188, 43],
+  ['graphite', l10n('Graphit'), 220, 5],
 ];
 const KEY = 'luna-color-theme';
 export function colorTheme() {
@@ -127,7 +128,7 @@ function syncErrorPalette() {
 }
 export function colorThemesHTML() {
   const current = colorTheme();
-  return `<div class="palette-heading"><h3>Deine Farbwelt</h3><p class="muted">Zehn Looks für Luna. Jeder passt sich an Hell und Dunkel an.</p></div><div class="color-themes" role="group" aria-label="Farbthemes">${COLOR_THEMES.map(([id, name, h, s]) => `<button class="color-theme" data-act="color-theme" data-color="${id}" aria-pressed="${id === current}" style="--preview-h:${h};--preview-s:${s}%"><span class="palette-preview" aria-hidden="true"><i class="palette-dots">•••</i><i class="palette-window"><i></i><i></i></i><span class="palette-check">✓</span></span><span class="palette-name">${name}</span></button>`).join('')}</div>`;
+  return l10nMsg`<div class="palette-heading"><h3>Deine Farbwelt</h3><p class="muted">Zehn Looks für Luna. Jeder passt sich an Hell und Dunkel an.</p></div><div class="color-themes" role="group" aria-label="Farbthemes">${COLOR_THEMES.map(([id, name, h, s]) => `<button class="color-theme" data-act="color-theme" data-color="${id}" aria-pressed="${id === current}" style="--preview-h:${h};--preview-s:${s}%"><span class="palette-preview" aria-hidden="true"><i class="palette-dots">•••</i><i class="palette-window"><i></i><i></i></i><span class="palette-check">✓</span></span><span class="palette-name">${name}</span></button>`).join('')}</div>`;
 }
 
 let currentIcon = '',
@@ -164,7 +165,7 @@ function updateThemeIcon([id, , h, s]) {
     canvas.width = canvas.height = 1024;
     canvas.getContext('2d').drawImage(img, 0, 0, 1024, 1024);
     setDockIcon(canvas.toDataURL('image/png').split(',')[1]).catch((e) => {
-      console.warn('Dock-Symbol konnte nicht aktualisiert werden', e);
+      console.warn(l10n('Dock-Symbol konnte nicht aktualisiert werden'), e);
       const toast = document.getElementById('toast');
       if (toast) {
         toast.textContent = String(e);
@@ -181,7 +182,7 @@ export async function setCustomIcon(file) {
     !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) ||
     file.size > 20 * 1024 * 1024
   )
-    throw Error('Bitte wähle ein PNG-, JPG- oder WebP-Foto bis 20 MB.');
+    throw Error(l10n('Bitte wähle ein PNG-, JPG- oder WebP-Foto bis 20 MB.'));
   const bitmap = await createImageBitmap(file);
   const small = document.createElement('canvas');
   small.width = small.height = 384;
@@ -205,7 +206,7 @@ export async function setCustomIcon(file) {
   canvas.getContext('2d').drawImage(small, 0, 0, 1024, 1024);
   const url = canvas.toDataURL('image/png');
   if (url.length > 2 * 1024 * 1024)
-    throw Error('Das Foto ist zu detailreich. Bitte wähle ein kleineres Bild.');
+    throw Error(l10n('Das Foto ist zu detailreich. Bitte wähle ein kleineres Bild.'));
   const previous = customIcon();
   localStorage.setItem(CUSTOM_ICON_KEY, url);
   ++iconGeneration; // Cancel any older asynchronous theme-icon render.

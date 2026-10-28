@@ -1,3 +1,4 @@
+import { t as l10n } from './i18n.js';
 import { commandOn } from './command-data.js';
 // Spotify-Suchmodus als Chip im Eingabefeld. Ergebnisse kommen aus der Spotify-API.
 const logo =
@@ -19,7 +20,7 @@ export function bindSpotifySearch(input, navigate, onModeChange = () => {}, play
   chip.className = 'spotify-search-chip';
   chip.hidden = true;
   chip.innerHTML = logo + '<span>Spotify</span><span aria-hidden="true">×</span>';
-  chip.setAttribute('aria-label', 'Spotify-Suchmodus beenden');
+  chip.setAttribute('aria-label', l10n('Spotify-Suchmodus beenden'));
   input.before(chip);
   const setMode = (on) => {
     cancel();
@@ -32,15 +33,15 @@ export function bindSpotifySearch(input, navigate, onModeChange = () => {}, play
       '</span><span aria-hidden="true">×</span>';
     chip.setAttribute(
       'aria-label',
-      on === 'play' ? 'Play-Modus beenden' : 'Spotify-Suchmodus beenden',
+      on === 'play' ? l10n('Play-Modus beenden') : l10n('Spotify-Suchmodus beenden'),
     );
     chip.hidden = !on;
     input.parentElement.classList.toggle('spotify-search-mode', on);
     input.placeholder =
       on === 'play'
-        ? 'Song eingeben · Enter zum Abspielen'
+        ? l10n('Song eingeben · Enter zum Abspielen')
         : on
-          ? 'Auf Spotify suchen …'
+          ? l10n('Auf Spotify suchen …')
           : originalPlaceholder;
   };
   const consumePlay = () => {

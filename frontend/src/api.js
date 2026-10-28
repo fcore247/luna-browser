@@ -1,6 +1,25 @@
 // Einzige Stelle, an der das Frontend das Go-Backend aufruft.
-import * as App from '../wailsjs/go/main/App.js';
+import * as AppBridge from '../wailsjs/go/main/App.js';
+import { translateBackendError } from './i18n.js';
 import { EventsOn } from '../wailsjs/runtime/runtime.js';
+
+// Wails rejects backend calls with a string. Translate only these application
+// errors; successful responses can contain website or user content.
+// Rollup freezes module namespace objects in production. A separate mutable
+// target lets the proxy return wrapped functions without violating invariants.
+const App = new Proxy(
+  { ...AppBridge },
+  {
+    get(target, name) {
+      const method = target[name];
+      if (typeof method !== 'function') return method;
+      return (...args) =>
+        Promise.resolve(method(...args)).catch((error) => {
+          throw translateBackendError(error);
+        });
+    },
+  },
+);
 
 // Tabs (native WKWebViews)
 // Der Entwicklungs-Zugang im normalen Browser (http://localhost:34115) teilt sich die nativen Tab-Ansichten mit dem

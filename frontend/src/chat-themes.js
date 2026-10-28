@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { colorThemesHTML } from './color-themes.js';
 
 // Assistant text may request the picker; user text and unlinked tool output cannot.
@@ -52,8 +53,8 @@ export function renderThemeCards(list, messages) {
     if (existing) return;
     const box = document.createElement('section');
     box.className = 'chat-theme-card';
-    box.setAttribute('aria-label', 'Theme selbst auswählen');
-    box.innerHTML = `<span class="chat-eyebrow">DEINE WAHL</span>${colorThemesHTML()}<p class="chat-theme-status" role="status">Wähle deinen Look – ein Klick übernimmt ihn für den Browser.</p>`;
+    box.setAttribute('aria-label', l10n('Theme selbst auswählen'));
+    box.innerHTML = l10nMsg`<span class="chat-eyebrow">DEINE WAHL</span>${colorThemesHTML()}<p class="chat-theme-status" role="status">Wähle deinen Look – ein Klick übernimmt ihn für den Browser.</p>`;
     box.addEventListener('click', (e) => {
       const button = e.target.closest('[data-act="color-theme"]');
       if (!button) return;
@@ -63,7 +64,7 @@ export function renderThemeCards(list, messages) {
           .querySelectorAll('[data-color]')
           .forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
         box.querySelector('.chat-theme-status').textContent =
-          `${button.querySelector('.palette-name').textContent} ausgewählt.`;
+          l10nMsg`${button.querySelector('.palette-name').textContent} ausgewählt.`;
       });
     });
     article.append(box);
