@@ -14,6 +14,7 @@ import {
 import { createLoadWatchdog, showSlowSetup, slowSetupVisible } from './slow-setup.js';
 import { WINDOWS, shortcut, windowsCommand } from './platform.js';
 import { createOnboarding } from './onboarding.js';
+import { initStarPrompt } from './star-prompt.js';
 let onboarding = null;
 import { createCommandUI } from './command-ui.js';
 import { commandOn, setAllCommands, setCommandOn } from './command-data.js';
@@ -3474,6 +3475,7 @@ wirePersonalSettings({
   toast,
 });
 applyBrowserName();
+initStarPrompt({ host: $('#toolbar'), openURL: (url) => newTab(url) });
 window.addEventListener('luna-personalization', (event) => {
   applyBrowserName();
   syncSharedBackground();

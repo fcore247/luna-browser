@@ -1308,5 +1308,9 @@
   "Tavily antwortete mit HTTP 500.": "Tavily returned HTTP 500.",
   "Tavily antwortete mit HTTP 502.": "Tavily returned HTTP 502.",
   "Tavily antwortete mit HTTP 503.": "Tavily returned HTTP 503.",
-  "Tavily antwortete mit HTTP 504.": "Tavily returned HTTP 504."
+  "Tavily antwortete mit HTTP 504.": "Tavily returned HTTP 504.",
+  "Gefällt dir Luna?": "Enjoying Luna?",
+  "Nicht mehr fragen": "Do not ask again",
+  "Ja? Gib Luna einen GitHub-Stern!": "Yes? Give Luna a GitHub star!",
+  "Luna auf GitHub öffnen und einen Stern dalassen": "Open Luna on GitHub and leave a star"
 }
