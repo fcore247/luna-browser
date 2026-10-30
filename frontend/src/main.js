@@ -2392,7 +2392,7 @@ async function runCmd(c) {
 }
 api.onCmd(runCmd);
 api.onPageMonitor((watch) => {
-  toast(`Seite aktualisiert: ${watch.url}`, 15000);
+  toast(l10n('Seite aktualisiert:') + ' ' + watch.url, 15000);
 });
 
 document.addEventListener('click', async (ev) => {

@@ -81,7 +81,7 @@ func (a *App) startup(ctx context.Context) {
 		b, _ := json.Marshal(w)
 		a.emit("page-monitor-changed", string(b))
 		go func() {
-			if err := pagemonitor.Notify(w); err != nil {
+			if err := pagemonitor.Notify(w, a.label("Seite aktualisiert")); err != nil {
 				println("Systembenachrichtigung:", err.Error())
 			}
 		}()

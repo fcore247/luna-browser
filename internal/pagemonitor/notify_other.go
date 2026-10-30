@@ -2,4 +2,4 @@
 
 package pagemonitor
 
-func Notify(w Watch) error { return nil }
+func Notify(w Watch, title string) error { return nil }

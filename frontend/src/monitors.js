@@ -1,6 +1,7 @@
 import * as api from './api.js';
 import { esc } from './ui.js';
-import { t as l10n, msg as l10nMsg, locale } from './i18n.js';
+import { t as l10n, msg as l10nMsg, locale, translateBackendError } from './i18n.js';
+const monitorError = (error) => String(translateBackendError(error));
 
 let watches = [];
 let loadError = '';
@@ -30,10 +31,10 @@ export function monitorCards(list = watches) {
         (w) => l10nMsg`<article class="monitor-card" data-monitor-card="${esc(w.id)}">
     <div class="monitor-card-heading"><strong>${esc(new URL(w.url).hostname)}</strong><span class="monitor-status" data-status="${!w.enabled ? 'paused' : w.error ? 'waiting' : 'active'}">${esc(monitorStatus(w))}</span></div>
     <p class="monitor-url">${esc(w.url)}</p>
-    <p class="monitor-meta">Letzte Prüfung: ${esc(time(w.last_checked))}<br>Letzte Änderung: ${esc(time(w.last_changed))}</p>
-    ${w.error ? `<p class="monitor-error" role="status">${esc(w.error)}</p>` : ''}
+    <p class="monitor-meta">${l10n('Letzte Prüfung:')} ${esc(time(w.last_checked))}<br>${l10n('Letzte Änderung:')} ${esc(time(w.last_changed))}</p>
+    ${w.error ? `<p class="monitor-error" role="status">${esc(monitorError(w.error))}</p>` : ''}
     <div class="monitor-options"><label>Prüfintervall <span><input type="number" min="1" max="10080" value="${w.interval_minutes}" data-monitor-interval="${esc(w.id)}" aria-label="Prüfintervall in Minuten"> Minuten</span></label>
-    ${w.source === 'browser' ? l10nMsg`<label class="monitor-refresh"><input type="checkbox" data-monitor-refresh="${esc(w.id)}" ${w.auto_refresh !== false ? 'checked' : ''}> Seite vor jeder Prüfung neu laden</label>` : '<span class="muted">Öffentliche Seite · kein offener Tab nötig</span>'}</div>
+    ${w.source === 'browser' ? l10nMsg`<label class="monitor-refresh"><input type="checkbox" data-monitor-refresh="${esc(w.id)}" ${w.auto_refresh !== false ? 'checked' : ''}> Seite vor jeder Prüfung neu laden</label>` : l10n('<span class="muted">Öffentliche Seite · kein offener Tab nötig</span>')}</div>
     <div class="monitor-actions"><button class="btn sm" data-monitor-action="open" data-monitor-id="${esc(w.id)}">Seite öffnen</button><button class="btn sm" data-monitor-action="${w.enabled ? 'pause' : 'resume'}" data-monitor-id="${esc(w.id)}">${w.enabled ? l10n('Pausieren') : l10n('Fortsetzen')}</button><button class="btn sm" data-monitor-action="check" data-monitor-id="${esc(w.id)}" ${w.enabled ? '' : 'disabled'}>Jetzt prüfen</button><button class="btn sm" data-monitor-action="remove" data-monitor-id="${esc(w.id)}">Entfernen</button></div>
     </article>`,
       )
@@ -52,9 +53,9 @@ export function createMonitorUI({ currentTab, openURL, openSettings, toast }) {
     const button = document.getElementById('bMonitor');
     if (!button) return;
     const t = currentTab();
-    button.hidden = t?.mode !== 'web';
     const list = watches.filter((w) => monitorURL(w.url) === monitorURL(t?.webUrl || t?.url));
     const active = list.find((w) => w.enabled) || list[0];
+    button.hidden = t?.mode !== 'web' || !active;
     button.dataset.state = !active
       ? 'none'
       : !active.enabled
@@ -70,7 +71,7 @@ export function createMonitorUI({ currentTab, openURL, openSettings, toast }) {
         : l10n('Seitenüberwachung öffnen'),
     );
     button.title = active
-      ? `${monitorStatus(active)} · ${active.interval_minutes} ${l10n('Minuten')} · ${active.error || l10n('Überwachung verwalten')}`
+      ? `${monitorStatus(active)} · ${active.interval_minutes} ${l10n('Minuten')} · ${active.error ? monitorError(active.error) : l10n('Überwachung verwalten')}`
       : l10n('Seitenüberwachung öffnen');
   }
   function refresh(force = false) {
@@ -85,7 +86,7 @@ export function createMonitorUI({ currentTab, openURL, openSettings, toast }) {
         }
         updateToolbar();
       } catch (error) {
-        loadError = String(error?.message || error);
+        loadError = monitorError(error);
       }
     })().finally(() => {
       busy = null;
@@ -115,7 +116,7 @@ export function createMonitorUI({ currentTab, openURL, openSettings, toast }) {
           : l10n('Überwachung gespeichert'),
       );
     } catch (error) {
-      toast(String(error?.message || error));
+      toast(monitorError(error));
     } finally {
       button.disabled = false;
     }
@@ -140,7 +141,7 @@ export function createMonitorUI({ currentTab, openURL, openSettings, toast }) {
     } catch (error) {
       if (input.dataset.monitorRefresh) input.checked = w.auto_refresh !== false;
       else input.value = w.interval_minutes;
-      toast(String(error?.message || error));
+      toast(monitorError(error));
     }
   });
   api.onPageMonitorsUpdated(refresh);
