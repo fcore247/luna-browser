@@ -75,6 +75,12 @@ export const openFile = (path, reveal) => App.OpenFile(path, reveal);
 // Ereignisse aus Go
 export const onWeb = (cb) => EventsOn('web', (j) => cb(JSON.parse(j))); // Tab-Ereignisse
 export const onCmd = (cb) => EventsOn('cmd', cb); // Menü-Befehle
+export const onPageMonitor = (cb) => EventsOn('page-monitor-changed', (j) => cb(JSON.parse(j)));
+export const pageMonitors = () => window.go.main.App.PageMonitors();
+export const pageMonitorAction = (id, action) => window.go.main.App.PageMonitorAction(id, action);
+export const pageMonitorConfigure = (id, interval, refresh) =>
+  window.go.main.App.PageMonitorConfigure(id, interval, refresh);
+export const onPageMonitorsUpdated = (cb) => EventsOn('page-monitors-updated', cb);
 
 // Spotify
 export const spotifyState = () => App.SpotifyState();

@@ -48,4 +48,31 @@ Die Werkzeuge liefern kompakte Einsatzregeln, Feldbeschreibungen und JSON-Beispi
 
 ## Zugriffsschutz
 
+### Windows-Testpakete und getrennte Profile
+
+Windows-Testpakete mit `scripts/build-windows-test.ps1` bauen. Das Skript setzt
+`browser-mac/internal/buildinfo.TestMode=1` im Programm selbst. Dadurch verwenden
+GUI und `Luna.exe --mcp` dasselbe Testprofil, auch wenn Claude oder ein anderer
+MCP-Client ohne die Umgebungsvariable `LUNA_TEST_MODE` startet. Für den Build
+werden ein vorhandenes Go-Werkzeug, gebaute Frontend-Assets und eine vorhandene
+native Windows-Komponente benötigt; das Skript installiert nichts.
+
+Das normale Profil ist `%APPDATA%/browser-mac`, das Testprofil
+`%APPDATA%/Luna Extension Test/browser-mac`. Die Installation bzw. der EXE-Ordner
+legt kein portables Profil an. Im jeweiligen Profil verwaltet Luna selbst
+`mcp-server.json` mit Freigabe, Zugangsschlüssel und lokalem Endpoint. Die Datei
+unter Windows ist per DPAPI für den Benutzer geschützt; nicht auslesen oder
+manuell ändern. Es gibt weder eine Endpoint-Suchdatei noch einen Pipe-/Lock-
+Mechanismus. Standard ist `127.0.0.1:17845`, bei belegtem Port wird ein freier
+Loopback-Port gespeichert. Der eingeschaltete Server startet beim nächsten
+GUI-Start wieder. Profile werden bei Verbindungsfehlern nicht durchprobiert:
+Eine Freigabe in einem anderen Profil ersetzt keine Freigabe im gewählten Profil.
+
+Ein ausschließlich beim GUI-Start gesetztes `LUNA_TEST_MODE=1` reicht für ein
+eigenständig von Claude gestartetes `--mcp` nicht aus. Der Schalter muss im
+gewählten Profil eingeschaltet sein. Alle Requests bleiben am Loopback und
+benötigen den profilspezifischen Bearer-Schlüssel. stdout der stdio-Anbindung
+enthält nur JSON-RPC; Diagnosen gehen an stderr und nennen gegebenenfalls das
+verwendete Profil, niemals den Schlüssel.
+
 Der Zugangsschlüssel entsteht pro Installation zufällig beim ersten Einschalten (`mcp-server.json`, 0600). Jeder Nutzer hat also seinen eigenen. Das **Einschalten** von MCP in den Einstellungen verlangt Touch ID oder das Mac-Passwort (`LocalAuthentication`). Ausschalten braucht keine Bestätigung. Ein echter WebAuthn-Passkey ist in einer ad-hoc signierten App nicht möglich.

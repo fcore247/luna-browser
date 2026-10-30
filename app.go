@@ -14,6 +14,7 @@ import (
 	"browser-mac/internal/chat"
 	"browser-mac/internal/extensions"
 	"browser-mac/internal/musicqueue"
+	"browser-mac/internal/pagemonitor"
 	"browser-mac/internal/personalpages"
 	"browser-mac/internal/search"
 	"browser-mac/internal/secret"
@@ -27,17 +28,19 @@ import (
 
 // App bündelt alle Methoden, die das Frontend aufrufen darf (nur über frontend/src/api.js).
 type App struct {
-	personalized *personalpages.Manager
-	extensions   *extensions.Manager
-	chat         *chat.Service
-	queueRouter  musicqueue.Router
-	autoNext     *spotify.AutoNext
-	mcpServer    *browsermcp.Manager
-	mcpBridge    mcpBridge
-	ctx          context.Context
-	stopSonos    context.CancelFunc
-	st           *store.Store
-	out          chan [2]string // Ereignisse ans Frontend
+	pageMonitors     *pagemonitor.Manager
+	stopPageMonitors context.CancelFunc
+	personalized     *personalpages.Manager
+	extensions       *extensions.Manager
+	chat             *chat.Service
+	queueRouter      musicqueue.Router
+	autoNext         *spotify.AutoNext
+	mcpServer        *browsermcp.Manager
+	mcpBridge        mcpBridge
+	ctx              context.Context
+	stopSonos        context.CancelFunc
+	st               *store.Store
+	out              chan [2]string // Ereignisse ans Frontend
 
 	secrets    *secret.Store
 	search     *search.Client
@@ -74,6 +77,23 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 	web.SetEmitter(func(j string) { a.emit("web", j) })
+	if a.pageMonitors, err = pagemonitor.New(filepath.Join(dir, "page-monitors.json"), func(w pagemonitor.Watch) {
+		b, _ := json.Marshal(w)
+		a.emit("page-monitor-changed", string(b))
+		go func() {
+			if err := pagemonitor.Notify(w); err != nil {
+				println("Systembenachrichtigung:", err.Error())
+			}
+		}()
+	}); err == nil {
+		a.pageMonitors.BrowserRead = a.readMonitoredPage
+		a.pageMonitors.Updated = func() { a.emit("page-monitors-updated", "") }
+		var monitorContext context.Context
+		monitorContext, a.stopPageMonitors = context.WithCancel(ctx)
+		go a.pageMonitors.Run(monitorContext)
+	} else {
+		println("Seitenüberwachung nicht verfügbar:", err.Error())
+	}
 	// Mausgeste (Kreis): Skript in jede Seite, Ein/Aus aus den Einstellungen (Standard: an)
 	a.gesture = pageGestureScript()
 	// A cold Windows native-host launch must not hold the Wails startup callback.
@@ -313,6 +333,9 @@ func (a *App) SonosConfigure(enabled bool, selected []string) (sonos.Status, err
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.stopPageMonitors != nil {
+		a.stopPageMonitors()
+	}
 	closePlatform()
 	if a.chat != nil {
 		a.chat.Close()

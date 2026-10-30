@@ -86,6 +86,18 @@ export const COMMANDS = [
     hint: l10n('Eine kurze Tipp-Pause löst den Sprung aus.'),
     action: { run: 'youtube' },
   },
+  {
+    id: 'watch',
+    word: 'watch',
+    title: l10n('Seitenüberwachung'),
+    text: l10n(
+      'Überwachungen der aktuellen Seite direkt in der Adressleiste verwalten. Auch monitor oder überwachen öffnet die Leiste.',
+    ),
+    demo: 'watch',
+    result: l10n('Status · Prüfintervall · Neuladen'),
+    hint: l10n('Pausieren, fortsetzen oder alle gespeicherten Aufgaben öffnen.'),
+    action: { run: 'watch' },
+  },
 ];
 
 const KEY = 'luna-commands-off';

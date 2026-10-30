@@ -103,6 +103,52 @@ func (a *App) mcpUI(ctx context.Context, name string, args map[string]any) (any,
 }
 func (a *App) mcpDispatch(ctx context.Context, name string, args map[string]any) (any, error) {
 	switch name {
+	case "browser_page_monitors":
+		if a.pageMonitors == nil {
+			return nil, errors.New("Seitenüberwachung nicht verfügbar")
+		}
+		action, _ := args["action"].(string)
+		switch action {
+		case "list":
+			return a.pageMonitors.List(), nil
+		case "add":
+			url, _ := args["url"].(string)
+			minutes, _ := args["interval_minutes"].(float64)
+			source, _ := args["source"].(string)
+			selector, _ := args["selector"].(string)
+			watch, err := a.pageMonitors.AddSource(url, int(minutes), source, selector)
+			if err != nil {
+				return nil, err
+			}
+			if refresh, ok := args["auto_refresh"].(bool); ok {
+				if _, err = a.pageMonitors.Edit(watch.ID, watch.Interval, refresh); err != nil {
+					return nil, err
+				}
+				watch.AutoRefresh = &refresh
+			}
+			return watch, nil
+		case "update":
+			id, _ := args["id"].(string)
+			for _, watch := range a.pageMonitors.List() {
+				if watch.ID == id {
+					minutes := watch.Interval
+					if value, ok := args["interval_minutes"].(float64); ok {
+						minutes = int(value)
+					}
+					refresh := watch.RefreshEnabled()
+					if value, ok := args["auto_refresh"].(bool); ok {
+						refresh = value
+					}
+					return a.pageMonitors.Edit(id, minutes, refresh)
+				}
+			}
+			return nil, errors.New("Überwachung nicht gefunden")
+		case "pause", "resume", "remove", "check":
+			id, _ := args["id"].(string)
+			return a.pageMonitors.Update(id, action)
+		default:
+			return nil, errors.New("Ungültige Überwachungsaktion")
+		}
 	case "browser_play_song":
 		song, _ := args["song"].(string)
 		artist, _ := args["artist"].(string)

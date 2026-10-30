@@ -225,7 +225,9 @@ func RunBridge(ctx context.Context, store *secret.Store) error {
 	client := mcp.NewClient(&mcp.Implementation{Name: "luna-local-bridge", Version: "1.0.0"}, nil)
 	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{Transport: authTransport{cfg.Token, &http.Transport{Proxy: nil}}, Timeout: 40 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil)
 	if err != nil {
-		return errors.New("Luna MCP ist nicht erreichbar. Öffne Luna und aktiviere KI & MCP.")
+		// Do not include the transport error: credentials must never escape in
+		// diagnostics. The profile directory is safe and explains mismatches.
+		return fmt.Errorf("Luna MCP ist nicht erreichbar. Öffne dieselbe Luna-Version und aktiviere KI & MCP. Verwendetes Profil: %s", store.Dir)
 	}
 	defer session.Close()
 	server := NewServer(func(ctx context.Context, name string, args map[string]any) (any, error) {

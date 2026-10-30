@@ -6,6 +6,7 @@ import { COLOR_THEMES, colorTheme, colorThemesHTML } from './color-themes.js';
 import { personal } from './personalization.js';
 import { esc } from './ui.js';
 import { COMMANDS, commandOn, commandSwitchHTML, setCommandOn } from './command-data.js';
+import { monitorCommand } from './monitors.js';
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -19,6 +20,7 @@ export function createCommandUI({
   pickMode,
   fill,
   run,
+  monitorHTML = () => '',
 }) {
   let pageEl = null,
     pageObserver = null,
@@ -28,6 +30,15 @@ export function createCommandUI({
     dropClosing = false,
     backgroundMenu = null,
     demoTimers = [];
+  let dropMode = 'theme';
+  window.addEventListener('luna-monitors-changed', () => {
+    if (
+      dropEl &&
+      dropMode === 'monitors' &&
+      !document.activeElement?.matches('[data-monitor-interval], [data-monitor-refresh]')
+    )
+      dropEl.innerHTML = monitorHTML();
+  });
 
   /* ---------- Befehls-Seite ---------- */
   function stopDemos() {
@@ -213,8 +224,10 @@ export function createCommandUI({
   window.addEventListener('luna-personalization', (event) => {
     applyDropBlur();
   });
-  function openDrop() {
-    if (dropEl && !dropClosing) return;
+  function openDrop(mode = 'theme') {
+    if (dropEl && !dropClosing && dropMode === mode) return;
+    if (dropEl) closeDrop(true);
+    dropMode = mode;
     closePage();
     backgroundMenu?.dispose();
     dropEl?.remove();
@@ -222,9 +235,14 @@ export function createCommandUI({
     dropEl = document.createElement('div');
     dropEl.id = 'themeDrop';
     dropEl.setAttribute('role', 'dialog');
-    dropEl.setAttribute('aria-label', l10n('Farbwelt wählen'));
-    dropEl.innerHTML = dropHTML();
-    backgroundMenu = wireBackgroundMenu(dropEl.querySelector('#td-background'));
+    dropEl.setAttribute(
+      'aria-label',
+      l10n(mode === 'monitors' ? 'Seitenüberwachung' : 'Farbwelt wählen'),
+    );
+    dropEl.classList.toggle('monitor-drop', mode === 'monitors');
+    dropEl.innerHTML = mode === 'monitors' ? monitorHTML() : dropHTML();
+    backgroundMenu =
+      mode === 'monitors' ? null : wireBackgroundMenu(dropEl.querySelector('#td-background'));
     applyDropBlur();
     dropEl.addEventListener('keydown', (event) => {
       const tab = event.target.closest('[data-design-tab]');
@@ -303,7 +321,7 @@ export function createCommandUI({
     window.addEventListener('resize', placeDrop);
   }
   function closeDrop(immediate = false) {
-    if (!dropEl || dropClosing) return;
+    if (!dropEl || (dropClosing && !immediate)) return;
     const el = dropEl;
     backgroundMenu?.dispose();
     backgroundMenu = null;
@@ -313,7 +331,8 @@ export function createCommandUI({
     window.removeEventListener('resize', placeDrop);
     const done = () => {
       el.remove();
-      if (dropEl === el) dropEl = null;
+      if (dropEl !== el) return;
+      dropEl = null;
       dropClosing = false;
       urlbox.classList.remove('drop-open');
       cover(false);
@@ -330,7 +349,8 @@ export function createCommandUI({
   // Beides gilt nur solange das Wort in der Adressleiste steht: tippt man weiter oder etwas anderes, schließt es sich.
   input.addEventListener('input', () => {
     const word = input.value.trim().toLowerCase();
-    if (dropEl && !/^themes?$/.test(word)) closeDrop();
+    if (dropEl && !(dropMode === 'monitors' ? monitorCommand(word) : /^themes?$/.test(word)))
+      closeDrop();
     if (pageEl && !/^(?:commands?|befehle)$/.test(word)) closePage();
   });
   // Jede Bedienung außerhalb (Spotify-Chip, Tabs, Menü, Seitenleiste …) schließt die Befehlsseite zuerst und läuft dann normal weiter.

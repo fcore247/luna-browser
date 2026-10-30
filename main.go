@@ -149,7 +149,7 @@ func main() {
 		OnStartup:        app.startup,
 		OnDomReady: func(ctx context.Context) {
 			platformWindowReady(ctx)
-			if os.Getenv("LUNA_TEST_MODE") != "1" {
+			if !testProfileEnabled() {
 				web.StartUpdates()
 			}
 		},

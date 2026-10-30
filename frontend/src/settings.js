@@ -13,6 +13,7 @@ import { colorThemesHTML } from './color-themes.js';
 import { commandSettingsHTML } from './command-data.js';
 import { settingsWordmark } from './branding.js';
 import { mcpSettingsHTML } from './mcp-view.js';
+import { monitorSettingsHTML } from './monitors.js';
 import { sonosSettingsHTML, updateSonosSettings } from './sonos-view.js';
 import { spotifySettingsHTML } from './spotify-view.js';
 import { allPanels, panelGroups, isPanelHidden } from './sidepanel.js';
@@ -28,6 +29,13 @@ export function createSettings({
   onSearchKeyChanged,
 }) {
   let personalPagesList = [];
+  window.addEventListener('luna-monitors-changed', () => {
+    if (
+      settingsSection === 'monitors' &&
+      !document.activeElement?.matches('[data-monitor-interval], [data-monitor-refresh]')
+    )
+      renderSettingsView();
+  });
   let vaultInfo = { status: {}, entries: [] };
   const loadVault = () =>
     Promise.all([api.vaultStatus(), api.vaultAll()])
@@ -174,11 +182,14 @@ export function createSettings({
     ['mcp', l10n('KI & MCP')],
     ['extensions', l10n('Erweiterungen')],
     ['personalized', l10n('Personalisierte Seiten')],
+    ['monitors', l10n('Seitenüberwachung')],
     ['passwords', l10n('Passwörter')],
     ['updates', 'Updates'],
     ['data', l10n('Daten')],
   ];
   const SET_ICONS = {
+    monitors:
+      '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12"/><circle cx="12" cy="12" r="3"/>',
     personalized: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M9 9v11"/>',
     passwords: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3M14 9l2 2"/>',
     extensions:
@@ -252,6 +263,7 @@ export function createSettings({
         <div class="swrow"><div><b>Zuletzt geöffnete Seiten merken</b><span>${S.restore ? l10n('Beim nächsten Start öffnen sich die Tabs von zuletzt.') : l10n('Aus: Der Browser startet immer mit der Startseite.')}</span></div>
           <button class="switch ${S.restore ? 'on' : ''}" role="switch" aria-checked="${S.restore}" aria-label="Zuletzt geöffnete Seiten merken" data-act="pref-restore"><i></i></button></div>
       </section>
+      ${monitorSettingsHTML()}
       ${gesturesHTML(S.gesture)}
       ${commandSettingsHTML()}
       <section id="set-search" class="sp-card"><h2>${copy('Deine Suche', 'Your search')}</h2>

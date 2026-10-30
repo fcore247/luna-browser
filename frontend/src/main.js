@@ -17,6 +17,8 @@ import { createOnboarding } from './onboarding.js';
 import { initStarPrompt } from './star-prompt.js';
 let onboarding = null;
 import { createCommandUI } from './command-ui.js';
+import { createMonitorUI, monitorCommand, monitorURL } from './monitors.js';
+let monitorUI = null;
 import { commandOn, setAllCommands, setCommandOn } from './command-data.js';
 import { parseTabCommand, tabDomain, tabMatchesDomain } from './tab-command.js';
 import { initChat, refreshChatStatus } from './chat.js';
@@ -271,6 +273,11 @@ function adoptPopup(id) {
 }
 /* ---------- Navigation: Startseite · Suche · Web ---------- */
 function visit(t, input, options = {}) {
+  if (monitorCommand(input) && commandOn('watch')) {
+    closeSugg();
+    cmdUI.openDrop('monitors');
+    return;
+  }
   if (/^(?:commands?|befehle)$/i.test(String(input).trim())) {
     closeSugg();
     $('#url').blur();
@@ -774,6 +781,7 @@ function renderToolbar() {
   personalizedPages?.update(t);
   if (!t) return;
   vaultUI?.update(t);
+  monitorUI?.updateToolbar();
   const lunaView = $('#bLunaView');
   // One switch for the whole domain: off hides every Luna view of it, on brings all of them back.
   const lunaOn = !!personalizedPages?.isOn(t);
@@ -1280,6 +1288,7 @@ function openMenu() {
     [l10n('Verkleinern'), shortcut('⌘−'), 'zoom-out'],
     [l10n('Tatsächliche Größe (') + z + ' %)', shortcut('⌘0'), 'zoom-reset'],
     '-',
+    [l10n('Seitenüberwachung'), 'watch', 'monitors'],
     [l10n('Einstellungen …'), shortcut('⌘,'), 'settings'],
     [isDark() ? l10n('Heller Modus') : l10n('Dunkelmodus'), shortcut('⇧⌘D'), 'toggle-theme'],
     '-',
@@ -1338,13 +1347,15 @@ cmdUI = createCommandUI({
     renderTabs();
     if (cur()?.mode === 'settings') renderSettingsView();
   },
+  monitorHTML: () => monitorUI?.quickHTML() || '',
   fill: (text) => {
     url.focus();
     url.value = text;
     url.dispatchEvent(new Event('input', { bubbles: true }));
   },
   run: (name) => {
-    if (name === 'chat') visit(cur(), 'chat:');
+    if (name === 'watch') cmdUI.openDrop('monitors');
+    else if (name === 'chat') visit(cur(), 'chat:');
     else if (name === 'einstellungen') askSettings(cur(), 'einstellungen');
     else visit(cur(), QUICK_SITES[name]);
   },
@@ -1457,6 +1468,11 @@ function armQuickSite(input, ev) {
   clearTimeout(quickT);
   if (ev && ev.inputType && !ev.inputType.startsWith('insert')) return;
   const key = input.value.trim().toLowerCase();
+  if (monitorCommand(key) && commandOn('watch') && !ev?.isComposing) {
+    closeSugg();
+    cmdUI.openDrop('monitors');
+    return;
+  }
   if (key === 'chat' && commandOn('chat') && !ev?.isComposing) {
     closeSugg();
     input.blur();
@@ -2026,6 +2042,19 @@ const {
   refreshSonos,
   refreshSpotifyAccount,
 } = settings;
+monitorUI = createMonitorUI({
+  currentTab: cur,
+  renderToolbar,
+  openURL: (url) => {
+    cmdUI.closeAll();
+    newTab(url);
+  },
+  openSettings: () => {
+    cmdUI.closeAll();
+    openSettingsAt('monitors');
+  },
+  toast,
+});
 extensionMenu = createExtensionsMenu({
   cover,
   currentTab: cur,
@@ -2237,6 +2266,11 @@ async function toggleBookmark() {
   renderSide();
 }
 async function runCmd(c) {
+  if (c === 'monitors') {
+    cmdUI.closeAll();
+    openSettingsAt('monitors');
+    return;
+  }
   if (onboarding?.active) return;
   const t = cur();
   switch (c) {
@@ -2357,6 +2391,9 @@ async function runCmd(c) {
   }
 }
 api.onCmd(runCmd);
+api.onPageMonitor((watch) => {
+  toast(`Seite aktualisiert: ${watch.url}`, 15000);
+});
 
 document.addEventListener('click', async (ev) => {
   const a = ev.target.closest('[data-act]');
@@ -2364,6 +2401,10 @@ document.addEventListener('click', async (ev) => {
   const t = cur(),
     d = a.dataset;
   switch (d.act) {
+    case 'monitor-quick':
+      closeSugg();
+      cmdUI.openDrop('monitors');
+      break;
     case 'tab':
       activate(+d.id);
       break;
@@ -3394,6 +3435,58 @@ async function runMCPCommand(name, a) {
 }
 let mcpCommandQueue = Promise.resolve();
 api.onMCP((command) => {
+  if (command.name === 'monitor_refresh') {
+    (async () => {
+      try {
+        if (!(await api.mcpCommandActive(command.id))) return;
+        const watches = (await api.pageMonitors()) || [];
+        if (!watches.some((w) => w.id === command.args?.watch_id && w.enabled))
+          throw Error('Überwachung wurde pausiert oder entfernt');
+        const t = tabById(command.args?.tab_id);
+        if (
+          !t ||
+          t.mode !== 'web' ||
+          t.loading ||
+          t.error ||
+          monitorURL(t.webUrl || t.url) !== monitorURL(command.args?.url)
+        )
+          throw Error('Warte auf geöffnete Zielseite');
+        await api.reload(t.id);
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        const end = Date.now() + 18000;
+        while (t.loading && Date.now() < end)
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        if (t.loading || t.error) throw Error('Seite konnte nicht neu geladen werden');
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+        if (!(await api.mcpCommandActive(command.id))) return;
+        await api.mcpReply(command.id, { tab_id: t.id }, '');
+      } catch (error) {
+        await api.mcpReply(command.id, null, String(error?.message || error));
+      }
+    })();
+    return;
+  }
+  if (command.name === 'monitor_target') {
+    const normalize = (raw) => {
+      try {
+        const u = new URL(raw);
+        u.hash = '';
+        return u.href;
+      } catch {
+        return '';
+      }
+    };
+    const target = S.tabs.find(
+      (t) =>
+        t.native &&
+        t.mode === 'web' &&
+        !t.loading &&
+        !t.error &&
+        normalize(t.webUrl || t.url) === normalize(command.args?.url),
+    );
+    api.mcpReply(command.id, target ? { tab_id: target.id } : {}, '');
+    return;
+  }
   mcpCommandQueue = mcpCommandQueue
     .catch(() => {})
     .then(async () => {

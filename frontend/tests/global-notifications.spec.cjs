@@ -14,6 +14,7 @@ test('global-notifications', async ({ browser }) => {
   const src = fs.readFileSync(path.join(__dirname, '../src/api.js'), 'utf8');
   const names = [...src.matchAll(/export const (\w+)/g)].map((x) => x[1]);
   const mocks = {
+    onPageMonitor: '(cb)=>{window.pageMonitorChanged=cb}',
     resetBrowserSettings: 'async()=>{sessionStorage.setItem("reset-called","yes")}',
     updateStatus:
       'async()=>({version:"1.1.1",ready:true,canCheck:true,automatic:window.autoUpdates!==false,message:window.updateChecked?"Du verwendest die neueste Version.":"Bereit",lastCheck:0})',
@@ -84,6 +85,11 @@ test('global-notifications', async ({ browser }) => {
   );
   await p.goto('http://127.0.0.1:5174');
   await p.locator('#splash.gone').waitFor({ state: 'attached' });
+  const watchedURL = 'https://example.com/?q=<img src=x onerror=alert(1)>';
+  await p.evaluate((url) => window.pageMonitorChanged({ url }), watchedURL);
+  await p.getByText(`Seite aktualisiert: ${watchedURL}`, { exact: true }).waitFor();
+  if (await p.locator('#toast img').count()) throw Error('monitor URL interpreted as HTML');
+  await p.locator('#toast button').click();
   const call = async (name, args = {}) => {
     const r = await p.evaluate(([n, a]) => window.callMCP(n, a), [name, args]);
     if (r.error) throw Error(name + ': ' + r.error);
