@@ -1,3 +1,4 @@
+import { t as l10n } from './i18n.js';
 import { WINDOWS } from './platform.js';
 import * as api from './api.js';
 import { createBrowserNotifications } from './notifications.js';
@@ -19,22 +20,22 @@ export function initAutoNext({
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.textContent = '×';
-  cancel.setAttribute('aria-label', 'Vorgemerkten Song abbrechen');
+  cancel.setAttribute('aria-label', l10n('Vorgemerkten Song abbrechen'));
   pending.append(label, cancel);
   host?.append(pending);
   function update(status) {
     pending.hidden = status.status !== 'waiting';
-    label.textContent = 'Vorgemerkt: ' + (status.title || 'Spotify-Song');
+    label.textContent = l10n('Vorgemerkt: ') + (status.title || l10n('Spotify-Song'));
     pending.title =
-      'Luna startet diesen Song am Titelende oder beim Überspringen: ' +
-      (status.title || 'Spotify-Song');
+      l10n('Luna startet diesen Song am Titelende oder beim Überspringen: ') +
+      (status.title || l10n('Spotify-Song'));
   }
   cancel.onclick = async () => {
     cancel.disabled = true;
     try {
       await api.spotifyCancelNext();
       update({});
-      toast('Vormerkung aufgehoben');
+      toast(l10n('Vormerkung aufgehoben'));
     } catch (e) {
       toast(String(e?.message || e));
     } finally {
@@ -48,7 +49,8 @@ export function initAutoNext({
     } catch {
       update(status);
     }
-    if (status.status === 'started') toast('Luna hat „' + status.title + '“ übernommen');
+    if (status.status === 'started')
+      toast(l10n('Luna hat „') + status.title + l10n('“ übernommen'));
     if (status.status === 'error') toast(status.message, 10000);
   });
   api
@@ -59,37 +61,41 @@ export function initAutoNext({
   async function ask(uri, title, reason) {
     await notifications.ask({
       kind: 'music',
-      eyebrow: 'LUNA MUSIC · EIN KLEINER UMWEG',
-      title: 'Soll Luna übernehmen?',
-      message:
+      eyebrow: l10n('LUNA MUSIC · EIN KLEINER UMWEG'),
+      title: l10n('Soll Luna übernehmen?'),
+      message: l10n(
         'Irgendwie will die Warteschlange heute nicht so richtig.\nSoll Luna deinen Song automatisch starten, sobald der aktuelle zu Ende geht – oder du ihn überspringst?',
-      highlight: { label: 'ALS NÄCHSTES', value: title || 'Dein Spotify-Song' },
-      note: 'Über die Spotify-App auf diesem Mac · Start eine Sekunde vor Schluss\nEine bestehende Luna-Vormerkung wird ersetzt.',
+      ),
+      highlight: { label: l10n('ALS NÄCHSTES'), value: title || l10n('Dein Spotify-Song') },
+      note: l10n(
+        'Über die Spotify-App auf diesem Mac · Start eine Sekunde vor Schluss\nEine bestehende Luna-Vormerkung wird ersetzt.',
+      ),
       remember: {
-        label: 'Luna soll das immer machen',
-        description:
+        label: l10n('Luna soll das immer machen'),
+        description: l10n(
           'Bei Problemen automatisch übernehmen. In den Spotify-Einstellungen wieder ausschaltbar.',
+        ),
       },
       details: String(reason?.message || reason),
-      cancelLabel: 'Nicht jetzt',
-      confirmLabel: 'Ja, Luna übernimmt',
+      cancelLabel: l10n('Nicht jetzt'),
+      confirmLabel: l10n('Ja, Luna übernimmt'),
       onConfirm: async ({ checked }) => {
-        await api.spotifyScheduleNext(uri, title || 'Spotify-Song');
+        await api.spotifyScheduleNext(uri, title || l10n('Spotify-Song'));
         update({ uri, title, status: 'waiting' });
         if (checked) {
           try {
             const prefs = await api.setPref('spotifyAutoNextAlways', true);
             if (!prefs?.spotifyAutoNextAlways)
-              throw new Error('Einstellung konnte nicht gespeichert werden.');
+              throw new Error(l10n('Einstellung konnte nicht gespeichert werden.'));
             onPreferenceChange(true);
           } catch {
             toast(
-              'Song vorgemerkt. Die dauerhafte Auswahl konnte nicht gespeichert werden.',
+              l10n('Song vorgemerkt. Die dauerhafte Auswahl konnte nicht gespeichert werden.'),
               10000,
             );
           }
         }
-        toast('„' + (title || 'Dein Song') + '“ ist für Luna vorgemerkt');
+        toast('„' + (title || l10n('Dein Song')) + l10n('“ ist für Luna vorgemerkt'));
       },
     });
     return false;
@@ -97,7 +103,7 @@ export function initAutoNext({
 
   return async function enqueue(uri, title) {
     if (busy) {
-      toast('Bitte schließe zuerst die laufende Warteschlangen-Anfrage ab.');
+      toast(l10n('Bitte schließe zuerst die laufende Warteschlangen-Anfrage ab.'));
       return false;
     }
     busy = true;
@@ -108,7 +114,7 @@ export function initAutoNext({
         if (WINDOWS) {
           toast(
             String(e?.message || e) +
-              ' Die lokale Luna-Vormerkung ist unter Windows noch nicht verfügbar.',
+              l10n(' Die lokale Luna-Vormerkung ist unter Windows noch nicht verfügbar.'),
             10000,
           );
           return false;
@@ -117,7 +123,7 @@ export function initAutoNext({
         const prefs = await api.prefs().catch(() => ({}));
         if (prefs?.spotifyAutoNextAlways) {
           try {
-            await api.spotifyScheduleNext(uri, title || 'Spotify-Song');
+            await api.spotifyScheduleNext(uri, title || l10n('Spotify-Song'));
             update({ uri, title, status: 'waiting' });
           } catch (error) {
             toast(String(error?.message || error), 10000);
@@ -126,7 +132,7 @@ export function initAutoNext({
         }
         return await ask(uri, title, e);
       }
-      toast('„' + (title || 'Dein Song') + '“ zur Warteschlange hinzugefügt');
+      toast('„' + (title || l10n('Dein Song')) + l10n('“ zur Warteschlange hinzugefügt'));
       return true;
     } finally {
       busy = false;

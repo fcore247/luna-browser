@@ -1,21 +1,22 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import { esc } from './ui.js';
 
 export const gestureActions = {
-  none: 'Keine Aktion',
-  notes: 'Notizen öffnen / schließen',
-  screenshot: 'Screenshot kopieren',
-  music: 'Luna Music öffnen',
-  settings: 'Einstellungen öffnen',
-  new_tab: 'Neuer Tab',
-  close_tab: 'Aktuellen Tab schließen',
-  back: 'Zurück',
-  forward: 'Vorwärts',
-  reload: 'Seite neu laden',
-  bookmarks: 'Lesezeichen öffnen',
-  history: 'Verlauf öffnen',
-  downloads: 'Downloads öffnen',
-  open_url: 'Website öffnen',
+  none: l10n('Keine Aktion'),
+  notes: l10n('Notizen öffnen / schließen'),
+  screenshot: l10n('Screenshot kopieren'),
+  music: l10n('Luna Music öffnen'),
+  settings: l10n('Einstellungen öffnen'),
+  new_tab: l10n('Neuer Tab'),
+  close_tab: l10n('Aktuellen Tab schließen'),
+  back: l10n('Zurück'),
+  forward: l10n('Vorwärts'),
+  reload: l10n('Seite neu laden'),
+  bookmarks: l10n('Lesezeichen öffnen'),
+  history: l10n('Verlauf öffnen'),
+  downloads: l10n('Downloads öffnen'),
+  open_url: l10n('Website öffnen'),
 };
 let bindings = { O: { action: 'notes' }, S: { action: 'screenshot' } };
 export function gestureState() {
@@ -26,9 +27,9 @@ export async function loadGestures() {
   if (saved) bindings = saved;
 }
 export function gesturesHTML(enabled = true) {
-  return `<section id="set-gestures" class="sp-card"><h2>Buchstaben-Gesten</h2>
+  return l10nMsg`<section id="set-gestures" class="sp-card"><h2>Buchstaben-Gesten</h2>
   <p class="muted">Linke Maustaste halten, einen großen Druckbuchstaben in einem Zug zeichnen und loslassen. Beginne am Punkt und folge der Vorlage; bei Querstrichen fährst du ein Stück zurück. O funktioniert auch als Kreis. Eingabefelder bleiben ausgenommen.</p>
-  <div class="row"><button class="switch ${enabled ? 'on' : ''}" role="switch" aria-checked="${enabled}" aria-label="Mausgesten aktivieren" data-act="pref-gesture"><i></i></button><span>${enabled ? 'Mausgesten eingeschaltet' : 'Mausgesten ausgeschaltet'}</span><button class="btn" data-gesture-reset>Standardbelegung wiederherstellen</button></div>
+  <div class="row"><button class="switch ${enabled ? 'on' : ''}" role="switch" aria-checked="${enabled}" aria-label="Mausgesten aktivieren" data-act="pref-gesture"><i></i></button><span>${enabled ? l10n('Mausgesten eingeschaltet') : l10n('Mausgesten ausgeschaltet')}</span><button class="btn" data-gesture-reset>Standardbelegung wiederherstellen</button></div>
   <p class="muted">Eine Aktion wird erst beim Loslassen ausgeführt. Unklare Formen lösen nichts aus. Die Belegung wird lokal gespeichert und kann auch per MCP geändert werden.</p>
   <div class="gesture-grid">${[...'CDHIJLOPQSVWZ']
     .map((letter) => {
@@ -37,7 +38,7 @@ export function gesturesHTML(enabled = true) {
       const preview = points
         ? `<polyline pathLength="1" points="${points.map((p) => `${10 + p[0] * 44},${8 + p[1] * 48}`).join(' ')}"/><circle cx="${10 + points[0][0] * 44}" cy="${8 + points[0][1] * 48}" r="3"/>`
         : '<path pathLength="1" d="M52 14 C10 -8 0 32 32 32 C64 32 54 76 12 50"/><circle cx="52" cy="14" r="3"/>';
-      return `<form class="gesture-card" data-gesture-letter="${letter}"><header><b>${letter}</b><svg data-gesture-preview viewBox="0 0 64 64" aria-label="Zeichenvorlage ${letter}">${preview}</svg></header><label>Aktion für ${letter}<select name="action">${Object.entries(
+      return l10nMsg`<form class="gesture-card" data-gesture-letter="${letter}"><header><b>${letter}</b><svg data-gesture-preview viewBox="0 0 64 64" aria-label="Zeichenvorlage ${letter}">${preview}</svg></header><label>Aktion für ${letter}<select name="action">${Object.entries(
         gestureActions,
       )
         .map(
@@ -54,7 +55,7 @@ export function initGestures({ actions, toast, render }) {
   const configure = async ({ action = 'list', letter, binding, value = '' }) => {
     if (action === 'set') bindings = await api.setGestureBinding(letter, binding, value);
     else if (action === 'reset') bindings = await api.resetGestureBindings();
-    else if (action !== 'list') throw Error('Unbekannte Gestenaktion.');
+    else if (action !== 'list') throw Error(l10n('Unbekannte Gestenaktion.'));
     if (action !== 'list') render();
     return gestureState();
   };
@@ -76,7 +77,7 @@ export function initGestures({ actions, toast, render }) {
         binding: form.elements.action.value,
         value: form.elements.url.value,
       });
-      toast('Geste gespeichert');
+      toast(l10n('Geste gespeichert'));
     } catch (err) {
       form.querySelector('[role=status]').textContent = String(err?.message || err);
     } finally {
@@ -87,7 +88,7 @@ export function initGestures({ actions, toast, render }) {
     if (!e.target.closest('[data-gesture-reset]')) return;
     try {
       await configure({ action: 'reset' });
-      toast('O: Notizen · S: Screenshot');
+      toast(l10n('O: Notizen · S: Screenshot'));
     } catch (err) {
       toast(String(err));
     }
@@ -101,7 +102,7 @@ export function initGestures({ actions, toast, render }) {
       try {
         await actions[binding.action]?.(binding.value);
       } catch (err) {
-        toast('Geste fehlgeschlagen: ' + String(err?.message || err));
+        toast(l10n('Geste fehlgeschlagen: ') + String(err?.message || err));
       }
     },
   };

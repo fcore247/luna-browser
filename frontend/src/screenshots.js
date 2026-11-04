@@ -1,3 +1,4 @@
+import { t as l10n } from './i18n.js';
 import * as api from './api.js';
 import { $ } from './ui.js';
 import { playPolaroid } from './polaroid.js';
@@ -20,18 +21,18 @@ export function createScreenshots({ state: S, currentTab: cur, nativeShow, updat
   async function takeShot() {
     if (shotBusy) return;
     shotBusy = true;
-    showShotStatus('Screenshot wird erstellt …');
+    showShotStatus(l10n('Screenshot wird erstellt …'));
     const t = cur(),
       web = !!t && t.mode === 'web' && t.native;
     try {
       const b64 = await api.screenshot(web ? t.id : -1); // kopiert in die Zwischenablage und spielt den Ton (Go)
-      if (!b64) throw new Error('Leere Aufnahme');
-      showShotStatus('✓ Screenshot kopiert', true);
-      toast('Screenshot in Zwischenablage kopiert');
+      if (!b64) throw new Error(l10n('Leere Aufnahme'));
+      showShotStatus(l10n('✓ Screenshot kopiert'), true);
+      toast(l10n('Screenshot in Zwischenablage kopiert'));
       await shotAnimation('data:image/jpeg;base64,' + b64, web);
     } catch (e) {
-      showShotStatus('Screenshot fehlgeschlagen', true);
-      toast('Screenshot nicht möglich: ' + String(e?.message || e));
+      showShotStatus(l10n('Screenshot fehlgeschlagen'), true);
+      toast(l10n('Screenshot nicht möglich: ') + String(e?.message || e));
     } finally {
       shotBusy = false;
     }

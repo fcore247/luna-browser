@@ -1,6 +1,25 @@
 // Einzige Stelle, an der das Frontend das Go-Backend aufruft.
-import * as App from '../wailsjs/go/main/App.js';
+import * as AppBridge from '../wailsjs/go/main/App.js';
+import { translateBackendError } from './i18n.js';
 import { EventsOn } from '../wailsjs/runtime/runtime.js';
+
+// Wails rejects backend calls with a string. Translate only these application
+// errors; successful responses can contain website or user content.
+// Rollup freezes module namespace objects in production. A separate mutable
+// target lets the proxy return wrapped functions without violating invariants.
+const App = new Proxy(
+  { ...AppBridge },
+  {
+    get(target, name) {
+      const method = target[name];
+      if (typeof method !== 'function') return method;
+      return (...args) =>
+        Promise.resolve(method(...args)).catch((error) => {
+          throw translateBackendError(error);
+        });
+    },
+  },
+);
 
 // Tabs (native WKWebViews)
 // Der Entwicklungs-Zugang im normalen Browser (http://localhost:34115) teilt sich die nativen Tab-Ansichten mit dem
@@ -56,6 +75,12 @@ export const openFile = (path, reveal) => App.OpenFile(path, reveal);
 // Ereignisse aus Go
 export const onWeb = (cb) => EventsOn('web', (j) => cb(JSON.parse(j))); // Tab-Ereignisse
 export const onCmd = (cb) => EventsOn('cmd', cb); // Menü-Befehle
+export const onPageMonitor = (cb) => EventsOn('page-monitor-changed', (j) => cb(JSON.parse(j)));
+export const pageMonitors = () => window.go.main.App.PageMonitors();
+export const pageMonitorAction = (id, action) => window.go.main.App.PageMonitorAction(id, action);
+export const pageMonitorConfigure = (id, interval, refresh) =>
+  window.go.main.App.PageMonitorConfigure(id, interval, refresh);
+export const onPageMonitorsUpdated = (cb) => EventsOn('page-monitors-updated', cb);
 
 // Spotify
 export const spotifyState = () => App.SpotifyState();

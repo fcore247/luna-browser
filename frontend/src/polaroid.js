@@ -1,3 +1,4 @@
+import { t as l10n } from './i18n.js';
 import { $ } from './ui.js';
 
 // Wie ein Foto aus einer alten Sofortbildkamera: Blitz, dann springt das Bild als Polaroid aus der Seite in die Ecke,
@@ -40,7 +41,7 @@ export async function playPolaroid(src, page, zIndex) {
   img.alt = '';
   const caption = document.createElement('div');
   caption.className = 'shot-caption';
-  caption.textContent = 'Kopiert ✓';
+  caption.textContent = l10n('Kopiert ✓');
   card.append(img, caption);
   place(card, reduce ? target : page);
   layer.append(card, flash);

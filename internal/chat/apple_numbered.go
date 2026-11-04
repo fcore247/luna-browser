@@ -11,7 +11,7 @@ import (
 )
 
 // Permanent numbers: append new tools, never renumber existing entries.
-var siraToolNames = []string{"browser_state", "browser_tab", "browser_tab_group", "browser_tab_move", "browser_page", "browser_customize", "browser_gestures", "browser_settings", "browser_bookmarks", "browser_notes", "browser_history", "browser_downloads", "browser_search", "browser_play_song", "browser_spotify", "browser_sonos", "browser_screenshot"}
+var siraToolNames = []string{"browser_state", "browser_tab", "browser_tab_group", "browser_tab_move", "browser_page", "browser_customize", "browser_gestures", "browser_settings", "browser_bookmarks", "browser_notes", "browser_history", "browser_downloads", "browser_search", "browser_play_song", "browser_spotify", "browser_sonos", "browser_screenshot", "browser_page_monitors"}
 
 func (c *Client) streamApple(ctx context.Context, messages []Message, tools []map[string]any, delta func(string)) (string, []ToolCall, error) {
 	prompt, shortened, err := applePrompt(messages)

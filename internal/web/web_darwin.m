@@ -9,6 +9,15 @@
 extern void goWebEvent(char *json);
 extern void goSnapshotDone(int req, char *b64);
 
+static NSDictionary *gLanguageMessages;
+static NSString *L(NSString *source) { return gLanguageMessages[source] ?: source; }
+void fmwSetLanguage(const char *messages) {
+ NSData *data = [[NSString stringWithUTF8String:messages] dataUsingEncoding:NSUTF8StringEncoding];
+ id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+ NSDictionary *labels = [parsed isKindOfClass:[NSDictionary class]] ? parsed : @{};
+ dispatch_async(dispatch_get_main_queue(), ^{ gLanguageMessages = labels; });
+}
+
 // Ereignisse laufen asynchron auf dem Main-Thread und mit kopiertem C-String
 // (ein Zeiger aus -UTF8String kann unter ARC sofort ungültig werden).
 static void emit(NSDictionary *d) {
@@ -110,9 +119,9 @@ static WKWebViewConfiguration *sharedConfig(void) {
 static NSString *gErrorPaletteCSS = @"";
 
 static NSString *errorHTML(NSError *e, NSURL *u) {
- NSString *title = @"Diese Seite ist gerade nicht erreichbar.";
- NSString *reason = @"Luna konnte die Seite nicht laden. Die Verbindung wurde unterbrochen oder die Website antwortet gerade nicht.";
- NSString *hint = @"Versuche es in einem Moment noch einmal.";
+ NSString *title = L(@"Diese Seite ist gerade nicht erreichbar.");
+ NSString *reason = L(@"Luna konnte die Seite nicht laden. Die Verbindung wurde unterbrochen oder die Website antwortet gerade nicht.");
+ NSString *hint = L(@"Versuche es in einem Moment noch einmal.");
  if ([e.domain isEqualToString:NSURLErrorDomain]) {
   switch (e.code) {
    case NSURLErrorServerCertificateHasBadDate:
@@ -120,28 +129,28 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
    case NSURLErrorServerCertificateHasUnknownRoot:
    case NSURLErrorServerCertificateNotYetValid:
    case NSURLErrorSecureConnectionFailed:
-    title = @"Luna fühlt sich auf dieser Seite nicht wohl.";
-    reason = @"Luna kann die Identität dieser Website nicht sicher bestätigen. Das Sicherheitszertifikat ist möglicherweise abgelaufen, noch nicht gültig, nicht vertrauenswürdig oder gehört zu einer anderen Adresse. Auch eine gestörte verschlüsselte Verbindung kann die Ursache sein.";
-    hint = @"Deshalb hat Luna die Seite nicht geöffnet. Prüfe die Adresse sowie Datum und Uhrzeit deines Macs. Bei einer neu eingerichteten Website ist das Zertifikat eventuell noch nicht bereit. Versuche es später erneut.";
+    title = L(@"Luna fühlt sich auf dieser Seite nicht wohl.");
+    reason = L(@"Luna kann die Identität dieser Website nicht sicher bestätigen. Das Sicherheitszertifikat ist möglicherweise abgelaufen, noch nicht gültig, nicht vertrauenswürdig oder gehört zu einer anderen Adresse. Auch eine gestörte verschlüsselte Verbindung kann die Ursache sein.");
+    hint = L(@"Deshalb hat Luna die Seite nicht geöffnet. Prüfe die Adresse sowie Datum und Uhrzeit deines Macs. Bei einer neu eingerichteten Website ist das Zertifikat eventuell noch nicht bereit. Versuche es später erneut.");
     break;
    case NSURLErrorClientCertificateRejected:
    case NSURLErrorClientCertificateRequired:
-    title = @"Luna fühlt sich auf dieser Seite nicht wohl.";
-    reason = @"Diese Website verlangt ein persönliches Zugangs-Zertifikat. Es fehlt oder wurde vom Server abgelehnt.";
-    hint = @"Wende dich an den Betreiber der Website, wenn du Zugang benötigst.";
+    title = L(@"Luna fühlt sich auf dieser Seite nicht wohl.");
+    reason = L(@"Diese Website verlangt ein persönliches Zugangs-Zertifikat. Es fehlt oder wurde vom Server abgelehnt.");
+    hint = L(@"Wende dich an den Betreiber der Website, wenn du Zugang benötigst.");
     break;
    case NSURLErrorNotConnectedToInternet:
-    reason = @"Dein Mac scheint gerade nicht mit dem Internet verbunden zu sein.";
-    hint = @"Prüfe dein WLAN oder deine Netzwerkverbindung und versuche es erneut.";
+    reason = L(@"Dein Mac scheint gerade nicht mit dem Internet verbunden zu sein.");
+    hint = L(@"Prüfe dein WLAN oder deine Netzwerkverbindung und versuche es erneut.");
     break;
    case NSURLErrorCannotFindHost:
    case NSURLErrorDNSLookupFailed:
-    reason = @"Die Adresse dieser Website konnte nicht gefunden werden. Sie ist möglicherweise falsch geschrieben oder ihre DNS-Einträge sind noch nicht verfügbar.";
-    hint = @"Prüfe die Schreibweise. Wurde die Domain gerade eingerichtet, versuche es später erneut.";
+    reason = L(@"Die Adresse dieser Website konnte nicht gefunden werden. Sie ist möglicherweise falsch geschrieben oder ihre DNS-Einträge sind noch nicht verfügbar.");
+    hint = L(@"Prüfe die Schreibweise. Wurde die Domain gerade eingerichtet, versuche es später erneut.");
     break;
    case NSURLErrorTimedOut:
-    reason = @"Die Website hat zu lange nicht geantwortet.";
-    hint = @"Der Server ist möglicherweise ausgelastet. Versuche es gleich noch einmal.";
+    reason = L(@"Die Website hat zu lange nicht geantwortet.");
+    hint = L(@"Der Server ist möglicherweise ausgelastet. Versuche es gleich noch einmal.");
     break;
    default: break;
   }
@@ -153,10 +162,10 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
   return [s stringByReplacingOccurrencesOfString:@"\"" withString:@"&quot;"];
  };
  NSString *scheme = u.scheme.lowercaseString;
- NSString *retry = ([scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"]) ? [NSString stringWithFormat:@"<a href=\"%@\">Erneut versuchen</a>", esc(u.absoluteString)] : @"";
- return [NSString stringWithFormat:@"<!doctype html><html lang=de><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\"><title>%@</title><style>"
+ NSString *retry = ([scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"]) ? [NSString stringWithFormat:@"<a href=\"%@\">%@</a>", esc(u.absoluteString), esc(L(@"Erneut versuchen"))] : @"";
+ return [NSString stringWithFormat:@"<!doctype html><html lang=%@><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\"><title>%@</title><style>"
  @":root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:32px;background:#fbf2f7;color:#3a2433;font:16px -apple-system,system-ui,sans-serif}main{width:min(100%%,620px)}.mark{font-size:14px;letter-spacing:3px;font-weight:700;color:#896578;margin-bottom:32px}svg{width:52px;height:52px;margin-bottom:22px;color:#a7778e}h1{font-size:clamp(28px,5vw,42px);line-height:1.15;letter-spacing:-1px;margin:0 0 24px}p{line-height:1.65;color:#6f5264}.host{font-size:13px;overflow-wrap:anywhere}a{display:inline-block;margin-top:16px;padding:13px 21px;border-radius:24px;background:#3a2433;color:#fbeef6;text-decoration:none;font-weight:600}a:focus-visible,summary:focus-visible{outline:3px solid #a7778e;outline-offset:4px}details{margin-top:30px;color:#6f5264;font-size:13px}summary{cursor:pointer}details p{overflow-wrap:anywhere}@media(prefers-color-scheme:dark){body{background:#1c151b;color:#fbeef6}p,details{color:#bfa8b6}a{background:#edcedf;color:#2a1621}}"
- @"</style><style id=luna-error-palette>%@</style><main><div class=mark>LUNA BROWSER</div><svg aria-hidden=true viewBox=\"0 0 48 48\" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d=\"M24 4 7 11v12c0 10 17 21 17 21s17-11 17-21V11Z\"/><path d=\"M24 14v12m0 7h.01\"/></svg><div class=host>%@</div><h1>%@</h1><p>%@</p><p>%@</p>%@<details><summary>Technische Details</summary><p>%@ (%@ · %ld)</p></details></main></html>", esc(title), gErrorPaletteCSS, esc(u.host), esc(title), esc(reason), esc(hint), retry, esc(e.localizedDescription), esc(e.domain), (long)e.code];
+ @"</style><style id=luna-error-palette>%@</style><main><div class=mark>LUNA BROWSER</div><svg aria-hidden=true viewBox=\"0 0 48 48\" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d=\"M24 4 7 11v12c0 10 17 21 17 21s17-11 17-21V11Z\"/><path d=\"M24 14v12m0 7h.01\"/></svg><div class=host>%@</div><h1>%@</h1><p>%@</p><p>%@</p>%@<details><summary>%@</summary><p>%@ (%@ · %ld)</p></details></main></html>", (gLanguageMessages.count ? @"en" : @"de"), esc(title), gErrorPaletteCSS, esc(u.host), esc(title), esc(reason), esc(hint), retry, esc(L(@"Technische Details")), esc(e.localizedDescription), esc(e.domain), (long)e.code];
 }
 
 @interface FMTab : NSObject <WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, WKWebExtensionTab>
@@ -305,18 +314,18 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)webViewDidClose:(WKWebView *)wv { emit(@{@"t": @"close", @"tab": @(_tid)}); }
 
 - (void)webView:(WKWebView *)wv runJavaScriptAlertPanelWithMessage:(NSString *)m initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(void))ch {
-	NSAlert *a = [NSAlert new]; a.messageText = wv.URL.host ?: @"Seite"; a.informativeText = m;
+	NSAlert *a = [NSAlert new]; a.messageText = wv.URL.host ?: L(@"Seite"); a.informativeText = m;
 	[a addButtonWithTitle:@"OK"]; [a runModal]; ch();
 }
 - (void)webView:(WKWebView *)wv runJavaScriptConfirmPanelWithMessage:(NSString *)m initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(BOOL))ch {
-	NSAlert *a = [NSAlert new]; a.messageText = wv.URL.host ?: @"Seite"; a.informativeText = m;
-	[a addButtonWithTitle:@"OK"]; [a addButtonWithTitle:@"Abbrechen"];
+	NSAlert *a = [NSAlert new]; a.messageText = wv.URL.host ?: L(@"Seite"); a.informativeText = m;
+	[a addButtonWithTitle:@"OK"]; [a addButtonWithTitle:L(@"Abbrechen")];
 	ch([a runModal] == NSAlertFirstButtonReturn);
 }
 - (void)webView:(WKWebView *)wv runJavaScriptTextInputPanelWithPrompt:(NSString *)p defaultText:(NSString *)d initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(NSString *))ch {
-	NSAlert *a = [NSAlert new]; a.messageText = wv.URL.host ?: @"Seite"; a.informativeText = p;
+	NSAlert *a = [NSAlert new]; a.messageText = wv.URL.host ?: L(@"Seite"); a.informativeText = p;
 	NSTextField *tf = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 260, 24)]; tf.stringValue = d ?: @""; a.accessoryView = tf;
-	[a addButtonWithTitle:@"OK"]; [a addButtonWithTitle:@"Abbrechen"];
+	[a addButtonWithTitle:@"OK"]; [a addButtonWithTitle:L(@"Abbrechen")];
 	ch([a runModal] == NSAlertFirstButtonReturn ? tf.stringValue : nil);
 }
 - (void)webView:(WKWebView *)wv runOpenPanelWithParameters:(WKOpenPanelParameters *)p initiatedByFrame:(WKFrameInfo *)f completionHandler:(void (^)(NSArray<NSURL *> *))ch {
@@ -668,6 +677,7 @@ static BOOL setupKeyPage(NSURL *url, NSString *provider) {
  NSString *path = url.path;
  if ([path hasSuffix:@"/"]) path = [path substringToIndex:path.length - 1];
  if ([provider isEqualToString:@"brave"]) return [host isEqualToString:@"api-dashboard.search.brave.com"] && [path isEqualToString:@"/app/keys"];
+ if ([provider isEqualToString:@"tavily"]) return [host isEqualToString:@"app.tavily.com"] && [path isEqualToString:@"/home"];
  if ([provider isEqualToString:@"groq"]) return [host isEqualToString:@"console.groq.com"] && [path isEqualToString:@"/keys"];
  if ([provider isEqualToString:@"openrouter"]) return [host isEqualToString:@"openrouter.ai"] && ([path isEqualToString:@"/settings/keys"] || ([path hasPrefix:@"/workspace"] && [path hasSuffix:@"/keys"]));
  if ([provider isEqualToString:@"spotify"]) return [host isEqualToString:@"developer.spotify.com"] && [path hasPrefix:@"/dashboard/"];

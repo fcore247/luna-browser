@@ -556,3 +556,36 @@
     padding: 10px;
   }
 }
+.setup-language {
+  margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid var(--line, #8885);
+  border-radius: 16px;
+}
+.setup-language h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.setup-language label,
+.language-setting label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.setup-language select,
+.language-setting select {
+  padding: 10px 14px;
+  min-width: 180px;
+  border-radius: 10px;
+  border: 1px solid var(--line, #8885);
+  color: var(--ink, inherit);
+  background: var(--card, #fff);
+  font: inherit;
+}
+.setup-language p {
+  font-size: 0.85rem;
+  margin: 10px 0 0;
+}
+.language-setting {
+  margin: 20px 0;
+}

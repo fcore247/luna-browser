@@ -14,6 +14,7 @@ import (
 	"browser-mac/internal/chat"
 	"browser-mac/internal/extensions"
 	"browser-mac/internal/musicqueue"
+	"browser-mac/internal/pagemonitor"
 	"browser-mac/internal/personalpages"
 	"browser-mac/internal/search"
 	"browser-mac/internal/secret"
@@ -27,20 +28,23 @@ import (
 
 // App bündelt alle Methoden, die das Frontend aufrufen darf (nur über frontend/src/api.js).
 type App struct {
-	personalized *personalpages.Manager
-	extensions   *extensions.Manager
-	chat         *chat.Service
-	queueRouter  musicqueue.Router
-	autoNext     *spotify.AutoNext
-	mcpServer    *browsermcp.Manager
-	mcpBridge    mcpBridge
-	ctx          context.Context
-	stopSonos    context.CancelFunc
-	st           *store.Store
-	out          chan [2]string // Ereignisse ans Frontend
+	pageMonitors     *pagemonitor.Manager
+	stopPageMonitors context.CancelFunc
+	personalized     *personalpages.Manager
+	extensions       *extensions.Manager
+	chat             *chat.Service
+	queueRouter      musicqueue.Router
+	autoNext         *spotify.AutoNext
+	mcpServer        *browsermcp.Manager
+	mcpBridge        mcpBridge
+	ctx              context.Context
+	stopSonos        context.CancelFunc
+	st               *store.Store
+	out              chan [2]string // Ereignisse ans Frontend
 
 	secrets    *secret.Store
 	search     *search.Client
+	tavily     *search.TavilyClient
 	spotifyAPI *spotifyapi.Client
 	sonosSync  *sonos.Manager
 	gesture    string // Skript der Mausgeste (wird in jede Seite eingeschleust)
@@ -48,7 +52,8 @@ type App struct {
 }
 
 const (
-	keyFile = "brave-api-key"
+	keyFile       = "brave-api-key"
+	tavilyKeyFile = "tavily-api-key"
 )
 
 func NewApp() *App { return &App{} }
@@ -72,11 +77,29 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 	web.SetEmitter(func(j string) { a.emit("web", j) })
+	if a.pageMonitors, err = pagemonitor.New(filepath.Join(dir, "page-monitors.json"), func(w pagemonitor.Watch) {
+		b, _ := json.Marshal(w)
+		a.emit("page-monitor-changed", string(b))
+		go func() {
+			if err := pagemonitor.Notify(w, a.label("Seite aktualisiert")); err != nil {
+				println("Systembenachrichtigung:", err.Error())
+			}
+		}()
+	}); err == nil {
+		a.pageMonitors.BrowserRead = a.readMonitoredPage
+		a.pageMonitors.Updated = func() { a.emit("page-monitors-updated", "") }
+		var monitorContext context.Context
+		monitorContext, a.stopPageMonitors = context.WithCancel(ctx)
+		go a.pageMonitors.Run(monitorContext)
+	} else {
+		println("Seitenüberwachung nicht verfügbar:", err.Error())
+	}
 	// Mausgeste (Kreis): Skript in jede Seite, Ein/Aus aus den Einstellungen (Standard: an)
 	a.gesture = pageGestureScript()
 	// A cold Windows native-host launch must not hold the Wails startup callback.
 	gestureEnabled := a.st.Prefs()["circleGesture"] || !hasPref(a.st.Prefs(), "circleGesture")
 	go func() {
+		a.applyNativeLanguage()
 		web.SetWriteSound(writeSound)
 		web.ConfigureGesture(a.gesture, gestureEnabled)
 	}()
@@ -96,6 +119,10 @@ func (a *App) startup(ctx context.Context) {
 	a.search = search.NewClient(func() (string, error) {
 		v, _, err := a.secrets.Get(keyFile)
 		return v, err
+	})
+	a.tavily = search.NewTavilyClient(func() (string, error) {
+		value, _, err := a.secrets.Get(tavilyKeyFile)
+		return value, err
 	})
 	a.mcpServer = browsermcp.New(a.secrets, a.mcpDispatch)
 	a.chat.ToolFactory = func(ctx context.Context) (*chat.BrowserTools, error) {
@@ -177,10 +204,25 @@ func (a *App) HistoryClear()                                 { a.st.HistoryClear
 func (a *App) Downloads() []store.Download                   { return a.st.Downloads() }
 func (a *App) DownloadAdd(name, path string)                 { a.st.DownloadAdd(name, path) }
 func (a *App) DownloadsClear()                               { a.st.DownloadsClear() }
-func (a *App) Prefs() map[string]bool                        { return a.st.Prefs() }
-func (a *App) SetPref(key string, v bool) map[string]bool    { return a.st.SetPref(key, v) }
-func (a *App) SessionSave(js string)                         { a.st.SessionSave(js) }
-func (a *App) SessionLoad() string                           { return a.st.SessionLoad() }
+func (a *App) Prefs() map[string]bool {
+	prefs := a.st.Prefs()
+	if _, exists := prefs["tavilySearch"]; !exists {
+		prefs["tavilySearch"] = a.useTavily()
+	}
+	return prefs
+}
+func (a *App) SetPref(key string, v bool) map[string]bool {
+	prefs := a.st.SetPref(key, v)
+	if key == "englishUI" {
+		a.applyNativeLanguage()
+		if menu := buildMenu(a); menu != nil {
+			wr.MenuSetApplicationMenu(a.ctx, menu)
+		}
+	}
+	return prefs
+}
+func (a *App) SessionSave(js string) { a.st.SessionSave(js) }
+func (a *App) SessionLoad() string   { return a.st.SessionLoad() }
 
 // OpenFile öffnet eine heruntergeladene Datei; reveal zeigt sie stattdessen im Finder.
 func (a *App) OpenFile(path string, reveal bool) error {
@@ -203,12 +245,26 @@ func (a *App) SpotifyCommand(cmd string, arg float64) error {
 func (a *App) Search(q string, page int) (*search.Page, error) {
 	ctx, cancel := context.WithTimeout(a.ctx, 14*time.Second)
 	defer cancel()
-	return a.search.Search(ctx, q, page)
+	language := "de"
+	if a.englishUI() {
+		language = "en"
+	}
+	if a.useTavily() {
+		if page > 0 {
+			return &search.Page{Query: q, Provider: "Tavily", Results: []search.Result{}}, nil
+		}
+		return a.tavily.Search(ctx, q, language)
+	}
+	result, err := a.search.SearchInLanguage(ctx, q, page, language)
+	if result != nil {
+		result.Provider = "Brave"
+	}
+	return result, err
 }
 
 // SearchKeyStatus sagt nur, OB ein Schlüssel gespeichert ist.
 func (a *App) SearchKeyStatus() bool {
-	_, ok, _ := a.secrets.Get(keyFile)
+	_, ok, _ := a.secrets.Get(a.searchKeyFile())
 	return ok
 }
 
@@ -217,16 +273,37 @@ func (a *App) SearchKeySet(key string) error {
 	if key == "" || len(key) > 200 || strings.ContainsAny(key, " \t\r\n\x00") {
 		return errors.New("Das sieht nicht nach einem gültigen API-Schlüssel aus.")
 	}
-	return a.secrets.Set(keyFile, key)
+	return a.secrets.Set(a.searchKeyFile(), key)
 }
 
-func (a *App) SearchKeyClear() error { return a.secrets.Delete(keyFile) }
+func (a *App) SearchKeyClear() error { return a.secrets.Delete(a.searchKeyFile()) }
 
 // SearchKeyTest prüft den gespeicherten Schlüssel mit einer echten Anfrage an Brave.
 func (a *App) SearchKeyTest() error {
 	ctx, cancel := context.WithTimeout(a.ctx, 12*time.Second)
 	defer cancel()
+	if a.useTavily() {
+		_, err := a.tavily.Search(ctx, "Luna browser", "en")
+		return err
+	}
 	return a.search.Test(ctx)
+}
+
+func (a *App) useTavily() bool {
+	prefs := a.st.Prefs()
+	if selected, exists := prefs["tavilySearch"]; exists {
+		return selected
+	}
+	// Keep existing Brave profiles intact; new profiles recommend Tavily.
+	_, hasBrave, _ := a.secrets.Get(keyFile)
+	return !hasBrave && !prefs["onboardingComplete"]
+}
+
+func (a *App) searchKeyFile() string {
+	if a.useTavily() {
+		return tavilyKeyFile
+	}
+	return keyFile
 }
 
 func hasPref(p map[string]bool, k string) bool { _, ok := p[k]; return ok }
@@ -256,6 +333,9 @@ func (a *App) SonosConfigure(enabled bool, selected []string) (sonos.Status, err
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.stopPageMonitors != nil {
+		a.stopPageMonitors()
+	}
 	closePlatform()
 	if a.chat != nil {
 		a.chat.Close()
@@ -308,5 +388,9 @@ func (a *App) ResetBrowserSettings() error {
 		return err
 	}
 	web.ConfigureGesture("", true)
+	a.applyNativeLanguage()
+	if menu := buildMenu(a); menu != nil {
+		wr.MenuSetApplicationMenu(a.ctx, menu)
+	}
 	return nil
 }

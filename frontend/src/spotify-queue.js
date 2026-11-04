@@ -1,11 +1,13 @@
+import { t as l10n } from './i18n.js';
 export function initQueueDrop({ enqueue, toast }) {
   const zone = document.createElement('div');
   zone.className = 'music-queue-drop';
   zone.hidden = true;
   zone.setAttribute('role', 'status');
   zone.setAttribute('aria-live', 'polite');
-  zone.innerHTML =
-    '<svg viewBox="0 0 32 32" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h20M5 13h15M5 19h10M23 18v12M17 24h12"/></svg><b>Zur Warteschlange</b><span>Song hier ablegen</span>';
+  zone.innerHTML = l10n(
+    '<svg viewBox="0 0 32 32" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h20M5 13h15M5 19h10M23 18v12M17 24h12"/></svg><b>Zur Warteschlange</b><span>Song hier ablegen</span>',
+  );
   document.body.append(zone);
   let track = null,
     busy = false;
@@ -43,7 +45,7 @@ export function initQueueDrop({ enqueue, toast }) {
     const song = track;
     clear();
     busy = true;
-    toast('Wird zur Warteschlange hinzugefügt …');
+    toast(l10n('Wird zur Warteschlange hinzugefügt …'));
     try {
       await enqueue(song.uri, song.title);
     } catch (error) {

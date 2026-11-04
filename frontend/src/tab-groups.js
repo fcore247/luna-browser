@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { $, esc } from './ui.js';
 
 export function initTabGroups({
@@ -23,7 +24,7 @@ export function initTabGroups({
     title = String(title || '')
       .trim()
       .slice(0, 40);
-    if (!title) throw Error('Gruppenname fehlt.');
+    if (!title) throw Error(l10n('Gruppenname fehlt.'));
     const t = requireTab(tabID),
       id = 'tg-' + crypto.randomUUID();
     S.groups[id] = { title, collapsed: false };
@@ -47,7 +48,7 @@ export function initTabGroups({
     saveSession();
   }
   function moveTab(id, beforeID, group) {
-    if (group && !S.groups[group]) throw Error('Gruppe nicht gefunden.');
+    if (group && !S.groups[group]) throw Error(l10n('Gruppe nicht gefunden.'));
     const t = requireTab(id);
     if (beforeID === id) return;
     if (beforeID !== null) requireTab(beforeID);
@@ -69,7 +70,7 @@ export function initTabGroups({
     return new Promise((resolve) => {
       const dialog = document.createElement('dialog');
       dialog.className = 'tab-group-dialog';
-      dialog.innerHTML = `<form method="dialog"><h2>${initial ? 'Gruppe umbenennen' : 'Neue Tab-Gruppe'}</h2><label>Gruppenname<input name="title" maxlength="40" value="${esc(initial)}" placeholder="Zum Beispiel Musik oder Arbeit" required autofocus></label><div><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn pri" value="save">Speichern</button></div></form>`;
+      dialog.innerHTML = l10nMsg`<form method="dialog"><h2>${initial ? l10n('Gruppe umbenennen') : l10n('Neue Tab-Gruppe')}</h2><label>Gruppenname<input name="title" maxlength="40" value="${esc(initial)}" placeholder="Zum Beispiel Musik oder Arbeit" required autofocus></label><div><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn pri" value="save">Speichern</button></div></form>`;
       document.body.append(dialog);
       cover(true);
       dialog.addEventListener(
@@ -97,7 +98,7 @@ export function initTabGroups({
     const items = [];
     if (t) {
       items.push({
-        label: 'Neue Gruppe …',
+        label: l10n('Neue Gruppe …'),
         act: async () => {
           const title = await askTabGroup();
           if (title) createTabGroup(title, t.id);
@@ -106,14 +107,15 @@ export function initTabGroups({
       for (const [id, g] of Object.entries(S.groups))
         if (id !== t.group)
           items.push({
-            label: 'In „' + g.title + '“ verschieben',
+            label: l10n('In „') + g.title + l10n('“ verschieben'),
             act: () => moveTab(t.id, null, id),
           });
-      if (t.group) items.push({ label: 'Aus Gruppe lösen', act: () => moveTab(t.id, null, '') });
+      if (t.group)
+        items.push({ label: l10n('Aus Gruppe lösen'), act: () => moveTab(t.id, null, '') });
       const i = S.tabs.indexOf(t);
       if (i > 0)
         items.push({
-          label: 'Nach links verschieben',
+          label: l10n('Nach links verschieben'),
           act: () => {
             const target = S.tabs[i - 1];
             moveTab(t.id, target.id, target.group || '');
@@ -121,7 +123,7 @@ export function initTabGroups({
         });
       if (i < S.tabs.length - 1)
         items.push({
-          label: 'Nach rechts verschieben',
+          label: l10n('Nach rechts verschieben'),
           act: () => {
             const next = S.tabs[i + 1],
               after = S.tabs[i + 2];
@@ -133,7 +135,7 @@ export function initTabGroups({
       items.push(
         '-',
         {
-          label: 'Gruppe umbenennen …',
+          label: l10n('Gruppe umbenennen …'),
           act: async () => {
             const title = await askTabGroup(S.groups[gid].title);
             if (title) {
@@ -144,12 +146,12 @@ export function initTabGroups({
           },
         },
         {
-          label: S.groups[gid].collapsed ? 'Gruppe ausklappen' : 'Gruppe einklappen',
+          label: S.groups[gid].collapsed ? l10n('Gruppe ausklappen') : l10n('Gruppe einklappen'),
           act: () => toggleTabGroup(gid),
         },
-        { label: 'Gruppe auflösen', act: () => removeTabGroup(gid) },
+        { label: l10n('Gruppe auflösen'), act: () => removeTabGroup(gid) },
       );
-    if (t) items.push('-', { label: 'Tab schließen', act: () => closeTab(t.id) });
+    if (t) items.push('-', { label: l10n('Tab schließen'), act: () => closeTab(t.id) });
     showCtx(items, ev.clientX, ev.clientY);
   });
   let draggedTab = null;

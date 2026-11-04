@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import { esc } from './ui.js';
 import './styles/vault.css';
@@ -38,7 +39,7 @@ export function createVault({ currentTab, toast, cover, refreshUI }) {
     offers.set(offer.tab, offer);
     refreshUI?.();
     toast?.(
-      `${offer.update ? 'Passwort aktualisieren' : 'Passwort speichern'} für ${hostOf(offer.origin)}? Klicke auf den Schlüssel in der Adressleiste.`,
+      l10nMsg`${offer.update ? l10n('Passwort aktualisieren') : l10n('Passwort speichern')} für ${hostOf(offer.origin)}? Klicke auf den Schlüssel in der Adressleiste.`,
     );
   });
 
@@ -64,12 +65,12 @@ export function createVault({ currentTab, toast, cover, refreshUI }) {
     button.hidden = !show;
     if (!show) return;
     button.dataset.state = offer ? 'offer' : 'fill';
-    button.innerHTML = `${KEY_ICON}${offer ? `<span>${offer.update ? 'Aktualisieren' : 'Speichern'}</span>` : ''}`;
+    button.innerHTML = `${KEY_ICON}${offer ? `<span>${offer.update ? l10n('Aktualisieren') : l10n('Speichern')}</span>` : ''}`;
     button.title = offer
-      ? `Passwort für ${hostOf(offer.origin)} (${offer.username || 'ohne Benutzername'}) speichern`
+      ? l10nMsg`Passwort für ${hostOf(offer.origin)} (${offer.username || l10n('ohne Benutzername')}) speichern`
       : list.length > 1
-        ? 'Gespeicherte Anmeldungen anzeigen'
-        : `Anmelden als ${list[0].username || 'gespeicherter Nutzer'} (Touch ID)`;
+        ? l10n('Gespeicherte Anmeldungen anzeigen')
+        : l10nMsg`Anmelden als ${list[0].username || l10n('gespeicherter Nutzer')} (Touch ID)`;
     button.setAttribute('aria-label', button.title);
   }
 
@@ -104,10 +105,12 @@ export function createVault({ currentTab, toast, cover, refreshUI }) {
       const result = await api.vaultFill(tab.id, tab.url, entry.username);
       toast?.(
         result?.username && result?.password
-          ? 'Anmeldedaten ausgefüllt.'
+          ? l10n('Anmeldedaten ausgefüllt.')
           : result?.password
-            ? 'Passwort ausgefüllt.'
-            : 'Benutzername ausgefüllt. Für das Passwort noch einmal auf den Schlüssel klicken.',
+            ? l10n('Passwort ausgefüllt.')
+            : l10n(
+                'Benutzername ausgefüllt. Für das Passwort noch einmal auf den Schlüssel klicken.',
+              ),
       );
     } catch (error) {
       toast?.(String(error?.message || error));
@@ -120,25 +123,25 @@ export function createVault({ currentTab, toast, cover, refreshUI }) {
     const rows = list
       .map(
         (entry, index) =>
-          `<button type="button" class="vault-row" data-vault-choice="${index}"${index === 0 ? ' autofocus' : ''}><b>${esc(entry.username || 'Ohne Benutzername')}</b><small>${esc(hostOf(entry.origin))}</small></button>`,
+          `<button type="button" class="vault-row" data-vault-choice="${index}"${index === 0 ? ' autofocus' : ''}><b>${esc(entry.username || l10n('Ohne Benutzername'))}</b><small>${esc(hostOf(entry.origin))}</small></button>`,
       )
       .join('');
     const choice = await sheet(
-      `<div class="vault-sheet"><span class="vault-eyebrow">${KEY_ICON} PASSWÖRTER</span><h2>Anmelden bei ${esc(hostOf(list[0].origin))}</h2><p>Wähle ein Konto. Danach bestätigst du mit Touch ID.</p><div class="vault-rows">${rows}</div><button type="button" class="vault-quiet" data-vault-choice="">Abbrechen</button></div>`,
+      l10nMsg`<div class="vault-sheet"><span class="vault-eyebrow">${KEY_ICON} PASSWÖRTER</span><h2>Anmelden bei ${esc(hostOf(list[0].origin))}</h2><p>Wähle ein Konto. Danach bestätigst du mit Touch ID.</p><div class="vault-rows">${rows}</div><button type="button" class="vault-quiet" data-vault-choice="">Abbrechen</button></div>`,
     );
     if (choice !== '' && list[Number(choice)]) await fill(tab, list[Number(choice)]);
   }
 
   async function answerOffer(tab, offer) {
     const choice = await sheet(
-      `<div class="vault-sheet"><span class="vault-eyebrow">${KEY_ICON} PASSWÖRTER</span><h2>${offer.update ? 'Passwort aktualisieren?' : 'Passwort speichern?'}</h2><p>Luna speichert es verschlüsselt auf diesem Mac und füllt es später nur nach Touch ID aus. Deine KI kann es nie lesen.</p><div class="vault-fact"><span>${esc(hostOf(offer.origin))}</span><strong>${esc(offer.username || 'Ohne Benutzername')}</strong></div><div class="vault-actions"><button type="button" data-vault-choice="">Nicht jetzt</button><button type="button" class="vault-primary" data-vault-choice="save" autofocus>${offer.update ? 'Aktualisieren' : 'Speichern'}</button></div></div>`,
+      l10nMsg`<div class="vault-sheet"><span class="vault-eyebrow">${KEY_ICON} PASSWÖRTER</span><h2>${offer.update ? l10n('Passwort aktualisieren?') : l10n('Passwort speichern?')}</h2><p>Luna speichert es verschlüsselt auf diesem Mac und füllt es später nur nach Touch ID aus. Deine KI kann es nie lesen.</p><div class="vault-fact"><span>${esc(hostOf(offer.origin))}</span><strong>${esc(offer.username || l10n('Ohne Benutzername'))}</strong></div><div class="vault-actions"><button type="button" data-vault-choice="">Nicht jetzt</button><button type="button" class="vault-primary" data-vault-choice="save" autofocus>${offer.update ? l10n('Aktualisieren') : l10n('Speichern')}</button></div></div>`,
     );
     if (choice === 'save') {
       try {
         await api.vaultSavePending(tab.id);
         offers.delete(tab.id);
         saved.delete(originOf(offer.origin));
-        toast?.(`Passwort für ${hostOf(offer.origin)} gespeichert.`);
+        toast?.(l10nMsg`Passwort für ${hostOf(offer.origin)} gespeichert.`);
         notifyChanged();
       } catch (error) {
         toast?.(String(error?.message || error));

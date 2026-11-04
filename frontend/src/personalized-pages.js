@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import { esc } from './ui.js';
 import { storeExtensionID } from './store-install.js';
@@ -170,7 +171,7 @@ export function createPersonalizedPages({
         : state.syncing
           ? ' pp-source-sync'
           : '';
-    const statusHTML = `<div class="pp-source-state${stateClass}" role="status">${esc(error || (loading ? 'Aktuelle Daten werden aus der Originalseite gelesen …' : `Aus der Originalseite · aktualisiert ${new Date(state.updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`))}<button data-pp-refresh>↻ Aktualisieren</button></div>`;
+    const statusHTML = l10nMsg`<div class="pp-source-state${stateClass}" role="status">${esc(error || (loading ? l10n('Aktuelle Daten werden aus der Originalseite gelesen …') : l10nMsg`Aus der Originalseite · aktualisiert ${new Date(state.updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`))}<button data-pp-refresh>↻ Aktualisieren</button></div>`;
     const blocks = shown
       .map((field, index) =>
         !group || !field.group || field.group === group
@@ -191,7 +192,7 @@ export function createPersonalizedPages({
     const layout = [state.key, state.preview, detail, group, blocks.length].join('|');
     if (!root.querySelector('.pp-grid') || state.layout !== layout) {
       // A new layout (first view, tab, detail switch): build it and let the cards fade in.
-      root.innerHTML = `<main class="pp-view"><nav><span>${state.preview ? 'VORSCHAU · NOCH NICHT GESPEICHERT' : 'DEIN LUNA · DEINE ANSICHT'}</span>${state.preview ? '<button data-pp-preview-close>Vorschau schließen</button>' : ''}<button data-pp-original>Originalseite öffnen ↗</button></nav><header><span class="pp-eyebrow">${esc(new URL(page.url).hostname)}</span><h1>${esc(page.title)}</h1><p>${esc(page.subtitle)}</p></header>${statusHTML}${detail ? `<div class="pp-detail-bar"><button data-pp-back>← Zurück zur Liste</button><span>${esc(page.detail.title || 'Details')}</span></div>` : ''}${groups.length ? `<div class="pp-tabs" role="group" aria-label="Ansichten">${['', ...groups].map((name) => `<button data-pp-group="${esc(name)}" aria-pressed="${name === group}">${esc(name || 'Alle')}</button>`).join('')}</div>` : ''}<div class="pp-grid">${blocks.join('')}</div><footer>Personalisierte Ansicht · Quellen: ${[page.url, ...(page.sources || []).map((source) => source.url)].map((url) => esc(new URL(url).hostname)).join(' · ')} · Inhalte werden aus deinem geöffneten Original-Tab übernommen.</footer></main>`;
+      root.innerHTML = l10nMsg`<main class="pp-view"><nav><span>${state.preview ? l10n('VORSCHAU · NOCH NICHT GESPEICHERT') : l10n('DEIN LUNA · DEINE ANSICHT')}</span>${state.preview ? l10n('<button data-pp-preview-close>Vorschau schließen</button>') : ''}<button data-pp-original>Originalseite öffnen ↗</button></nav><header><span class="pp-eyebrow">${esc(new URL(page.url).hostname)}</span><h1>${esc(page.title)}</h1><p>${esc(page.subtitle)}</p></header>${statusHTML}${detail ? l10nMsg`<div class="pp-detail-bar"><button data-pp-back>← Zurück zur Liste</button><span>${esc(page.detail.title || 'Details')}</span></div>` : ''}${groups.length ? l10nMsg`<div class="pp-tabs" role="group" aria-label="Ansichten">${['', ...groups].map((name) => `<button data-pp-group="${esc(name)}" aria-pressed="${name === group}">${esc(name || l10n('Alle'))}</button>`).join('')}</div>` : ''}<div class="pp-grid">${blocks.join('')}</div><footer>Personalisierte Ansicht · Quellen: ${[page.url, ...(page.sources || []).map((source) => source.url)].map((url) => esc(new URL(url).hostname)).join(' · ')} · Inhalte werden aus deinem geöffneten Original-Tab übernommen.</footer></main>`;
       state.layout = layout;
       root.classList.add('pp-intro');
       clearTimeout(introTimer);
@@ -257,7 +258,7 @@ export function createPersonalizedPages({
             .filter((item) => (item.field.source || '') === source.id);
           if (!selected.length) return;
           try {
-            if (!source.tab) throw Error('Quell-Tab nicht verfügbar: ' + source.url);
+            if (!source.tab) throw Error(l10n('Quell-Tab nicht verfügbar: ') + source.url);
             const result = await api.personalizedRead(
               source.tab,
               selected.map((item) => item.field),
@@ -268,7 +269,7 @@ export function createPersonalizedPages({
                 result.url,
               )
             )
-              throw Error('Quelle ist auf eine andere Seite gewechselt: ' + source.url);
+              throw Error(l10n('Quelle ist auf eine andere Seite gewechselt: ') + source.url);
             selected.forEach((item, index) => {
               fields[item.index] = result.fields?.[index] || { values: [] };
               fields[item.index].sourceURL = result.url;
@@ -377,7 +378,7 @@ export function createPersonalizedPages({
     const sig = task.data?.fields?.[block]?.sigs?.[position];
     if (!field?.open || sig === undefined) return;
     if (field.source) {
-      toast?.('Nur Zeilen der Hauptquelle lassen sich öffnen.');
+      toast?.(l10n('Nur Zeilen der Hauptquelle lassen sich öffnen.'));
       return;
     }
     task.opening = true;
@@ -498,7 +499,7 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
           (scope === 'site' && pageMatches({ ...page, scope: 'site', enabled: true }, url))),
     );
   const conflictMessage = (existing, action) =>
-    `Für diese Webseite gibt es bereits eine personalisierte Seite: ${JSON.stringify(existing.map(brief))}. Entscheide das nicht allein: Frage den Nutzer, ob die vorhandene Ansicht bearbeitet oder gelöscht werden soll. Bearbeiten: action=${action} erneut mit exakt derselben id ("${existing[0].id}") aufrufen, das ersetzt die vorhandene Ansicht. Löschen: action=remove mit id "${existing[0].id}". Luna fragt dann den Nutzer um Erlaubnis, und du darfst erst weiterarbeiten, wenn er zugestimmt hat.`;
+    l10nMsg`Für diese Webseite gibt es bereits eine personalisierte Seite: ${JSON.stringify(existing.map(brief))}. Entscheide das nicht allein: Frage den Nutzer, ob die vorhandene Ansicht bearbeitet oder gelöscht werden soll. Bearbeiten: action=${action} erneut mit exakt derselben id ("${existing[0].id}") aufrufen, das ersetzt die vorhandene Ansicht. Löschen: action=remove mit id "${existing[0].id}". Luna fragt dann den Nutzer um Erlaubnis, und du darfst erst weiterarbeiten, wenn er zugestimmt hat.`;
   const deletions = new Map(),
     DELETION_TTL = 10 * 60 * 1000;
   const decisionOf = (id) => {
@@ -521,18 +522,19 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
     ask?.({
       kind: 'warning',
       blur: true,
-      eyebrow: 'DEIN KI-AGENT MÖCHTE ETWAS LÖSCHEN',
-      title: 'Ansicht löschen?',
-      message: `Dein KI-Agent möchte die personalisierte Seite „${page.title}“ löschen. Das lässt sich nicht rückgängig machen. Die Originalseite selbst bleibt unverändert.`,
-      highlight: { label: 'PERSONALISIERTE SEITE', value: `${page.title} · ${host}` },
-      note: 'Dein Agent wartet, bis du entschieden hast.',
+      eyebrow: l10n('DEIN KI-AGENT MÖCHTE ETWAS LÖSCHEN'),
+      title: l10n('Ansicht löschen?'),
+      message: l10nMsg`Dein KI-Agent möchte die personalisierte Seite „${page.title}“ löschen. Das lässt sich nicht rückgängig machen. Die Originalseite selbst bleibt unverändert.`,
+      highlight: { label: l10n('PERSONALISIERTE SEITE'), value: `${page.title} · ${host}` },
+      note: l10n('Dein Agent wartet, bis du entschieden hast.'),
       remember: {
-        label: 'Mein Agent darf das automatisch machen',
-        description:
+        label: l10n('Mein Agent darf das automatisch machen'),
+        description: l10n(
           'Ich muss nicht mehr zustimmen. Du kannst das jederzeit unter Einstellungen → Personalisierte Seiten wieder ausschalten.',
+        ),
       },
-      cancelLabel: 'Nicht löschen',
-      confirmLabel: 'Löschen erlauben',
+      cancelLabel: l10n('Nicht löschen'),
+      confirmLabel: l10n('Löschen erlauben'),
       onConfirm: ({ checked }) => {
         if (checked) setAgentMayDeleteAutomatically(true);
       },
@@ -542,8 +544,8 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
         deletions.set(page.id, { state: approved ? 'approved' : 'denied', time: Date.now() });
         toast?.(
           approved
-            ? `Dein Agent darf „${page.title}“ jetzt löschen.`
-            : `Löschen von „${page.title}“ abgelehnt.`,
+            ? l10nMsg`Dein Agent darf „${page.title}“ jetzt löschen.`
+            : l10nMsg`Löschen von „${page.title}“ abgelehnt.`,
         );
       })
       .catch(() => deletions.delete(page.id));
@@ -554,7 +556,7 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
         return { pages, switched_off_domains: [...off].sort() };
       case 'inspect': {
         if (tab?.mode !== 'web' || !tab.native || tab.loading)
-          throw Error('Öffne zuerst die echte Quellseite in einem Browser-Tab.');
+          throw Error(l10n('Öffne zuerst die echte Quellseite in einem Browser-Tab.'));
         const source = await api.personalizedInspect(
           tab.id,
           args.query || '',
@@ -566,7 +568,9 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
         );
         if (!source?.nodes?.length && !args.query && !args.selector && !args.offset)
           throw Error(
-            'Auf der Quellseite wurden noch keine lesbaren Inhalte gefunden. Warte auf das Laden.',
+            l10n(
+              'Auf der Quellseite wurden noch keine lesbaren Inhalte gefunden. Warte auf das Laden.',
+            ),
           );
         const token = crypto.randomUUID();
         inspections.set(token, {
@@ -580,20 +584,21 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
           inspection_token: token,
           ...(existing.length && {
             existing_personalized_pages: existing.map(brief),
-            existing_pages_hint: `Für diese Webseite gibt es bereits eine personalisierte Seite. Frage den Nutzer, ob du sie bearbeiten (save mit derselben id "${existing[0].id}") oder löschen (remove, braucht die Zustimmung des Nutzers) sollst.`,
+            existing_pages_hint: l10nMsg`Für diese Webseite gibt es bereits eine personalisierte Seite. Frage den Nutzer, ob du sie bearbeiten (save mit derselben id "${existing[0].id}") oder löschen (remove, braucht die Zustimmung des Nutzers) sollst.`,
           }),
           ...source,
         };
       }
       case 'preview':
       case 'save': {
-        if (!designs.has(args.design_token)) throw Error('Zuerst browser_design_skill abrufen.');
+        if (!designs.has(args.design_token))
+          throw Error(l10n('Zuerst browser_design_skill abrufen.'));
         const inspected = inspections.get(args.inspection_token);
         if (!inspected || Date.now() - inspected.time > 3600000)
-          throw Error('Zuerst die aktuelle Originalseite mit inspect ansehen.');
+          throw Error(l10n('Zuerst die aktuelle Originalseite mit inspect ansehen.'));
         const recipe = JSON.parse(args.recipe_json || '{}');
         if (recipe.url !== inspected.url)
-          throw Error('Die Ansicht muss auf der zuvor angesehenen URL basieren.');
+          throw Error(l10n('Die Ansicht muss auf der zuvor angesehenen URL basieren.'));
         const conflicts = existingFor(recipe.url, recipe.scope, recipe.id);
         if (conflicts.length) throw Error(conflictMessage(conflicts, args.action));
         await api.personalizedValidate(recipe);
@@ -603,7 +608,9 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
           const receipt = inspections.get(tokens[source.id]);
           if (!receipt || receipt.url !== source.url || Date.now() - receipt.time > 3600000)
             throw Error(
-              'Quelle ' + source.id + ' zuerst inspizieren und source_tokens_json übergeben.',
+              l10n('Quelle ') +
+                source.id +
+                l10n(' zuerst inspizieren und source_tokens_json übergeben.'),
             );
           sources.set(source.id, receipt);
         }
@@ -618,7 +625,7 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
             selected.map((item) => item.field),
           );
           if (checked.url !== receipt.url)
-            throw Error('Quelle hat sich seit inspect geändert: ' + receipt.url);
+            throw Error(l10n('Quelle hat sich seit inspect geändert: ') + receipt.url);
           selected.forEach((item, index) => {
             const actual = checked.fields?.[index];
             if (!item.field.selector && ['heading', 'divider'].includes(item.field.kind)) return;
@@ -628,7 +635,7 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
                 title: item.field.title,
                 source: id || 'main',
                 selector: item.field.selector,
-                error: actual?.error || 'Kein passendes Quellenelement',
+                error: actual?.error || l10n('Kein passendes Quellenelement'),
               });
             for (const row of actual?.items || [])
               for (const [column, cell] of (row.cells || []).entries())
@@ -653,11 +660,13 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
               selector: recipe.activate_when,
               error:
                 gate?.error ||
-                'Kein passendes Element. activate_when muss auf der eingeloggten Seite vorhanden sein (zum Beispiel ein Abmelden-Link).',
+                l10n(
+                  'Kein passendes Element. activate_when muss auf der eingeloggten Seite vorhanden sein (zum Beispiel ein Abmelden-Link).',
+                ),
             });
         }
         if (diagnostics.length)
-          throw Error('Quellselektoren abgelehnt: ' + JSON.stringify(diagnostics));
+          throw Error(l10n('Quellselektoren abgelehnt: ') + JSON.stringify(diagnostics));
         if (args.action === 'preview') {
           const target =
             tab?.url === recipe.url ? tab : { id: inspected.tab, url: recipe.url, mode: 'web' };
@@ -685,7 +694,8 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
         };
       }
       case 'enable':
-        if (typeof args.enabled !== 'boolean') throw Error('enabled muss true oder false sein.');
+        if (typeof args.enabled !== 'boolean')
+          throw Error(l10n('enabled muss true oder false sein.'));
         await api.personalizedEnable(args.id, args.enabled);
         await load();
         return { pages };
@@ -693,18 +703,20 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
         const page = pages.find((item) => item.id === args.id);
         if (!page)
           throw Error(
-            'Keine personalisierte Seite mit dieser id. Mit action=list die vorhandenen ids abrufen.',
+            l10n(
+              'Keine personalisierte Seite mit dieser id. Mit action=list die vorhandenen ids abrufen.',
+            ),
           );
         const auto = agentMayDeleteAutomatically();
         const decision = decisionOf(page.id);
         if (!auto && decision?.state !== 'approved') {
           if (decision?.state === 'denied')
             throw Error(
-              `Der Nutzer hat das Löschen von „${page.title}“ abgelehnt. Versuche es nicht erneut, sondern sage dem Nutzer, dass nichts gelöscht wurde, und frage, wie es weitergehen soll (zum Beispiel die Ansicht bearbeiten).`,
+              l10nMsg`Der Nutzer hat das Löschen von „${page.title}“ abgelehnt. Versuche es nicht erneut, sondern sage dem Nutzer, dass nichts gelöscht wurde, und frage, wie es weitergehen soll (zum Beispiel die Ansicht bearbeiten).`,
             );
           requestDeletion(page);
           throw Error(
-            `WARTEN: Luna fragt den Nutzer gerade, ob du „${page.title}“ löschen darfst. Es wurde noch nichts gelöscht. Sage dem Nutzer jetzt, dass er das Löschen in Luna bestätigen muss und dass du erst weiterarbeitest, wenn er zugestimmt hat. Rufe action=remove mit derselben id erst nach seiner Rückmeldung erneut auf.`,
+            l10nMsg`WARTEN: Luna fragt den Nutzer gerade, ob du „${page.title}“ löschen darfst. Es wurde noch nichts gelöscht. Sage dem Nutzer jetzt, dass er das Löschen in Luna bestätigen muss und dass du erst weiterarbeitest, wenn er zugestimmt hat. Rufe action=remove mit derselben id erst nach seiner Rückmeldung erneut auf.`,
           );
         }
         deletions.delete(page.id);
@@ -718,13 +730,13 @@ Luna formats source text for you: text, notice and accordion keep paragraphs, li
         };
       }
       case 'open_original':
-        if (!tab) throw Error('Tab fehlt.');
+        if (!tab) throw Error(l10n('Tab fehlt.'));
         originals.add(identity(tab));
         update(tab);
         showNative(tab.id);
         return { original: true, url: tab.url };
       default:
-        throw Error('Unbekannte Aktion.');
+        throw Error(l10n('Unbekannte Aktion.'));
     }
   }
   return {

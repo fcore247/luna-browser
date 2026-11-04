@@ -1,6 +1,13 @@
+import { t as l10n } from './i18n.js';
+import { getLanguage } from './i18n.js';
 export const WINDOWS = /Windows/i.test(navigator.userAgent);
 export const shortcut = (mac) =>
-  WINDOWS ? mac.replaceAll('⌘', 'Strg+').replaceAll('⌥', 'Alt+').replaceAll('⇧', 'Umschalt+') : mac;
+  WINDOWS
+    ? mac
+        .replaceAll('⌘', getLanguage() === 'en' ? 'Ctrl+' : l10n('Strg+'))
+        .replaceAll('⌥', 'Alt+')
+        .replaceAll('⇧', getLanguage() === 'en' ? 'Shift+' : l10n('Umschalt+'))
+    : mac;
 
 // Shell shortcuts stay available without a native Windows menu bar.
 export function windowsCommand(event) {

@@ -67,15 +67,16 @@ type FAQ struct {
 }
 
 type Page struct {
-	Query   string   `json:"query"`
-	Altered string   `json:"altered"` // von Brave korrigierte Schreibweise
-	Results []Result `json:"results"`
-	Info    *Info    `json:"info"`
-	News    []News   `json:"news"`
-	Videos  []Video  `json:"videos"`
-	FAQ     []FAQ    `json:"faq"`
-	More    bool     `json:"more"`
-	Millis  int64    `json:"millis"`
+	Provider string   `json:"provider,omitempty"`
+	Query    string   `json:"query"`
+	Altered  string   `json:"altered"` // von Brave korrigierte Schreibweise
+	Results  []Result `json:"results"`
+	Info     *Info    `json:"info"`
+	News     []News   `json:"news"`
+	Videos   []Video  `json:"videos"`
+	FAQ      []FAQ    `json:"faq"`
+	More     bool     `json:"more"`
+	Millis   int64    `json:"millis"`
 }
 
 // Client fragt Brave ab. Key liefert den Schlüssel bei jeder Anfrage frisch (Schlüsselbund).
@@ -201,6 +202,11 @@ func crumb(p string) string {
 
 // Search holt Seite page (0-basiert) der Ergebnisse.
 func (c *Client) Search(ctx context.Context, q string, page int) (*Page, error) {
+	return c.SearchInLanguage(ctx, q, page, "de")
+}
+
+// SearchInLanguage keeps the UI and search language aligned with Luna's preference.
+func (c *Client) SearchInLanguage(ctx context.Context, q string, page int, language string) (*Page, error) {
 	key, err := c.Key()
 	if err != nil {
 		return nil, err
@@ -218,6 +224,10 @@ func (c *Client) Search(ctx context.Context, q string, page int) (*Page, error) 
 	v.Set("country", "DE")
 	v.Set("search_lang", "de")
 	v.Set("ui_lang", "de-DE")
+	if language == "en" {
+		v.Set("search_lang", "en")
+		v.Set("ui_lang", "en-GB")
+	}
 	v.Set("safesearch", "moderate")
 	v.Set("spellcheck", "1")
 	v.Set("extra_snippets", "true")

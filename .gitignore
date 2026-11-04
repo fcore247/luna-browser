@@ -22,6 +22,8 @@ native/windows/bin/
 native/windows/obj/
 /build/ci/
 /work/
+/build/tavily-*/
+/*.syso
 
 native-test*.log
 **/__pycache__/

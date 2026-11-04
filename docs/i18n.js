@@ -1,7 +1,7 @@
-/* Browser language: German, with English as the fallback. */
+/* The website opens in English, independently of the browser's language. */
 (() => {
   'use strict';
-  const language = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().split('-')[0] === 'de' ? 'de' : 'en';
+  const language = 'en';
   const translations = {
 "Luna herunterladen": "Download Luna",
 "Für macOS und Windows": "For macOS and Windows",

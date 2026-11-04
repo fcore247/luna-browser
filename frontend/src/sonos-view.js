@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 const images = import.meta.glob('./assets/sonos/*', {
   eager: true,
   query: '?url',
@@ -18,7 +19,7 @@ export function speakerImage(model) {
 export function sonosSettingsHTML(s) {
   const devices = s.devices || [],
     selected = s.selected || [];
-  return `<section id="set-sonos" class="sp-card sonos-settings"><div class="sonos-hero"><span class="sonos-wordmark">SONOS <i>× Luna</i></span><h2>Dein Sound.<br>Eine Tastatur.</h2><p>Steuere deine Räume mit den Lautstärketasten deines Computers.</p><div class="sonos-keys"><span>−</span><span>♪</span><span>+</span></div></div><div class="sonos-body"><div class="swrow"><div><b>Sonos Sync</b><span>${s.enabled ? 'Aktiv · folgt der Systemlautstärke' : 'Einschalten – Luna findet deine Lautsprecher automatisch.'}</span></div><button class="switch ${s.enabled ? 'on' : ''}" data-act="sonos-toggle" role="switch" aria-label="Sonos Sync" aria-checked="${!!s.enabled}"><i></i></button></div><p class="muted small">Solange Luna läuft, folgen ausgewählte Lautsprecher der Systemlautstärke – auch wenn Luna im Hintergrund ist. Beim Einschalten bleibt die aktuelle Lautstärke erhalten. Die nächste Änderung am Computer setzt auf allen ausgewählten Lautsprechern denselben Prozentwert.</p>${s.supported === false ? '<p class="sonos-notice">Der aktuelle Audioausgang meldet keine regelbare Lautstärke. Wähle zum Beispiel die internen Lautsprecher als Audioausgang.</p>' : ''}<div class="sonos-list-head"><div><h3>Deine Lautsprecher</h3><small>${devices.filter((d) => d.online).length} gefunden · ${selected.length} ausgewählt</small></div><span class="muted small" role="status">${s.scanning ? 'Suche läuft …' : s.enabled ? 'Automatisch · Prüfung alle 5 Sekunden' : 'Suche startet beim Einschalten'}</span></div><div class="sonos-grid">${devices
+  return l10nMsg`<section id="set-sonos" class="sp-card sonos-settings"><div class="sonos-hero"><span class="sonos-wordmark">SONOS <i>× Luna</i></span><h2>Dein Sound.<br>Eine Tastatur.</h2><p>Steuere deine Räume mit den Lautstärketasten deines Computers.</p><div class="sonos-keys"><span>−</span><span>♪</span><span>+</span></div></div><div class="sonos-body"><div class="swrow"><div><b>Sonos Sync</b><span>${s.enabled ? l10n('Aktiv · folgt der Systemlautstärke') : l10n('Einschalten – Luna findet deine Lautsprecher automatisch.')}</span></div><button class="switch ${s.enabled ? 'on' : ''}" data-act="sonos-toggle" role="switch" aria-label="Sonos Sync" aria-checked="${!!s.enabled}"><i></i></button></div><p class="muted small">Solange Luna läuft, folgen ausgewählte Lautsprecher der Systemlautstärke – auch wenn Luna im Hintergrund ist. Beim Einschalten bleibt die aktuelle Lautstärke erhalten. Die nächste Änderung am Computer setzt auf allen ausgewählten Lautsprechern denselben Prozentwert.</p>${s.supported === false ? l10n('<p class="sonos-notice">Der aktuelle Audioausgang meldet keine regelbare Lautstärke. Wähle zum Beispiel die internen Lautsprecher als Audioausgang.</p>') : ''}<div class="sonos-list-head"><div><h3>Deine Lautsprecher</h3><small>${devices.filter((d) => d.online).length} gefunden · ${selected.length} ausgewählt</small></div><span class="muted small" role="status">${s.scanning ? l10n('Suche läuft …') : s.enabled ? l10n('Automatisch · Prüfung alle 5 Sekunden') : l10n('Suche startet beim Einschalten')}</span></div><div class="sonos-grid">${devices
     .map((d) => {
       const img = speakerImage(d.model);
       const on = selected.includes(d.id);
@@ -32,11 +33,11 @@ export function sonosSettingsHTML(s) {
                 .slice(-6),
             )
           : ''
-      }</small><span class="sonos-online">${d.online ? 'Im Netzwerk' : 'Nicht erreichbar'}</span></button>`;
+      }</small><span class="sonos-online">${d.online ? l10n('Im Netzwerk') : l10n('Nicht erreichbar')}</span></button>`;
     })
     .join(
       '',
-    )}</div>${!devices.length ? `<div class="sonos-empty">${s.scanning ? 'Wir suchen in deinem lokalen Netzwerk …' : s.enabled ? 'Noch keine Lautsprecher entdeckt. Luna sucht automatisch weiter. Mac und Sonos müssen im selben Netzwerk sein.' : 'Schalte Sonos Sync ein, um Lautsprecher automatisch zu finden.'}</div>` : ''}<p class="sonos-notice" role="status">${esc(s.message || '')}</p></div></section>`;
+    )}</div>${!devices.length ? `<div class="sonos-empty">${s.scanning ? l10n('Wir suchen in deinem lokalen Netzwerk …') : s.enabled ? l10n('Noch keine Lautsprecher entdeckt. Luna sucht automatisch weiter. Mac und Sonos müssen im selben Netzwerk sein.') : l10n('Schalte Sonos Sync ein, um Lautsprecher automatisch zu finden.')}</div>` : ''}<p class="sonos-notice" role="status">${esc(s.message || '')}</p></div></section>`;
 }
 
 // Gleiche Knoten bleiben erhalten: keine neue Animation, kein Fokusverlust beim Polling.

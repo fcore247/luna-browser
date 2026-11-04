@@ -21,6 +21,7 @@ static class Program
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true });
         Console.SetIn(new StreamReader(Console.OpenStandardInput(), Encoding.UTF8));
         if (args.Length > 0 && args[0] == "--self-test") { NativeTests.Run(); return; }
+        if (args.Length > 0 && args[0] == "--self-test-clipboard") { NativeTests.TestKeyPagePolicy(); Console.WriteLine("CLIPBOARD_POLICY_TESTS_PASSED"); return; }
         if (args.Length == 0 || !int.TryParse(args[0], out var parent)) return;
         Application.Run(new Host(parent));
     }
@@ -54,6 +55,8 @@ sealed partial class Host : Form
     CoreWebView2Environment? environment;
     string gesture = "", appearance = "system";
     bool gesturesOn = true;
+    Dictionary<string, string> languageMessages = new();
+    string L(string source) => languageMessages.TryGetValue(source, out var translated) ? translated : source;
     int active = -1;
     Rectangle frame = new(0, 0, 800, 600);
     WaveOutEvent? penPlayer, soundPlayer;
@@ -145,7 +148,7 @@ sealed partial class Host : Form
         {
             loading[id] = false; failed[id] = !e.IsSuccess; State(id);
             Event(new { t = "loaded", tab = id, url = core.Source, title = core.DocumentTitle, error = !e.IsSuccess });
-            if (!e.IsSuccess) Event(new { t = "error", tab = id, url = core.Source, message = "Seite konnte nicht geladen werden: " + e.WebErrorStatus });
+            if (!e.IsSuccess) Event(new { t = "error", tab = id, url = core.Source, message = L("Seite konnte nicht geladen werden:") + " " + e.WebErrorStatus });
         };
         core.FaviconChanged += (_, _) => Event(new { t = "favicon", tab = id, icon = core.FaviconUri });
         core.NewWindowRequested += async (_, e) =>
@@ -188,7 +191,7 @@ sealed partial class Host : Form
             var deferral=e.GetDeferral();
             BeginInvoke(new Action(() => {
                 try {
-                    e.State = MessageBox.Show(this, $"{e.Uri}\n\nZugriff erlauben: {e.PermissionKind}?", "Luna – Website-Berechtigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes ? CoreWebView2PermissionState.Allow : CoreWebView2PermissionState.Deny;
+                    e.State = MessageBox.Show(this, $"{e.Uri}\n\n{L("Zugriff erlauben")}: {e.PermissionKind}?", L("Luna – Website-Berechtigung"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes ? CoreWebView2PermissionState.Allow : CoreWebView2PermissionState.Deny;
                 } finally { deferral.Complete(); }
             }));
         };
@@ -251,11 +254,12 @@ sealed partial class Host : Form
                     return Convert.ToBase64String(stream.ToArray());
                 }
             case "appearance": appearance = Str(a, "mode"); foreach (var v in tabs.Values) v.CoreWebView2.Profile.PreferredColorScheme = Scheme(); return null;
+            case "language": languageMessages = JsonSerializer.Deserialize<Dictionary<string,string>>(Str(a, "messages")) ?? new(); return null;
             case "gesture": if (Str(a, "source") != "") gesture = Str(a, "source"); gesturesOn = Bool(a, "on"); foreach (var (tid, v) in tabs) { v.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(gestureIDs[tid]); gestureIDs[tid] = await v.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(GestureScript()); await v.ExecuteScriptAsync("window.__fmGesture=" + (gesturesOn ? "true" : "false")); } return null;
             case "writeSoundData": penData = Convert.FromBase64String(Str(a, "data")); return null;
             case "writeSound": PlayPen(Bool(a, "on")); return null;
             case "sound": soundPlayer?.Dispose(); soundStream?.Dispose(); soundStream = new Mp3FileReader(new MemoryStream(Convert.FromBase64String(Str(a, "data")))); soundPlayer = new WaveOutEvent(); soundPlayer.Init(soundStream); soundPlayer.Play(); return null;
-            case "authenticate": Attach(); return await HelloVerification.Request(parent, Str(a, "reason"));
+            case "authenticate": Attach(); return await HelloVerification.Request(parent, Str(a, "reason"), L);
             case "clipboard": return ClipboardStatus(id, Str(a, "provider"), Int(a, "previousCount", -1));
             case "volume": using (var enumerator = new MMDeviceEnumerator()) using (var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)) return new { volume = device.AudioEndpointVolume.Mute ? 0 : (int)Math.Round(device.AudioEndpointVolume.MasterVolumeLevelScalar * 100), device = device.ID };
             case "spotifyState": return await SpotifyState().WaitAsync(TimeSpan.FromSeconds(4));
@@ -324,7 +328,7 @@ sealed partial class Host : Form
         var text = eligible && previous >= 0 && count != (uint)previous && Clipboard.ContainsText() ? Clipboard.GetText() : null;
         return new { count, eligible, host = uri?.Host ?? "", loading = tab == null || loading.GetValueOrDefault(id), error = failed.GetValueOrDefault(id), text = text?.Length <= 4096 ? text : null };
     }
-    internal static bool TrustedKeyPage(Uri u, string provider) { if (u.Scheme != "https") return false; var p = u.AbsolutePath.TrimEnd('/'); return provider switch { "brave" => u.Host == "api-dashboard.search.brave.com" && p == "/app/keys", "groq" => u.Host == "console.groq.com" && p == "/keys", "openrouter" => u.Host == "openrouter.ai" && (p == "/settings/keys" || (p.StartsWith("/workspace/") && p.EndsWith("/keys"))), "spotify" => u.Host == "developer.spotify.com" && p.StartsWith("/dashboard/"), _ => false }; }
+    internal static bool TrustedKeyPage(Uri u, string provider) { if (u.Scheme != "https") return false; var p = u.AbsolutePath.TrimEnd('/'); return provider switch { "brave" => u.Host == "api-dashboard.search.brave.com" && p == "/app/keys", "tavily" => u.Host == "app.tavily.com" && p == "/home", "groq" => u.Host == "console.groq.com" && p == "/keys", "openrouter" => u.Host == "openrouter.ai" && (p == "/settings/keys" || (p.StartsWith("/workspace/") && p.EndsWith("/keys"))), "spotify" => u.Host == "developer.spotify.com" && p.StartsWith("/dashboard/"), _ => false }; }
     static async Task<GlobalSystemMediaTransportControlsSession?> Spotify() { var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync(); return manager.GetSessions().FirstOrDefault(s => s.SourceAppUserModelId.Contains("Spotify", StringComparison.OrdinalIgnoreCase)); }
     static Task<object>? pendingSpotifyState;
     static Task<object> SpotifyState() {

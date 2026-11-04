@@ -1,3 +1,4 @@
+import { t as l10n } from './i18n.js';
 export const $ = (s) => document.querySelector(s);
 export const esc = (s) =>
   String(s ?? '').replace(
@@ -6,7 +7,7 @@ export const esc = (s) =>
   );
 export const isSearchUrl = (u) => !!u && u.startsWith('search:');
 export const hostOf = (u) => {
-  if (isSearchUrl(u)) return 'Suche';
+  if (isSearchUrl(u)) return l10n('Suche');
   try {
     return new URL(u).hostname.replace(/^www\./, '');
   } catch {

@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { backgroundMenuHTML, wireBackgroundMenu } from './background-menu.js';
 // Befehls-Seite („commands“) und Theme-Leiste („theme“) für die Adressleiste.
 // Beide erscheinen sofort beim Tippen, ohne Enter, und übernehmen die Farben des gewählten Themes über CSS-Variablen.
@@ -5,6 +6,7 @@ import { COLOR_THEMES, colorTheme, colorThemesHTML } from './color-themes.js';
 import { personal } from './personalization.js';
 import { esc } from './ui.js';
 import { COMMANDS, commandOn, commandSwitchHTML, setCommandOn } from './command-data.js';
+import { monitorCommand } from './monitors.js';
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -18,6 +20,7 @@ export function createCommandUI({
   pickMode,
   fill,
   run,
+  monitorHTML = () => '',
 }) {
   let pageEl = null,
     pageObserver = null,
@@ -27,6 +30,15 @@ export function createCommandUI({
     dropClosing = false,
     backgroundMenu = null,
     demoTimers = [];
+  let dropMode = 'theme';
+  window.addEventListener('luna-monitors-changed', () => {
+    if (
+      dropEl &&
+      dropMode === 'monitors' &&
+      !document.activeElement?.matches('[data-monitor-interval], [data-monitor-refresh]')
+    )
+      dropEl.innerHTML = monitorHTML();
+  });
 
   /* ---------- Befehls-Seite ---------- */
   function stopDemos() {
@@ -60,7 +72,7 @@ export function createCommandUI({
     ).join('');
   }
   function cardHTML(c, i) {
-    return `<article class="cmd-card ${commandOn(c.id) ? 'on' : 'off'}" style="--i:${i}" data-id="${c.id}" data-demo="${esc(c.demo)}" data-i="${i}">
+    return l10nMsg`<article class="cmd-card ${commandOn(c.id) ? 'on' : 'off'}" style="--i:${i}" data-id="${c.id}" data-demo="${esc(c.demo)}" data-i="${i}">
       <div class="cmd-card-top"><div class="cmd-word">${esc(c.word)}</div>${commandSwitchHTML(c)}</div>
       <h2>${esc(c.title)}</h2>
       <p>${esc(c.text)}</p>
@@ -86,8 +98,8 @@ export function createCommandUI({
     pageEl = document.createElement('div');
     pageEl.id = 'cmdPage';
     pageEl.setAttribute('role', 'dialog');
-    pageEl.setAttribute('aria-label', 'Befehle');
-    pageEl.innerHTML = `<div class="cmd-inner"><button type="button" class="cmd-close" data-close aria-label="Schließen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><header><span class="cmd-eyebrow">LUNA · BEFEHLE</span><h1>Tippen statt klicken.</h1><p>Gib einen Befehl oben in die Adressleiste ein. Viele starten sofort, ganz ohne Enter. Klicke eine Leiste an, um die Demo erneut zu sehen.</p></header><div class="cmd-grid">${COMMANDS.map(cardHTML).join('')}</div></div>`;
+    pageEl.setAttribute('aria-label', l10n('Befehle'));
+    pageEl.innerHTML = l10nMsg`<div class="cmd-inner"><button type="button" class="cmd-close" data-close aria-label="Schließen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><header><span class="cmd-eyebrow">LUNA · BEFEHLE</span><h1>Tippen statt klicken.</h1><p>Gib einen Befehl oben in die Adressleiste ein. Viele starten sofort, ganz ohne Enter. Klicke eine Leiste an, um die Demo erneut zu sehen.</p></header><div class="cmd-grid">${COMMANDS.map(cardHTML).join('')}</div></div>`;
     document.body.append(pageEl);
     placePage();
     pageObserver = new ResizeObserver(placePage);
@@ -103,7 +115,7 @@ export function createCommandUI({
         card.classList.toggle('off', !on);
         const sw = card.querySelector('.cmd-switch');
         sw.setAttribute('aria-checked', String(on));
-        sw.querySelector('.cmd-switch-label').textContent = on ? 'An' : 'Aus';
+        sw.querySelector('.cmd-switch-label').textContent = on ? l10n('An') : l10n('Aus');
         card.querySelector('[data-try]').disabled = !on;
         return;
       }
@@ -165,15 +177,15 @@ export function createCommandUI({
   function dropHTML() {
     const mode = getMode();
     const themes = colorThemesHTML().replace(/data-act="color-theme" data-color=/g, 'data-pick=');
-    return `<div class="td-head"><b>Dein Design</b><button type="button" class="td-close" data-close aria-label="Schließen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    return l10nMsg`<div class="td-head"><b>Dein Design</b><button type="button" class="td-close" data-close aria-label="Schließen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="td-tabs" role="tablist" aria-label="Designbereiche">
       <button role="tab" id="td-colors-tab" aria-controls="td-colors" aria-selected="true" data-design-tab="colors">Farben</button>
       <button role="tab" id="td-background-tab" aria-controls="td-background" aria-selected="false" tabindex="-1" data-design-tab="background">Hintergrund</button>
     </div>
     <section id="td-colors" role="tabpanel" aria-labelledby="td-colors-tab">
       <div class="td-modes" role="group" aria-label="Darstellung">${[
-        ['light', 'Hell'],
-        ['dark', 'Dunkel'],
+        ['light', l10n('Hell')],
+        ['dark', l10n('Dunkel')],
         ['auto', 'Auto'],
       ]
         .map(
@@ -212,8 +224,10 @@ export function createCommandUI({
   window.addEventListener('luna-personalization', (event) => {
     applyDropBlur();
   });
-  function openDrop() {
-    if (dropEl && !dropClosing) return;
+  function openDrop(mode = 'theme') {
+    if (dropEl && !dropClosing && dropMode === mode) return;
+    if (dropEl) closeDrop(true);
+    dropMode = mode;
     closePage();
     backgroundMenu?.dispose();
     dropEl?.remove();
@@ -221,9 +235,14 @@ export function createCommandUI({
     dropEl = document.createElement('div');
     dropEl.id = 'themeDrop';
     dropEl.setAttribute('role', 'dialog');
-    dropEl.setAttribute('aria-label', 'Farbwelt wählen');
-    dropEl.innerHTML = dropHTML();
-    backgroundMenu = wireBackgroundMenu(dropEl.querySelector('#td-background'));
+    dropEl.setAttribute(
+      'aria-label',
+      l10n(mode === 'monitors' ? 'Seitenüberwachung' : 'Farbwelt wählen'),
+    );
+    dropEl.classList.toggle('monitor-drop', mode === 'monitors');
+    dropEl.innerHTML = mode === 'monitors' ? monitorHTML() : dropHTML();
+    backgroundMenu =
+      mode === 'monitors' ? null : wireBackgroundMenu(dropEl.querySelector('#td-background'));
     applyDropBlur();
     dropEl.addEventListener('keydown', (event) => {
       const tab = event.target.closest('[data-design-tab]');
@@ -302,7 +321,7 @@ export function createCommandUI({
     window.addEventListener('resize', placeDrop);
   }
   function closeDrop(immediate = false) {
-    if (!dropEl || dropClosing) return;
+    if (!dropEl || (dropClosing && !immediate)) return;
     const el = dropEl;
     backgroundMenu?.dispose();
     backgroundMenu = null;
@@ -312,7 +331,8 @@ export function createCommandUI({
     window.removeEventListener('resize', placeDrop);
     const done = () => {
       el.remove();
-      if (dropEl === el) dropEl = null;
+      if (dropEl !== el) return;
+      dropEl = null;
       dropClosing = false;
       urlbox.classList.remove('drop-open');
       cover(false);
@@ -329,7 +349,8 @@ export function createCommandUI({
   // Beides gilt nur solange das Wort in der Adressleiste steht: tippt man weiter oder etwas anderes, schließt es sich.
   input.addEventListener('input', () => {
     const word = input.value.trim().toLowerCase();
-    if (dropEl && !/^themes?$/.test(word)) closeDrop();
+    if (dropEl && !(dropMode === 'monitors' ? monitorCommand(word) : /^themes?$/.test(word)))
+      closeDrop();
     if (pageEl && !/^(?:commands?|befehle)$/.test(word)) closePage();
   });
   // Jede Bedienung außerhalb (Spotify-Chip, Tabs, Menü, Seitenleiste …) schließt die Befehlsseite zuerst und läuft dann normal weiter.

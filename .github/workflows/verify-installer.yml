@@ -1,0 +1,26 @@
+name: Verify macOS release installer
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to verify without installing
+        required: true
+        default: v1.3.1
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify download, checksum, app identity and signature
+        env:
+          LUNA_RELEASE_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$LUNA_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          bash -n docs/install.sh
+          sed "s@https://api.github.com/repos/fcore247/luna-browser/releases/latest@https://api.github.com/repos/fcore247/luna-browser/releases/tags/$LUNA_RELEASE_TAG@" docs/install.sh > "$RUNNER_TEMP/luna-verify-install.sh"
+          bash "$RUNNER_TEMP/luna-verify-install.sh" --verify-only

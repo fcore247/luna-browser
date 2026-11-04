@@ -35,9 +35,10 @@ func Close(id int)             { action("close", id) }
 func SetFrame(x, y, w, h float64) {
 	send("frame", map[string]any{"x": x, "y": y, "width": w, "height": h})
 }
-func Zoom(id int, f float64)    { send("zoom", map[string]any{"tab": id, "factor": f}) }
-func FocusUI()                  { send("focus", nil) }
-func SetAppearance(mode string) { send("appearance", map[string]any{"mode": mode}) }
+func Zoom(id int, f float64)      { send("zoom", map[string]any{"tab": id, "factor": f}) }
+func FocusUI()                    { send("focus", nil) }
+func SetAppearance(mode string)   { send("appearance", map[string]any{"mode": mode}) }
+func SetLanguage(messages string) { send("language", map[string]any{"messages": messages}) }
 func Find(id int, text string, forward bool) {
 	send("find", map[string]any{"tab": id, "text": text, "forward": forward})
 }

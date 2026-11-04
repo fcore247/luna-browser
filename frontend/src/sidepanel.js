@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 // Seitenpanel-Baukasten.
 //
 // Jeder Bereich (Lesezeichen, Verlauf, Downloads, Notizen, später mehr) ist nur eine Registrierung:
@@ -116,9 +117,9 @@ export function removePanelGroup(id) {
 // parent: ID eines bereits registrierten Bereichs; beliebig tief verschachtelbar.
 export function registerPanel(def) {
   if (!def.id || !def.title || reg.has(def.id))
-    throw new Error('Bereich braucht eine eindeutige ID und einen Titel');
+    throw new Error(l10n('Bereich braucht eine eindeutige ID und einen Titel'));
   if (def.parent && !reg.has(def.parent))
-    throw new Error('Übergeordneten Bereich zuerst registrieren');
+    throw new Error(l10n('Übergeordneten Bereich zuerst registrieren'));
   reg.set(def.id, {
     order: 100 + reg.size * 10,
     ...def,
@@ -201,7 +202,7 @@ export function initSidePanel(options) {
 }
 
 function frame() {
-  host.innerHTML = `<div class="sw">
+  host.innerHTML = l10nMsg`<div class="sw">
     <header class="spShell"><button class="spChoose" data-sp-choose aria-expanded="false" aria-controls="spPicker">${svg(FOLDER, 18)}<span>Bereich wechseln</span>${svg('<path d="m6 9 6 6 6-6"/>', 14)}</button><button class="ib sm" data-sp-close aria-label="Seitenpanel schließen" title="Schließen (Esc)">${X}</button></header>
     <div id="spPicker" class="spPicker" hidden><input id="spFilter" placeholder="Bereich finden …" aria-label="Bereiche durchsuchen"><nav id="spRail" aria-label="Bereiche"></nav></div>
     <div class="spc">
@@ -215,7 +216,7 @@ function frame() {
     <footer class="spFooter"><button data-sp-cfg>${svg(GEAR, 16)}<span>Seitenleiste anpassen</span>${svg('<path d="m9 5 7 7-7 7"/>', 14)}</button></footer></div>`;
   const grip = document.createElement('div');
   grip.id = 'sideGrip';
-  grip.title = 'Breite ändern (Doppelklick: zurücksetzen)';
+  grip.title = l10n('Breite ändern (Doppelklick: zurücksetzen)');
   host.prepend(grip);
   built = true;
 }
@@ -249,7 +250,7 @@ function paintRail() {
               : ''
           }</span><span class="spNavArrow">${p.id === cfg.active ? '✓' : '›'}</span></button>`,
       )
-      .join('') || '<p class="muted">Keine Bereiche gefunden.</p>';
+      .join('') || l10n('<p class="muted">Keine Bereiche gefunden.</p>');
 }
 
 async function paintContent() {
@@ -284,7 +285,7 @@ async function paintContent() {
   sb.hidden = !p.search;
   if (p.search) {
     const i = sb.querySelector('input');
-    i.placeholder = p.search.placeholder || 'Suchen';
+    i.placeholder = p.search.placeholder || l10n('Suchen');
     i.setAttribute('aria-label', i.placeholder);
     if (i !== document.activeElement) i.value = q;
     sb.querySelector('.spClr').hidden = !q;
@@ -295,8 +296,9 @@ async function paintContent() {
   try {
     html = p.render ? await p.render({ q: q.trim().toLowerCase(), rawQ: q }) : '';
   } catch {
-    html =
-      '<div class="empty2"><b>Laden nicht möglich</b><p>Öffne den Bereich erneut, um es noch einmal zu versuchen.</p></div>';
+    html = l10n(
+      '<div class="empty2"><b>Laden nicht möglich</b><p>Öffne den Bereich erneut, um es noch einmal zu versuchen.</p></div>',
+    );
   }
   if (version !== renderVersion || cfg.active !== p.id || !env.isOpen()) return; // inzwischen woanders
   body.innerHTML = html;

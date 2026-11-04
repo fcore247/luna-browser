@@ -34,7 +34,9 @@ test('Windows first run opens even when media-session discovery never returns', 
   await page.goto('http://127.0.0.1:5174');
   await expect(page.locator('.setup')).toBeVisible({ timeout: 7000 });
   await expect(page.locator('#splash')).toHaveClass(/gone/);
+  await expect(page.getByRole('heading', { name: 'Choose your language' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Luna kennenlernen' }).click();
-  await expect(page.getByRole('button', { name: 'Google · ohne Key', exact: true })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Google', exact: true })).toBeVisible();
   await page.close();
 });

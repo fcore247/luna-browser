@@ -168,7 +168,11 @@ func (a *App) VaultFill(tab int, pageURL, username string) (VaultFillResult, err
 		return VaultFillResult{}, vault.ErrNotFound
 	}
 	host := strings.TrimPrefix(strings.TrimPrefix(origin, "https://"), "http://")
-	ok, err := web.Authenticate("Luna füllt dein Passwort für " + host + " aus")
+	reason := "Luna füllt dein Passwort für " + host + " aus"
+	if a.englishUI() {
+		reason = "Luna: fill in your password for " + host
+	}
+	ok, err := web.Authenticate(reason)
 	if err != nil {
 		return VaultFillResult{}, err
 	}
@@ -207,7 +211,7 @@ func (a *App) VaultDeleteAll() error {
 	if a.vaultData.vault == nil {
 		return errors.New("Der Passwort-Tresor ist nicht verfügbar.")
 	}
-	ok, err := web.Authenticate("Luna: alle gespeicherten Passwörter löschen")
+	ok, err := web.Authenticate(a.label("Luna: alle gespeicherten Passwörter löschen"))
 	if err != nil {
 		return err
 	}

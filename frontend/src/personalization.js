@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import { trackBackgroundContrast } from './background-contrast.js';
 import { esc } from './ui.js';
 import { WindowSetTitle } from '../wailsjs/runtime/runtime.js';
@@ -76,7 +77,7 @@ export async function mediaFile(file) {
           : tx.objectStore('files').put(file, 'background');
       tx.oncomplete = () => resolve(r.result);
       tx.onabort = tx.onerror = () =>
-        reject(tx.error || Error('Datei konnte nicht gespeichert werden.'));
+        reject(tx.error || Error(l10n('Datei konnte nicht gespeichert werden.')));
     });
   } finally {
     db.close();
@@ -84,7 +85,7 @@ export async function mediaFile(file) {
 }
 export function personalSettingsHTML() {
   const p = personal();
-  return `<div class="personal-settings"><h3>Dein Browser</h3>
+  return l10nMsg`<div class="personal-settings"><h3>Dein Browser</h3>
     <form data-personal-name class="personal-row"><label>Name<input name="browserName" value="${esc(p.name)}" maxlength="60" required></label><button class="btn" type="submit">Namen speichern</button></form>
     <p class="muted">Dein Name erscheint auf der Startseite und im Fenstertitel.</p>
     <div class="personal-row"><label class="btn personal-file">Foto als App-Icon<input type="file" data-personal-icon accept="image/png,image/jpeg,image/webp"></label><button class="btn" type="button" data-personal-reset-icon>Standard-Icon</button></div>
@@ -94,11 +95,11 @@ export function personalSettingsHTML() {
 }
 export function backgroundSettingsHTML() {
   const p = personal();
-  return `<div class="personal-background-controls"><div class="personal-options" role="group" aria-label="Hintergrund">
+  return l10nMsg`<div class="personal-background-controls"><div class="personal-options" role="group" aria-label="Hintergrund">
     ${[
-      ['waves', 'Luna-Wellen'],
-      ['image', 'Eigenes Foto'],
-      ['video', 'Eigenes Video'],
+      ['waves', l10n('Luna-Wellen')],
+      ['image', l10n('Eigenes Foto')],
+      ['video', l10n('Eigenes Video')],
       ['youtube', 'YouTube'],
     ]
       .map(
@@ -106,15 +107,15 @@ export function backgroundSettingsHTML() {
           `<button type="button" class="btn ${p.background === id ? 'pri' : ''}" data-personal-background="${id}" aria-pressed="${p.background === id}">${label}</button>`,
       )
       .join('')}</div>
-    <div class="personal-row"><label class="btn personal-file">Foto oder Video auswählen<input type="file" data-personal-media accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"></label><span class="muted">${esc(p.fileName || 'Foto bis 20 MB · Video bis 100 MB')}</span></div>
+    <div class="personal-row"><label class="btn personal-file">Foto oder Video auswählen<input type="file" data-personal-media accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"></label><span class="muted">${esc(p.fileName || l10n('Foto bis 20 MB · Video bis 100 MB'))}</span></div>
     <form data-personal-youtube class="personal-row"><label>YouTube-Link<input type="url" name="youtube" value="${esc(p.youtube)}" placeholder="https://www.youtube.com/watch?v=…" required></label><button class="btn" type="submit">Video verwenden</button></form>
     <p class="muted">YouTube verbindet sich mit Google. Nur Videos mit erlaubter Einbettung funktionieren. Videos starten ohne Ton und laufen auf Luna-Seiten weiter.</p>
     <label class="personal-motion"><input type="checkbox" data-personal-motion ${p.motion ? 'checked' : ''}> Hintergrund bewegen / Video abspielen</label>
     <label class="personal-contrast">Kontrast<input type="range" min="0" max="85" step="1" data-personal-contrast value="${p.contrast}"><output>${p.contrast}%</output></label>
     <label class="personal-text">Schrift<select data-personal-text aria-label="Schriftkontrast">${[
-      ['auto', 'Automatisch'],
-      ['dark', 'Hell'],
-      ['light', 'Dunkel'],
+      ['auto', l10n('Automatisch')],
+      ['dark', l10n('Hell')],
+      ['light', l10n('Dunkel')],
     ]
       .map(
         ([v, l]) => `<option value="${v}" ${p.textContrast === v ? 'selected' : ''}>${l}</option>`,
@@ -145,16 +146,17 @@ export function wirePersonalSettings({ refresh, setIcon, resetIcon, toast }) {
       if (form.matches('[data-personal-name]')) {
         const name = form.elements.browserName.value.trim();
         if (!name || name.length > 60 || /[\u0000-\u001f]/.test(name))
-          throw Error('Bitte gib einen Namen mit 1–60 Zeichen ein.');
+          throw Error(l10n('Bitte gib einen Namen mit 1–60 Zeichen ein.'));
         savePersonal({ name });
         applyBrowserName();
       } else {
         const youtube = form.elements.youtube.value.trim();
-        if (!youtubeID(youtube)) throw Error('Bitte füge einen gültigen YouTube-Videolink ein.');
+        if (!youtubeID(youtube))
+          throw Error(l10n('Bitte füge einen gültigen YouTube-Videolink ein.'));
         savePersonal({ youtube, background: 'youtube' });
       }
       refresh();
-      feedback('Gespeichert. Öffne einen neuen Tab für deinen Hintergrund.');
+      feedback(l10n('Gespeichert. Öffne einen neuen Tab für deinen Hintergrund.'));
     });
   });
   document.addEventListener('click', (event) => {
@@ -165,11 +167,11 @@ export function wirePersonalSettings({ refresh, setIcon, resetIcon, toast }) {
       else {
         const background = button.dataset.personalBackground;
         if (background === 'youtube' && !youtubeID(personal().youtube))
-          throw Error('Füge zuerst unten einen YouTube-Link ein.');
+          throw Error(l10n('Füge zuerst unten einen YouTube-Link ein.'));
         if (['image', 'video'].includes(background)) {
           const file = await mediaFile();
           if (!file || !file.type.startsWith(background === 'image' ? 'image/' : 'video/'))
-            throw Error('Wähle zuerst eine passende Datei aus.');
+            throw Error(l10n('Wähle zuerst eine passende Datei aus.'));
         }
         savePersonal({ background });
       }
@@ -220,8 +222,9 @@ export function wirePersonalSettings({ refresh, setIcon, resetIcon, toast }) {
         else {
           const image = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
           const video = ['video/mp4', 'video/webm'].includes(file.type);
-          if (!image && !video) throw Error('Bitte wähle PNG, JPG, WebP, MP4 oder WebM.');
-          if (file.size > (image ? 20 : 100) * 1024 * 1024) throw Error('Diese Datei ist zu groß.');
+          if (!image && !video) throw Error(l10n('Bitte wähle PNG, JPG, WebP, MP4 oder WebM.'));
+          if (file.size > (image ? 20 : 100) * 1024 * 1024)
+            throw Error(l10n('Diese Datei ist zu groß.'));
           await mediaFile(file);
           savePersonal({
             background: image ? 'image' : 'video',
@@ -230,7 +233,7 @@ export function wirePersonalSettings({ refresh, setIcon, resetIcon, toast }) {
           });
         }
         refresh();
-        feedback('Gespeichert.');
+        feedback(l10n('Gespeichert.'));
       } finally {
         input.disabled = false;
         input.value = '';
@@ -286,8 +289,9 @@ export function mountPersonalBackground(host) {
     stopContrast = () => {};
   const fail = () => {
     if (!disposed)
-      status.textContent =
-        'Hintergrund konnte nicht geladen werden. Wähle unter Darstellung eine andere Datei oder ein anderes Video.';
+      status.textContent = l10n(
+        'Hintergrund konnte nicht geladen werden. Wähle unter Darstellung eine andere Datei oder ein anderes Video.',
+      );
   };
   if (p.background === 'youtube') {
     const id = youtubeID(p.youtube);
@@ -302,7 +306,7 @@ export function mountPersonalBackground(host) {
       }
       if (!frame && id) {
         frame = document.createElement('iframe');
-        frame.title = 'YouTube-Hintergrund';
+        frame.title = l10n('YouTube-Hintergrund');
         frame.allow = 'autoplay; encrypted-media';
         frame.referrerPolicy = 'strict-origin-when-cross-origin';
         frame.src = `https://luna-browser.com/youtube-background.html?v=${id}`;
@@ -357,8 +361,9 @@ export function mountPersonalBackground(host) {
           unwatch = watchStartVisibility(host, (visible) => {
             if (visible && p.motion && !matchMedia('(prefers-reduced-motion: reduce)').matches)
               media.play().catch(() => {
-                status.textContent =
-                  'Videowiedergabe blockiert. Prüfe das Video unter Darstellung.';
+                status.textContent = l10n(
+                  'Videowiedergabe blockiert. Prüfe das Video unter Darstellung.',
+                );
               });
             else media.pause();
           });

@@ -37,7 +37,7 @@ test('commands opens a themed page without Enter and closes with the button and 
   await page.locator('#url').fill('commands');
   const cmd = page.locator('#cmdPage');
   await expect(cmd).toBeVisible();
-  await expect(cmd.locator('.cmd-card')).toHaveCount(7);
+  await expect(cmd.locator('.cmd-card')).toHaveCount(8);
   await expect(cmd.locator('.cmd-card').first().locator('.cmd-typed')).toHaveText(/spotify/, {
     timeout: 6000,
   });
@@ -114,17 +114,17 @@ test('settings chapter Befehle lists all commands and toggles them', async ({ pa
     await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
   }
   await page.getByRole('button', { name: 'Befehle', exact: true }).click();
-  await expect(page.locator('.cmd-set-card')).toHaveCount(7);
-  await expect(page.locator('.cmd-count')).toHaveText('7 von 7 Befehlen aktiv');
+  await expect(page.locator('.cmd-set-card')).toHaveCount(8);
+  await expect(page.locator('.cmd-count')).toHaveText('8 von 8 Befehlen aktiv');
   await page.locator('.cmd-set-card[data-id="chat"]').click();
   await expect(page.locator('.cmd-set-card[data-id="chat"]')).toHaveClass(/\boff\b/);
-  await expect(page.locator('.cmd-count')).toHaveText('6 von 7 Befehlen aktiv');
+  await expect(page.locator('.cmd-count')).toHaveText('7 von 8 Befehlen aktiv');
   await page.getByRole('button', { name: 'Alle aus' }).click();
-  await expect(page.locator('.cmd-count')).toHaveText('0 von 7 Befehlen aktiv');
+  await expect(page.locator('.cmd-count')).toHaveText('0 von 8 Befehlen aktiv');
   await page.waitForTimeout(1200);
   await page.screenshot({ path: '/tmp/luna-commands-settings.png' });
   await page.getByRole('button', { name: 'Alle an' }).click();
-  await expect(page.locator('.cmd-count')).toHaveText('7 von 7 Befehlen aktiv');
+  await expect(page.locator('.cmd-count')).toHaveText('8 von 8 Befehlen aktiv');
 });
 
 test('commands page does not trap the user: Spotify chip, typing and tabs work while it is open', async ({

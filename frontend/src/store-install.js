@@ -1,3 +1,4 @@
+import { t as l10n, msg as l10nMsg } from './i18n.js';
 import * as api from './api.js';
 import { esc } from './ui.js';
 import './styles/store-install.css';
@@ -25,12 +26,12 @@ const levelOf = (entry) =>
         : 'checking');
 const levelLabel = (level) =>
   ({
-    clear: 'Keine bekannten Probleme',
-    limited: 'Eingeschränkt kompatibel',
-    unsupported: 'Nicht kompatibel',
-    checking: 'Kompatibilität wird geprüft',
-    unknown: 'Prüfung nicht möglich',
-  })[level] || 'Kompatibilität unbekannt';
+    clear: l10n('Keine bekannten Probleme'),
+    limited: l10n('Eingeschränkt kompatibel'),
+    unsupported: l10n('Nicht kompatibel'),
+    checking: l10n('Kompatibilität wird geprüft'),
+    unknown: l10n('Prüfung nicht möglich'),
+  })[level] || l10n('Kompatibilität unbekannt');
 
 export function createStoreInstall({ currentTab, showNative, toast }) {
   const root = document.createElement('div');
@@ -60,7 +61,7 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
     dispose();
     root.hidden = true;
     if (failed)
-      toast('Store-Details konnten nicht geladen werden. Die Originalseite wird geöffnet.');
+      toast(l10n('Store-Details konnten nicht geladen werden. Die Originalseite wird geöffnet.'));
     showNative(currentTab().id);
     update(currentTab());
   }
@@ -69,7 +70,7 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
     const task = state,
       entry = task.pending,
       page = task.page;
-    const name = entry?.name || page?.name || 'Erweiterung wird geladen …';
+    const name = entry?.name || page?.name || l10n('Erweiterung wird geladen …');
     const icon = raster(entry?.icon) || raster(page?.icon);
     const images = (page?.screenshots || []).map(raster).filter(Boolean);
     const level = task.error ? 'unknown' : levelOf(entry);
@@ -77,33 +78,33 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
     const blocked = entry?.unsupported;
     const title =
       task.phase === 'installed'
-        ? 'Installiert ✓'
+        ? l10n('Installiert ✓')
         : blocked
-          ? 'Nicht kompatibel'
+          ? l10n('Nicht kompatibel')
           : task.phase === 'installing'
-            ? 'Wird installiert …'
+            ? l10n('Wird installiert …')
             : task.error
-              ? 'Erneut prüfen'
+              ? l10n('Erneut prüfen')
               : task.phase === 'checking'
-                ? 'Wird geprüft …'
+                ? l10n('Wird geprüft …')
                 : task.phase === 'review'
-                  ? 'Zugriff erlauben & installieren'
-                  : 'In Luna installieren';
+                  ? l10n('Zugriff erlauben & installieren')
+                  : l10n('In Luna installieren');
     const permissions =
       (entry?.permissions || []).map((p) => `<li>${esc(p)}</li>`).join('') ||
-      '<li>Keine zusätzlichen Rechte</li>';
+      l10n('<li>Keine zusätzlichen Rechte</li>');
     const scroll = root.scrollTop;
-    root.innerHTML = `<main id="storeInstallDrop" class="store-detail">
+    root.innerHTML = l10nMsg`<main id="storeInstallDrop" class="store-detail">
       <nav class="store-detail-nav"><span>LUNA EXTRAS <span aria-hidden="true">/</span> CHROME WEB STORE</span><button type="button" data-store-original>Original im Chrome Web Store öffnen ↗</button></nav>
-      <header class="store-detail-hero"><div class="store-detail-icon">${icon ? `<img src="${esc(icon)}" alt="">` : '<span aria-hidden="true">✧</span>'}</div><div><span class="store-detail-eyebrow">MEHR MÖGLICHKEITEN FÜR DEINEN BROWSER</span><h1>${esc(name)}</h1><p>${entry ? `Version ${esc(entry.version)} · Paket und Signatur geprüft` : 'Luna bereitet die Informationen für dich auf.'}</p></div></header>
+      <header class="store-detail-hero"><div class="store-detail-icon">${icon ? `<img src="${esc(icon)}" alt="">` : '<span aria-hidden="true">✧</span>'}</div><div><span class="store-detail-eyebrow">MEHR MÖGLICHKEITEN FÜR DEINEN BROWSER</span><h1>${esc(name)}</h1><p>${entry ? l10nMsg`Version ${esc(entry.version)} · Paket und Signatur geprüft` : l10n('Luna bereitet die Informationen für dich auf.')}</p></div></header>
       <div class="store-detail-layout"><div class="store-detail-main">
-        <section class="store-gallery" aria-label="Screenshots der Erweiterung">${images.length ? `<div class="store-gallery-stage"><img src="${esc(images[task.image || 0] || images[0])}" alt="Screenshot ${(task.image || 0) + 1} von ${esc(name)}"></div><div class="store-gallery-thumbs">${images.map((src, i) => `<button type="button" data-store-image="${i}" aria-label="Screenshot ${i + 1} anzeigen" aria-pressed="${i === (task.image || 0)}"><img src="${esc(src)}" alt=""></button>`).join('')}</div>` : `<div class="store-gallery-empty"><span aria-hidden="true">✧</span><p>${page ? 'Für diese Erweiterung sind keine Vorschaubilder verfügbar.' : 'Vorschaubilder werden geladen …'}</p></div>`}</section>
-        <section class="store-description"><span class="store-detail-eyebrow">DAS KANN DIE ERWEITERUNG</span><h2>Über ${esc(name)}</h2><p>${esc(page?.description || 'Beschreibung wird aus dem Chrome Web Store geladen …')}</p></section>
+        <section class="store-gallery" aria-label="Screenshots der Erweiterung">${images.length ? l10nMsg`<div class="store-gallery-stage"><img src="${esc(images[task.image || 0] || images[0])}" alt="Screenshot ${(task.image || 0) + 1} von ${esc(name)}"></div><div class="store-gallery-thumbs">${images.map((src, i) => l10nMsg`<button type="button" data-store-image="${i}" aria-label="Screenshot ${i + 1} anzeigen" aria-pressed="${i === (task.image || 0)}"><img src="${esc(src)}" alt=""></button>`).join('')}</div>` : `<div class="store-gallery-empty"><span aria-hidden="true">✧</span><p>${page ? l10n('Für diese Erweiterung sind keine Vorschaubilder verfügbar.') : l10n('Vorschaubilder werden geladen …')}</p></div>`}</section>
+        <section class="store-description"><span class="store-detail-eyebrow">DAS KANN DIE ERWEITERUNG</span><h2>Über ${esc(name)}</h2><p>${esc(page?.description || l10n('Beschreibung wird aus dem Chrome Web Store geladen …'))}</p></section>
       </div><aside class="store-detail-aside">
-        <section class="store-install-card"><span class="store-detail-eyebrow">IN DEINEM LUNA</span><h2>${task.phase === 'installed' ? 'Bereit für dich.' : 'Passt sie zu dir?'}</h2><span class="store-compatibility" data-level="${esc(level)}" role="status" aria-live="polite">${esc(levelLabel(level))}</span><p class="store-check-description">${esc(task.error || entry?.compatibility || (entry ? 'Die Manifestprüfung hat keine bekannten Kompatibilitätsprobleme gefunden.' : 'Luna lädt das Paket zur Prüfung. Es wird nichts installiert oder ausgeführt.'))}</p><p class="store-check-limit">Manifestprüfung · keine Garantie für alle Funktionen</p>
-        ${task.phase === 'review' ? `<div class="store-review" role="group" aria-label="Berechtigungen bestätigen"><h3>Diese Zugriffe erlauben?</h3><ul class="store-permissions">${permissions}</ul><p>Die Erweiterung kann auf den genannten Seiten Daten lesen und ändern. Installiere sie nur, wenn du ihr vertraust.</p><button type="button" class="store-cancel" data-store-cancel>Abbrechen</button></div>` : ''}
-        <button type="button" class="store-install-primary" data-store-confirm ${busy || blocked || task.phase === 'installed' ? 'disabled' : ''}>${esc(title)}</button><p class="store-install-note">${task.phase === 'installed' ? 'Lade die betroffenen Webseiten neu, um die Erweiterung zu verwenden.' : 'Du entscheidest vor der Installation über die Berechtigungen.'}</p></section>
-        <section class="store-permissions-card"><h2>Berechtigungen</h2>${entry ? `<ul>${permissions}</ul>` : '<p>Werden aus dem geprüften Paket ermittelt …</p>'}</section>
+        <section class="store-install-card"><span class="store-detail-eyebrow">IN DEINEM LUNA</span><h2>${task.phase === 'installed' ? l10n('Bereit für dich.') : l10n('Passt sie zu dir?')}</h2><span class="store-compatibility" data-level="${esc(level)}" role="status" aria-live="polite">${esc(levelLabel(level))}</span><p class="store-check-description">${esc(task.error || entry?.compatibility || (entry ? l10n('Die Manifestprüfung hat keine bekannten Kompatibilitätsprobleme gefunden.') : l10n('Luna lädt das Paket zur Prüfung. Es wird nichts installiert oder ausgeführt.')))}</p><p class="store-check-limit">Manifestprüfung · keine Garantie für alle Funktionen</p>
+        ${task.phase === 'review' ? l10nMsg`<div class="store-review" role="group" aria-label="Berechtigungen bestätigen"><h3>Diese Zugriffe erlauben?</h3><ul class="store-permissions">${permissions}</ul><p>Die Erweiterung kann auf den genannten Seiten Daten lesen und ändern. Installiere sie nur, wenn du ihr vertraust.</p><button type="button" class="store-cancel" data-store-cancel>Abbrechen</button></div>` : ''}
+        <button type="button" class="store-install-primary" data-store-confirm ${busy || blocked || task.phase === 'installed' ? 'disabled' : ''}>${esc(title)}</button><p class="store-install-note">${task.phase === 'installed' ? l10n('Lade die betroffenen Webseiten neu, um die Erweiterung zu verwenden.') : l10n('Du entscheidest vor der Installation über die Berechtigungen.')}</p></section>
+        <section class="store-permissions-card"><h2>Berechtigungen</h2>${entry ? `<ul>${permissions}</ul>` : l10n('<p>Werden aus dem geprüften Paket ermittelt …</p>')}</section>
       </aside></div></main>`;
     root.scrollTop = scroll;
   }
@@ -117,7 +118,7 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
         if (pending?.id) await api.extensionCancel(pending.id);
         return;
       }
-      if (!pending?.id) throw new Error('Die Kompatibilität konnte nicht geprüft werden.');
+      if (!pending?.id) throw new Error(l10n('Die Kompatibilität konnte nicht geprüft werden.'));
       task.pending = pending;
       task.phase = 'ready';
       render();
@@ -134,7 +135,7 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
       const page = pages.get(task.id) || (await api.extensionStorePage(task.url));
       if (!current(task)) return;
       if (!page?.name || !page.description || page.id !== task.id)
-        throw new Error('Ungültige Store-Details');
+        throw new Error(l10n('Ungültige Store-Details'));
       if (pages.size > 8) pages.delete(pages.keys().next().value);
       pages.set(task.id, page);
       task.page = page;
@@ -154,8 +155,8 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
         showNative(tab?.mode === 'web' ? tab.id : -1);
       }
       if (key) {
-        anchor.querySelector('span:last-child').textContent = 'Luna-Ansicht';
-        anchor.title = 'Erweiterung in Luna ansehen';
+        anchor.querySelector('span:last-child').textContent = l10n('Luna-Ansicht');
+        anchor.title = l10n('Erweiterung in Luna ansehen');
       }
       return;
     }
@@ -207,7 +208,7 @@ export function createStoreInstall({ currentTab, showNative, toast }) {
         task.phase = 'installed';
         render();
       }
-      toast(`${task.pending.name} wurde installiert. Lade die Webseite neu.`);
+      toast(l10nMsg`${task.pending.name} wurde installiert. Lade die Webseite neu.`);
       window.dispatchEvent(new Event('luna-extensions-changed'));
     } catch (error) {
       if (current(task)) {
