@@ -82,6 +82,46 @@ export function EditBookmark(arg1, arg2, arg3) {
   return window['go']['main']['App']['EditBookmark'](arg1, arg2, arg3);
 }
 
+export function ExtensionCancel(arg1) {
+  return window['go']['main']['App']['ExtensionCancel'](arg1);
+}
+
+export function ExtensionEnable(arg1, arg2) {
+  return window['go']['main']['App']['ExtensionEnable'](arg1, arg2);
+}
+
+export function ExtensionInstall(arg1) {
+  return window['go']['main']['App']['ExtensionInstall'](arg1);
+}
+
+export function ExtensionOpen(arg1, arg2) {
+  return window['go']['main']['App']['ExtensionOpen'](arg1, arg2);
+}
+
+export function ExtensionPrepare(arg1) {
+  return window['go']['main']['App']['ExtensionPrepare'](arg1);
+}
+
+export function ExtensionRemove(arg1) {
+  return window['go']['main']['App']['ExtensionRemove'](arg1);
+}
+
+export function ExtensionStoreDetails(arg1) {
+  return window['go']['main']['App']['ExtensionStoreDetails'](arg1);
+}
+
+export function ExtensionStoreLookup(arg1) {
+  return window['go']['main']['App']['ExtensionStoreLookup'](arg1);
+}
+
+export function ExtensionStorePage(arg1) {
+  return window['go']['main']['App']['ExtensionStorePage'](arg1);
+}
+
+export function ExtensionsStatus() {
+  return window['go']['main']['App']['ExtensionsStatus']();
+}
+
 export function GestureBindings() {
   return window['go']['main']['App']['GestureBindings']();
 }
@@ -154,12 +194,64 @@ export function OpenFile(arg1, arg2) {
   return window['go']['main']['App']['OpenFile'](arg1, arg2);
 }
 
+export function PageMonitorAction(arg1, arg2) {
+  return window['go']['main']['App']['PageMonitorAction'](arg1, arg2);
+}
+
+export function PageMonitorConfigure(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PageMonitorConfigure'](arg1, arg2, arg3);
+}
+
+export function PageMonitors() {
+  return window['go']['main']['App']['PageMonitors']();
+}
+
+export function PersonalizedClick(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['PersonalizedClick'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function PersonalizedEnable(arg1, arg2) {
+  return window['go']['main']['App']['PersonalizedEnable'](arg1, arg2);
+}
+
+export function PersonalizedInspect(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['PersonalizedInspect'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function PersonalizedPages() {
+  return window['go']['main']['App']['PersonalizedPages']();
+}
+
+export function PersonalizedRead(arg1, arg2) {
+  return window['go']['main']['App']['PersonalizedRead'](arg1, arg2);
+}
+
+export function PersonalizedRemove(arg1) {
+  return window['go']['main']['App']['PersonalizedRemove'](arg1);
+}
+
+export function PersonalizedSave(arg1) {
+  return window['go']['main']['App']['PersonalizedSave'](arg1);
+}
+
+export function PersonalizedSource(arg1, arg2) {
+  return window['go']['main']['App']['PersonalizedSource'](arg1, arg2);
+}
+
+export function PersonalizedValidate(arg1) {
+  return window['go']['main']['App']['PersonalizedValidate'](arg1);
+}
+
 export function PlayClick() {
   return window['go']['main']['App']['PlayClick']();
 }
 
 export function Prefs() {
   return window['go']['main']['App']['Prefs']();
+}
+
+export function RemoveLuna() {
+  return window['go']['main']['App']['RemoveLuna']();
 }
 
 export function ResetBrowserSettings() {
@@ -176,6 +268,10 @@ export function Screenshot(arg1) {
 
 export function Search(arg1, arg2) {
   return window['go']['main']['App']['Search'](arg1, arg2);
+}
+
+export function SearchImages(arg1) {
+  return window['go']['main']['App']['SearchImages'](arg1);
 }
 
 export function SearchKeyClear() {
@@ -304,6 +400,38 @@ export function SpotifyState() {
 
 export function UpdateStatus() {
   return window['go']['main']['App']['UpdateStatus']();
+}
+
+export function VaultAll() {
+  return window['go']['main']['App']['VaultAll']();
+}
+
+export function VaultDelete(arg1, arg2) {
+  return window['go']['main']['App']['VaultDelete'](arg1, arg2);
+}
+
+export function VaultDeleteAll() {
+  return window['go']['main']['App']['VaultDeleteAll']();
+}
+
+export function VaultDismissPending(arg1) {
+  return window['go']['main']['App']['VaultDismissPending'](arg1);
+}
+
+export function VaultEntries(arg1) {
+  return window['go']['main']['App']['VaultEntries'](arg1);
+}
+
+export function VaultFill(arg1, arg2, arg3) {
+  return window['go']['main']['App']['VaultFill'](arg1, arg2, arg3);
+}
+
+export function VaultSavePending(arg1) {
+  return window['go']['main']['App']['VaultSavePending'](arg1);
+}
+
+export function VaultStatus() {
+  return window['go']['main']['App']['VaultStatus']();
 }
 
 export function WebBack(arg1) {

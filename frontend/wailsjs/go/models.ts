@@ -269,6 +269,408 @@ export namespace chat {
 
 }
 
+export namespace extensions {
+
+	export class Entry {
+	    compatibilityLevel?: string;
+	    compatibility?: string;
+	    unsupported?: boolean;
+	    icon?: string;
+	    id: string;
+	    name: string;
+	    version: string;
+	    permissions: string[];
+	    enabled: boolean;
+	    runtimeID?: string;
+	    error?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.compatibilityLevel = source["compatibilityLevel"];
+	        this.compatibility = source["compatibility"];
+	        this.unsupported = source["unsupported"];
+	        this.icon = source["icon"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.permissions = source["permissions"];
+	        this.enabled = source["enabled"];
+	        this.runtimeID = source["runtimeID"];
+	        this.error = source["error"];
+	    }
+	}
+
+}
+
+export namespace main {
+
+	export class StorePage {
+	    id: string;
+	    url: string;
+	    name: string;
+	    description: string;
+	    icon: string;
+	    screenshots: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new StorePage(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.url = source["url"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.icon = source["icon"];
+	        this.screenshots = source["screenshots"];
+	    }
+	}
+	export class VaultFillResult {
+	    filled: boolean;
+	    username: boolean;
+	    password: boolean;
+	    message?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new VaultFillResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filled = source["filled"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.message = source["message"];
+	    }
+	}
+	export class VaultStatus {
+	    supported: boolean;
+	    ready: boolean;
+	    error?: string;
+	    count: number;
+	    offers: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new VaultStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supported = source["supported"];
+	        this.ready = source["ready"];
+	        this.error = source["error"];
+	        this.count = source["count"];
+	        this.offers = source["offers"];
+	    }
+	}
+
+}
+
+export namespace pagemonitor {
+
+	export class Watch {
+	    auto_refresh?: boolean;
+	    source: string;
+	    selector?: string;
+	    id: string;
+	    url: string;
+	    interval_minutes: number;
+	    enabled: boolean;
+	    hash?: string;
+	    // Go type: time
+	    last_checked: any;
+	    // Go type: time
+	    last_changed: any;
+	    error?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Watch(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.auto_refresh = source["auto_refresh"];
+	        this.source = source["source"];
+	        this.selector = source["selector"];
+	        this.id = source["id"];
+	        this.url = source["url"];
+	        this.interval_minutes = source["interval_minutes"];
+	        this.enabled = source["enabled"];
+	        this.hash = source["hash"];
+	        this.last_checked = this.convertValues(source["last_checked"], null);
+	        this.last_changed = this.convertValues(source["last_changed"], null);
+	        this.error = source["error"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace personalpages {
+
+	export class Format {
+	    attribute?: string;
+	    pattern?: string;
+	    group?: number;
+	    unit?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Format(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.attribute = source["attribute"];
+	        this.pattern = source["pattern"];
+	        this.group = source["group"];
+	        this.unit = source["unit"];
+	    }
+	}
+	export class Column {
+	    title: string;
+	    selector: string;
+	    format?: Format;
+
+	    static createFrom(source: any = {}) {
+	        return new Column(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.selector = source["selector"];
+	        this.format = this.convertValues(source["format"], Format);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Open {
+	    target?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Open(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.target = source["target"];
+	    }
+	}
+	export class Threshold {
+	    op: string;
+	    value: number;
+	    tone: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Threshold(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.op = source["op"];
+	        this.value = source["value"];
+	        this.tone = source["tone"];
+	    }
+	}
+	export class Field {
+	    title: string;
+	    selector: string;
+	    kind: string;
+	    icon?: string;
+	    width?: string;
+	    group?: string;
+	    tone?: string;
+	    max?: number;
+	    limit?: number;
+	    source?: string;
+	    format?: Format;
+	    columns?: Column[];
+	    thresholds?: Threshold[];
+	    firstRowHeader?: boolean;
+	    open?: Open;
+
+	    static createFrom(source: any = {}) {
+	        return new Field(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.selector = source["selector"];
+	        this.kind = source["kind"];
+	        this.icon = source["icon"];
+	        this.width = source["width"];
+	        this.group = source["group"];
+	        this.tone = source["tone"];
+	        this.max = source["max"];
+	        this.limit = source["limit"];
+	        this.source = source["source"];
+	        this.format = this.convertValues(source["format"], Format);
+	        this.columns = this.convertValues(source["columns"], Column);
+	        this.thresholds = this.convertValues(source["thresholds"], Threshold);
+	        this.firstRowHeader = source["firstRowHeader"];
+	        this.open = this.convertValues(source["open"], Open);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Detail {
+	    when: string;
+	    title?: string;
+	    fields: Field[];
+
+	    static createFrom(source: any = {}) {
+	        return new Detail(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.when = source["when"];
+	        this.title = source["title"];
+	        this.fields = this.convertValues(source["fields"], Field);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+
+
+	export class Source {
+	    id: string;
+	    url: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Source(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.url = source["url"];
+	    }
+	}
+	export class Page {
+	    id: string;
+	    title: string;
+	    subtitle: string;
+	    url: string;
+	    scope: string;
+	    enabled: boolean;
+	    fields: Field[];
+	    sources?: Source[];
+	    activate_when?: string;
+	    detail?: Detail;
+
+	    static createFrom(source: any = {}) {
+	        return new Page(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.subtitle = source["subtitle"];
+	        this.url = source["url"];
+	        this.scope = source["scope"];
+	        this.enabled = source["enabled"];
+	        this.fields = this.convertValues(source["fields"], Field);
+	        this.sources = this.convertValues(source["sources"], Source);
+	        this.activate_when = source["activate_when"];
+	        this.detail = this.convertValues(source["detail"], Detail);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+
+}
+
 export namespace search {
 
 	export class FAQ {
@@ -286,6 +688,66 @@ export namespace search {
 	        this.a = source["a"];
 	        this.url = source["url"];
 	    }
+	}
+	export class Image {
+	    title: string;
+	    url: string;
+	    host: string;
+	    thumb: string;
+	    full: string;
+	    w: number;
+	    h: number;
+
+	    static createFrom(source: any = {}) {
+	        return new Image(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.url = source["url"];
+	        this.host = source["host"];
+	        this.thumb = source["thumb"];
+	        this.full = source["full"];
+	        this.w = source["w"];
+	        this.h = source["h"];
+	    }
+	}
+	export class ImagePage {
+	    provider?: string;
+	    query: string;
+	    images: Image[];
+	    millis: number;
+
+	    static createFrom(source: any = {}) {
+	        return new ImagePage(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.query = source["query"];
+	        this.images = this.convertValues(source["images"], Image);
+	        this.millis = source["millis"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Info {
 	    title: string;
@@ -382,6 +844,7 @@ export namespace search {
 	    }
 	}
 	export class Page {
+	    provider?: string;
 	    query: string;
 	    altered: string;
 	    results: Result[];
@@ -398,6 +861,7 @@ export namespace search {
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
 	        this.query = source["query"];
 	        this.altered = source["altered"];
 	        this.results = this.convertValues(source["results"], Result);
@@ -931,6 +1395,27 @@ export namespace store {
 	        this.title = source["title"];
 	        this.last = source["last"];
 	        this.visits = source["visits"];
+	    }
+	}
+
+}
+
+export namespace vault {
+
+	export class Entry {
+	    origin: string;
+	    username: string;
+	    updated: number;
+
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.origin = source["origin"];
+	        this.username = source["username"];
+	        this.updated = source["updated"];
 	    }
 	}
 
