@@ -87,7 +87,7 @@ func TestMCPProtocolAndValidation(t *testing.T) {
 			t.Fatal("custom colors reached dispatcher", r, err)
 		}
 	}
-	for _, id := range []string{"luna", "lavender", "ocean", "mint", "forest", "sand", "peach", "cherry", "arctic", "graphite"} {
+	for _, id := range []string{"luna", "lavender", "ocean", "mint", "forest", "sand", "peach", "cherry", "arctic", "graphite", "abyss"} {
 		r, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "browser_customize", Arguments: map[string]any{"color_theme": id}})
 		if err != nil || r.IsError {
 			t.Fatal("built-in palette rejected", id, r, err)

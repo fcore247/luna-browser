@@ -6,7 +6,7 @@ import (
 )
 
 func TestSiraThemeShortcuts(t *testing.T) {
-	defs := map[string]string{"browser_state": `{"parameters":{"type":"object","properties":{}}}`, "browser_customize": `{"parameters":{"type":"object","properties":{"color_theme":{"type":"string","enum":["ocean"]}},"additionalProperties":false}}`}
+	defs := map[string]string{"browser_state": `{"parameters":{"type":"object","properties":{}}}`, "browser_customize": `{"parameters":{"type":"object","properties":{"color_theme":{"type":"string","enum":["ocean","abyss"]}},"additionalProperties":false}}`}
 	call, ok, err := siraThemeCommand("farbe optionen", defs)
 	if err != nil || !ok || call.Function.Name != "browser_state" {
 		t.Fatal(call, ok, err)
@@ -18,6 +18,12 @@ func TestSiraThemeShortcuts(t *testing.T) {
 	for _, command := range []string{"themeselect Ozean", "themeselect (Ozean)"} {
 		call, ok, err = siraThemeCommand(command, defs)
 		if err != nil || !ok || call.Function.Arguments != `{"color_theme":"ocean"}` {
+			t.Fatal(call, ok, err)
+		}
+	}
+	for _, command := range []string{"themeselect Tiefnacht", "themeselect abyss"} {
+		call, ok, err = siraThemeCommand(command, defs)
+		if err != nil || !ok || call.Function.Arguments != `{"color_theme":"abyss"}` {
 			t.Fatal(call, ok, err)
 		}
 	}

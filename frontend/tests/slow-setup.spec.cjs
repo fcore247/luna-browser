@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 test('startup threshold, one warning, removal failure remains recoverable', async ({ page }) => {
-  await page.route('**/src/api.js', (route) =>
+  await page.route('**/src/api.js*', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `export const removeLuna=async()=>{window.removalCalls=(window.removalCalls||0)+1;throw Error('Testfehler')};`,

@@ -11,6 +11,7 @@ var siraThemes = []struct{ ID, Name, Color string }{
 	{"forest", "Wald", "grün"}, {"sand", "Sand", "gelb"},
 	{"peach", "Pfirsich", "orange"}, {"cherry", "Kirschblüte", "rot"},
 	{"arctic", "Arktis", "türkis"}, {"graphite", "Graphit", "grau"},
+	{"abyss", "Tiefnacht", "schwarz"},
 }
 
 func siraThemeOptions() string {

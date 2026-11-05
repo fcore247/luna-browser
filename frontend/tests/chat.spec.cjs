@@ -299,9 +299,14 @@ test('chat opens without Enter, streams safely, preserves history and stops resp
     chatEvent(structuredClone(c));
   }, first);
   const themes = page.locator('.chat-theme-card');
-  await expect(themes.locator('[data-color]')).toHaveCount(10);
+  await expect(themes.locator('[data-color]')).toHaveCount(11);
   await expect(themes).toContainText('Luna Rosé');
   await expect(themes).toContainText('Ozean');
+  await expect(themes).toContainText('Tiefnacht');
+  await themes.locator('[data-color="abyss"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'abyss');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await page.evaluate(() => localStorage.getItem('luna-color-theme'))).toBe('abyss');
   await themes.locator('[data-color="ocean"]').click();
   await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'ocean');
   expect(await page.evaluate(() => localStorage.getItem('luna-color-theme'))).toBe('ocean');
@@ -344,7 +349,7 @@ test('chat opens without Enter, streams safely, preserves history and stops resp
   await expect(page.locator('.chat-theme-card')).toHaveCount(2);
   await expect(
     page.locator('.chat-message.assistant').last().locator('.chat-theme-card [data-color]'),
-  ).toHaveCount(10);
+  ).toHaveCount(11);
   await page.reload();
   await page.locator('#splash.gone').waitFor({ state: 'attached' });
   await page.locator('#url').fill('chat');

@@ -66,7 +66,7 @@ function pager(t, d) {
   const out = [];
   if (cur > 0)
     out.push(
-      l10nMsg`<button data-act="sv-page" data-p="${cur - 1}" aria-label="Zurück">←</button>`,
+      l10nMsg`<button data-act="sv-page" data-p="${cur - 1}" aria-label="${l10n('Zurück')}">←</button>`,
     );
   for (let i = start; i <= last; i++)
     out.push(
@@ -76,7 +76,7 @@ function pager(t, d) {
     );
   if (d.more && cur < 9)
     out.push(
-      l10nMsg`<button data-act="sv-page" data-p="${cur + 1}" aria-label="Weiter">→</button>`,
+      l10nMsg`<button data-act="sv-page" data-p="${cur + 1}" aria-label="${l10n('Weiter')}">→</button>`,
     );
   return out.length > 1
     ? l10nMsg`<nav class="sv-pg" aria-label="Seiten">${out.join('')}</nav>`
@@ -142,13 +142,13 @@ function lightbox(t) {
   if (t.filter !== 'images' || t.lb == null || !list?.[t.lb]) return '';
   const m = list[t.lb];
   const n = list.length;
-  return `<div class="im-lb" data-act="im-close" role="dialog" aria-modal="true" aria-label="${esc(m.title || 'Bild')}">
-    <button class="im-x" data-act="im-close" aria-label="Schließen">${IM.x}</button>
-    ${t.lb > 0 ? `<button class="im-nav prev" data-act="im-prev" aria-label="Zurück">${IM.l}</button>` : ''}
-    ${t.lb < n - 1 ? `<button class="im-nav next" data-act="im-next" aria-label="Weiter">${IM.r}</button>` : ''}
+  return `<div class="im-lb" data-act="im-close" role="dialog" aria-modal="true" aria-label="${esc(m.title || l10n('Bild'))}">
+    <button class="im-x" data-act="im-close" aria-label="${l10n('Schließen')}">${IM.x}</button>
+    ${t.lb > 0 ? `<button class="im-nav prev" data-act="im-prev" aria-label="${l10n('Zurück')}">${IM.l}</button>` : ''}
+    ${t.lb < n - 1 ? `<button class="im-nav next" data-act="im-next" aria-label="${l10n('Weiter')}">${IM.r}</button>` : ''}
     <figure class="im-fig"><img src="${esc(m.full)}" alt="${esc(m.title)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${esc(m.thumb)}'">
       <figcaption><div class="im-t"><b>${esc(m.title || m.host)}</b><span>${esc(m.host)}${m.w && m.h ? ' · ' + m.w + '×' + m.h : ''} · ${t.lb + 1}/${n}</span></div>
-      <div class="im-btns">${m.url ? l10nMsg`<button class="btn pri" data-act="sr-open" data-url="${esc(m.url)}">Seite besuchen ${IM.go}</button><button class="btn" data-act="sr-tab" data-url="${esc(m.url)}">In neuem Tab</button>` : ''}</div></figcaption></figure></div>`;
+      <div class="im-btns">${m.url ? l10nMsg`<button class="btn pri" data-act="sr-open" data-url="${esc(m.url)}">${l10n('Seite besuchen')} ${IM.go}</button><button class="btn" data-act="sr-tab" data-url="${esc(m.url)}">In neuem Tab</button>` : ''}</div></figcaption></figure></div>`;
 }
 
 function skeleton() {

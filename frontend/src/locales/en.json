@@ -1381,9 +1381,10 @@
   "Bildersuche braucht Brave": "Image search needs Brave",
   "Keine Bilder": "No images",
   "Zu „{{0}}“ hat Luna Search keine Bilder gefunden.": "Luna Search found no images for “{{0}}”.",
-  "Seite besuchen {{0}}": "Visit page {{0}}",
+  "Seite besuchen": "Visit page",
   "In neuem Tab": "In new tab",
   "Tiefnacht": "Deep Night",
+  "Bild": "Image",
   "Luna sucht": "Luna is searching",
   "Bildersuche": "Image search"
 }

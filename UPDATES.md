@@ -16,6 +16,17 @@ Der private Schlüssel verbleibt im Schlüsselbund dieses Macs. CI erhält keine
 privaten Schlüssel. Während der Testphase werden nur CI-Artefakte erzeugt; ein Push
 allein veröffentlicht weiterhin **kein** Update.
 
+## Version 1.3.5 · 5. November 2026
+
+- Luna Search im Glas-Look mit Filtern direkt in der Adressleiste.
+- Brave-Bildersuche mit animierter Ladeansicht, Bildraster und Großansicht mit Pfeiltasten/Escape.
+- Lokale Flip-Disk-Matrix-Uhr für Uhrzeit-Suchen, ohne Netzanfrage.
+- Gemeinsamer Glas-Look und weiche Übergänge zwischen Luna-Seiten; berücksichtigt reduzierte Bewegung.
+- Neues Theme Tiefnacht mit automatischem Wechsel auf Dunkel und Unterstützung in Chat, KI und MCP.
+- Aktualisierte Wails-Bindings einschließlich `SearchImages`, übersetzte Bildnavigation und korrigierte Oberflächentests.
+
+Windows bleibt **experimentell / instabil**.
+
 ## Bestehende macOS-Technik
 
 

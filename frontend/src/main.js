@@ -501,7 +501,8 @@ async function loadEntry(t, force) {
   const tok = ++t.sTok;
   t.images = null; // Bilder gehören zur jeweiligen Suche
   t.lb = null;
-  if (t.filter === 'images' && t.provider !== 'spotify' && !isTimeQuery(e.q)) queueMicrotask(() => loadImages(t));
+  if (t.filter === 'images' && t.provider !== 'spotify' && !isTimeQuery(e.q))
+    queueMicrotask(() => loadImages(t));
   if (e.data && !force) {
     t.data = e.data;
     t.sLoading = false;
@@ -3521,6 +3522,7 @@ async function runMCPCommand(name, a) {
       if (a.color_theme !== undefined || a.reset_colors) {
         clearLegacyMCPColors();
         applyColorTheme(a.color_theme ?? 'luna', true);
+        if (a.color_theme === DEEP_THEME && themeMode() !== 'dark') applyTheme('dark', true);
       }
       if (a.sidebar_width) {
         document.documentElement.style.setProperty('--sidew', a.sidebar_width + 'px');
