@@ -68,7 +68,7 @@ test('theme grows the address bar downward, applies themes live and closes', asy
   await page.waitForTimeout(1400);
   const full = (await drop.boundingBox()).height;
   expect(full).toBeGreaterThan(early);
-  await expect(drop.locator('.color-theme')).toHaveCount(10);
+  await expect(drop.locator('.color-theme')).toHaveCount(11);
   await page.screenshot({ path: '/tmp/luna-theme-drop.png' });
   await drop.locator('[data-pick="ocean"]').click();
   expect(await page.evaluate(() => document.documentElement.dataset.colorTheme)).toBe('ocean');

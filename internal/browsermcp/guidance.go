@@ -1,9 +1,9 @@
 package browsermcp
 
 // Shared by the external MCP client and Luna Chat. Keep concise for small contexts.
-var colorNames = map[string]string{"rosa": "luna", "lila": "lavender", "blau": "ocean", "mintgrün": "mint", "grün": "forest", "gelb": "sand", "orange": "peach", "rot": "cherry", "türkis": "arctic", "grau": "graphite"}
+var colorNames = map[string]string{"rosa": "luna", "lila": "lavender", "blau": "ocean", "mintgrün": "mint", "grün": "forest", "gelb": "sand", "orange": "peach", "rot": "cherry", "türkis": "arctic", "grau": "graphite", "schwarz": "abyss"}
 
-const ColorInstructions = `Browserfarbe ändern: Auch kurze, ungenaue oder falsch geschriebene Wünsche wie "mach blau", "browser blua" oder "ich will grün" sind Farbaufträge. Nutze browser_customize mit color. Verfügbare Farben (dieselben bestehenden Themes): rosa=Luna Rosé, lila=Lavendel, blau=Ozean, mintgrün=Minze, grün=Wald, gelb=Sand, orange=Pfirsich, rot=Kirschblüte, türkis=Arktis, grau=Graphit. Beispiel: "mach den Browser blau" -> {"color":"blau"}. Nur color senden, keine action und kein theme nötig. Sira schreibt bei unbekannter oder unklarer Wunschfarbe stattdessen Theme Widget in die Antwort, damit die Auswahl im Chat erscheint. Andere Modelle: Unbekannte Wunschfarbe auf die ähnlichste dieser Farben abbilden und die gewählte Farbe kurz nennen. Nicht nach technischen Theme-Namen fragen. Erfolg erst nach erfolgreichem Werkzeugergebnis bestätigen.`
+const ColorInstructions = `Browserfarbe ändern: Auch kurze, ungenaue oder falsch geschriebene Wünsche wie "mach blau", "browser blua" oder "ich will grün" sind Farbaufträge. Nutze browser_customize mit color. Verfügbare Farben (dieselben bestehenden Themes): rosa=Luna Rosé, lila=Lavendel, blau=Ozean, mintgrün=Minze, grün=Wald, gelb=Sand, orange=Pfirsich, rot=Kirschblüte, türkis=Arktis, grau=Graphit, schwarz=Tiefnacht. Beispiel: "mach den Browser blau" -> {"color":"blau"}. Nur color senden, keine action und kein theme nötig. Sira schreibt bei unbekannter oder unklarer Wunschfarbe stattdessen Theme Widget in die Antwort, damit die Auswahl im Chat erscheint. Andere Modelle: Unbekannte Wunschfarbe auf die ähnlichste dieser Farben abbilden und die gewählte Farbe kurz nennen. Nicht nach technischen Theme-Namen fragen. Erfolg erst nach erfolgreichem Werkzeugergebnis bestätigen.`
 
 const ThemeWidgetInstructions = `In Luna Chat: Um die Theme-Auswahl einzublenden, schreibe einfach die exakten Wörter "Theme Widget" in deine normale Antwort, z.B. "Wähle deinen Look im Theme Widget." Die Oberfläche zeigt automatisch die Auswahl mit den Namen aus den Einstellungen. Kein Werkzeugaufruf nötig, auch ohne Browser-Werkzeuge möglich. Dies ändert noch keine Farbe; der Nutzer wählt selbst. Nur erwähnen, wenn die Auswahl angezeigt werden soll.`
 
@@ -89,7 +89,7 @@ var parameterHelp = map[string]string{
 	"x":                  "Relativ horizontal scrollen, in Pixeln. Negativ=links.",
 	"y":                  "Relativ vertikal scrollen, in Pixeln. Positiv=unten.",
 	"theme":              "Helligkeit: auto=System, light=hell, dark=dunkel. Keine Farbe.",
-	"color":              "Gewünschte Browserfarbe: rosa, lila, blau, mintgrün, grün, gelb, orange, rot, türkis oder grau. Beispiel: blau. Die Namen wählen bestehende Themes, keine neuen Farben. Bevorzugt dieses Feld verwenden.",
+	"color":              "Gewünschte Browserfarbe: rosa, lila, blau, mintgrün, grün, gelb, orange, rot, türkis, grau oder schwarz. Beispiel: blau. Die Namen wählen bestehende Themes, keine neuen Farben. Bevorzugt dieses Feld verwenden.",
 	"color_theme":        "Alternative zu color. Eingebaute Farbwelt-ID: z.B. mint=Minze, ocean=Ozean, luna=Rosé. Ausschließlich die Enum-Werte, keine Hex-Farben.",
 	"reset_colors":       "true setzt auf Luna Rosé zurück; zum Wählen anderer Farben color_theme nutzen.",
 	"sidebar_width":      "Breite des Seitenpanels in Pixeln, 260 bis 560.",

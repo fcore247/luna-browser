@@ -140,7 +140,7 @@
   "Arktis": "Arctic",
   "Graphit": "Graphite",
   "Deine Farbwelt": "Your colour theme",
-  "Zehn Looks für Luna. Jeder passt sich an Hell und Dunkel an.": "Ten looks for Luna. Each adapts to light and dark mode.",
+  "Elf Looks für Luna. Jeder passt sich an Hell und Dunkel an, Tiefnacht ist fürs Dunkle gemacht.": "Eleven looks for Luna. Each adapts to light and dark mode; Deep Night is made for dark.",
   "Farbthemes": "Color themes",
   "Dock-Symbol konnte nicht aktualisiert werden": "Dock icon could not be updated",
   "Bitte wähle ein PNG-, JPG- oder WebP-Foto bis 20 MB.": "Please choose a PNG, JPG or WebP photo up to 20 MB.",
@@ -1373,5 +1373,18 @@
   "Zu viele Weiterleitungen": "Too many redirects",
   "Überwachungen der aktuellen Seite direkt in der Adressleiste verwalten. Auch monitor oder überwachen öffnet die Leiste.": "Manage monitors for the current page directly from the address bar. You can also type monitor or überwachen to open the controls.",
   "Status · Prüfintervall · Neuladen": "Status · Check interval · Reload",
-  "Pausieren, fortsetzen oder alle gespeicherten Aufgaben öffnen.": "Pause, resume or open all saved tasks."
+  "Pausieren, fortsetzen oder alle gespeicherten Aufgaben öffnen.": "Pause, resume or open all saved tasks.",
+  "Bilder{{5}}": "Images{{5}}",
+  "Nachrichten{{7}}": "News{{7}}",
+  "Bilder nicht verfügbar": "Images unavailable",
+  "Luna Search ist noch nicht eingerichtet.": "Luna Search is not set up yet.",
+  "Bildersuche braucht Brave": "Image search needs Brave",
+  "Keine Bilder": "No images",
+  "Zu „{{0}}“ hat Luna Search keine Bilder gefunden.": "Luna Search found no images for “{{0}}”.",
+  "Seite besuchen": "Visit page",
+  "In neuem Tab": "In new tab",
+  "Tiefnacht": "Deep Night",
+  "Bild": "Image",
+  "Luna sucht": "Luna is searching",
+  "Bildersuche": "Image search"
 }

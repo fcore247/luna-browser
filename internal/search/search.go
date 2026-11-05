@@ -81,13 +81,14 @@ type Page struct {
 
 // Client fragt Brave ab. Key liefert den Schlüssel bei jeder Anfrage frisch (Schlüsselbund).
 type Client struct {
-	Key      func() (string, error)
-	Endpoint string // nur für Tests; leer = Brave
-	HTTP     *http.Client
+	Key           func() (string, error)
+	Endpoint      string // nur für Tests; leer = Brave
+	ImageEndpoint string // nur für Tests; leer = Brave
+	HTTP          *http.Client
 }
 
 func NewClient(key func() (string, error)) *Client {
-	return &Client{Key: key, Endpoint: braveEndpoint, HTTP: &http.Client{Timeout: 10 * time.Second}}
+	return &Client{Key: key, Endpoint: braveEndpoint, ImageEndpoint: braveImageEndpoint, HTTP: &http.Client{Timeout: 10 * time.Second}}
 }
 
 const perPage = 20

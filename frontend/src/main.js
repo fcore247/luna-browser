@@ -48,6 +48,7 @@ import { initAutoNext } from './music-autonext.js';
 import { initQueueDrop } from './spotify-queue.js';
 import {
   COLOR_THEMES,
+  DEEP_THEME,
   applyColorTheme,
   colorTheme,
   themeIconURL,
@@ -68,7 +69,8 @@ import {
 import './gesture-core.js';
 import * as api from './api.js';
 import { IS_NATIVE } from './api.js';
-import { searchHTML } from './searchview.js';
+import { searchHTML, filterPillsHTML } from './searchview.js';
+import { isTimeQuery, mountClock } from './flipclock.js';
 import {
   addPanelGroup,
   renamePanelGroup,
@@ -374,7 +376,7 @@ function openWeb(t, url) {
 }
 function openSearch(t, q, page = 0, opts = {}) {
   q = q.trim();
-  if (q && opts.provider !== 'spotify' && S.googleSearch) {
+  if (q && opts.provider !== 'spotify' && S.googleSearch && !isTimeQuery(q)) {
     openWeb(t, 'https://www.google.com/search?q=' + encodeURIComponent(q));
     return;
   }
@@ -400,6 +402,88 @@ function openSearch(t, q, page = 0, opts = {}) {
   if (t.id === S.active) nativeShow(-1);
   saveSession();
 }
+// Nebel: Der Tunnel verschwindet im Nebel, darunter erscheint das Raster, und der Nebel lichtet sich
+// und blendet in die Bilder über (die Bilder werden dabei von unscharf zu scharf).
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fogVeil() {
+  const veil = document.createElement('div');
+  veil.className = 'fog-veil';
+  veil.setAttribute('aria-hidden', 'true');
+  veil.innerHTML = '<i></i><i></i><i></i><i></i><i></i>';
+  veil.style.opacity = '0';
+  $('#page').append(veil);
+  return veil;
+}
+function revealImages() {
+  const vh = window.innerHeight;
+  let n = 0;
+  for (const tile of document.querySelectorAll('#searchView .im')) {
+    const r = tile.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > vh) continue; // außerhalb des Sichtfelds: normales Einblenden
+    tile.style.animation = 'none';
+    tile.animate(
+      [
+        { opacity: 0, filter: 'blur(18px) brightness(1.3)', transform: 'scale(1.05)' },
+        { opacity: 1, filter: 'blur(0) brightness(1)', transform: 'none' },
+      ],
+      {
+        duration: 1100,
+        delay: Math.min(n++, 14) * 45,
+        easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)',
+        fill: 'backwards',
+      },
+    );
+  }
+}
+async function fogTransition(render) {
+  const veil = fogVeil();
+  try {
+    await veil.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 650,
+      easing: 'ease-in',
+      fill: 'forwards',
+    }).finished;
+    render();
+    revealImages();
+    await veil.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 1400,
+      easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)',
+      fill: 'forwards',
+    }).finished;
+  } catch {
+    render();
+  }
+  veil.remove();
+}
+// Bildersuche: lädt erst, wenn der Reiter „Bilder“ gebraucht wird, und nur für die aktuelle Suche.
+async function loadImages(t) {
+  const q = t.q,
+    tok = t.sTok;
+  if (!q || !S.hasKey) {
+    t.images = { err: S.hasKey ? '' : l10n('Luna Search ist noch nicht eingerichtet.') };
+    if (t.id === S.active) renderSearchView();
+    return;
+  }
+  t.images = { loading: true };
+  if (t.id === S.active) renderSearchView();
+  // Der Tunnel („Luna sucht“) soll mindestens kurz zu sehen sein, auch wenn Brave schnell antwortet.
+  const started = Date.now();
+  let result, failure;
+  try {
+    result = await api.searchImages(q);
+  } catch (err) {
+    failure = err;
+  }
+  const wait = (reducedMotion() ? 0 : 1600) - (Date.now() - started);
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  if (t.q !== q || t.sTok !== tok) return;
+  const live = t.id === S.active && t.mode === 'search';
+  t.images = failure
+    ? { err: String(failure?.message || failure) }
+    : { data: result || { images: [] } };
+  if (live && !failure && !reducedMotion()) await fogTransition(renderSearchView);
+  else if (live) renderSearchView();
+}
 // zeigt den Eintrag sHist[sIdx]; Ergebnisse werden pro Eintrag gemerkt (Zurück/Vor kostet keine Anfrage)
 async function loadEntry(t, force) {
   const e = t.sHist[t.sIdx];
@@ -415,6 +499,10 @@ async function loadEntry(t, force) {
   t.sel = 0;
   t.sErr = '';
   const tok = ++t.sTok;
+  t.images = null; // Bilder gehören zur jeweiligen Suche
+  t.lb = null;
+  if (t.filter === 'images' && t.provider !== 'spotify' && !isTimeQuery(e.q))
+    queueMicrotask(() => loadImages(t));
   if (e.data && !force) {
     t.data = e.data;
     t.sLoading = false;
@@ -423,6 +511,14 @@ async function loadEntry(t, force) {
     return;
   }
   t.data = null;
+  if (t.provider !== 'spotify' && isTimeQuery(e.q)) {
+    // Uhrzeit braucht keine Websuche: sie wird lokal als Flip-Disk-Matrix gezeigt
+    e.data = t.data = { local: true, results: [], millis: 0, provider: 'Luna', query: e.q };
+    t.sLoading = false;
+    t.loading = false;
+    if (t.id === S.active) renderAll();
+    return;
+  }
   if (t.provider === 'spotify' && !e.q) {
     t.sLoading = false;
     t.loading = false;
@@ -1100,11 +1196,22 @@ function syncSharedBackground() {
   page.classList.toggle('has-personal-background', custom);
 }
 let stopSearchBackground;
+// Die Filter (Alle · Bilder · Nachrichten · Videos) wohnen in der Adressleiste und verschmelzen mit ihr.
+function renderSearchPills() {
+  const box = $('#urlPills'),
+    t = cur();
+  if (!box) return;
+  const html = t?.mode === 'search' ? filterPillsHTML(t) : '';
+  box.innerHTML = html;
+  box.hidden = !html;
+  $('#urlbox').classList.toggle('has-pills', !!html);
+}
 function renderSearchView() {
   stopSearchBackground?.();
   stopSearchBackground = null;
   const t = cur(),
     el = $('#searchView');
+  renderSearchPills();
   const show = !!t && t.mode === 'search';
   el.hidden = !show;
   if (!show) return;
@@ -1112,6 +1219,7 @@ function renderSearchView() {
   el.classList.toggle('spotify-results-page', t.provider === 'spotify');
   const content = t.provider === 'spotify' ? spotifyResultsHTML(t) : searchHTML(t, isBookmarked);
   el.innerHTML = `<div class="search-scene"><div class="search-backdrop">${personal().background === 'waves' ? startBackgroundHTML : ''}</div><div class="search-content">${content}</div></div>`;
+  t.filterFrom = null; // Liquid-Tropfen animiert nur beim Wechsel, nicht bei jedem Neuzeichnen
   const resizeBackground = () =>
     el.style.setProperty('--search-viewport-height', el.clientHeight + 'px');
   resizeBackground();
@@ -1125,13 +1233,16 @@ function renderSearchView() {
         !personal().motion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       )
     : () => {};
+  const clock = el.querySelector('.fm');
+  const stopClock = clock ? mountClock(clock) : () => {};
   stopSearchBackground = () => {
     observer.disconnect();
     stopWaves();
+    stopClock();
   };
   el.scrollTop = t.sLoading ? 0 : top;
 }
-function renderAll() {
+function paintAll() {
   renderTabs();
   renderToolbar();
   renderBar();
@@ -1142,6 +1253,40 @@ function renderAll() {
   chatUI.show(cur()?.mode === 'chat');
   renderSide();
   updateFrame();
+}
+// Wechselt ein Tab zwischen Luna-Seiten (Start ↔ Luna Search ↔ Einstellungen ↔ Chat), blendet der Seitenbereich
+// weich über (alte Seite löst sich mit leichter Unschärfe, neue steigt auf) statt hart umzuspringen.
+const LUNA_PAGES = new Set(['start', 'search', 'settings', 'chat']);
+let lastPaint = { id: null, mode: null };
+function renderAll() {
+  const t = cur();
+  const from = lastPaint;
+  lastPaint = { id: t?.id ?? null, mode: t?.mode ?? null };
+  const smooth =
+    !!t &&
+    from.id === t.id &&
+    from.mode !== t.mode &&
+    LUNA_PAGES.has(from.mode) &&
+    LUNA_PAGES.has(t.mode) &&
+    typeof document.startViewTransition === 'function' &&
+    !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    !onboarding?.active;
+  if (!smooth) return paintAll();
+  const root = document.documentElement;
+  root.dataset.pageFrom = from.mode;
+  root.dataset.pageTo = t.mode;
+  try {
+    const vt = document.startViewTransition(() => paintAll());
+    const done = () => {
+      delete root.dataset.pageFrom;
+      delete root.dataset.pageTo;
+    };
+    vt.finished.then(done, done);
+  } catch {
+    delete root.dataset.pageFrom;
+    delete root.dataset.pageTo;
+    paintAll();
+  }
 }
 
 /* ---------- Seitenbereich ↔ native Ansicht ---------- */
@@ -1340,6 +1485,8 @@ cmdUI = createCommandUI({
     localStorage.removeItem(MCP_COLORS);
     clearLegacyMCPColors();
     applyColorTheme(id, true);
+    if (id === DEEP_THEME && themeMode() !== 'dark') applyTheme('dark', true); // Tiefnacht ist ein Dunkel-Theme
+    renderTabs();
     if (cur()?.mode === 'settings') renderSettingsView();
   },
   pickMode: (mode) => {
@@ -2473,7 +2620,34 @@ document.addEventListener('click', async (ev) => {
       openSearch(t, t.q, +d.p);
       break;
     case 'sv-filter':
+      t.filterFrom = ['all', 'images', 'news', 'video'].indexOf(t.filter);
       t.filter = d.k;
+      t.lb = null;
+      if (d.k === 'images' && !t.images) loadImages(t);
+      else renderSearchView();
+      break;
+    case 'sv-img-retry':
+      t.images = null;
+      loadImages(t);
+      break;
+    case 'im-open':
+      t.lb = +d.i;
+      renderSearchView();
+      break;
+    case 'im-close':
+      // Klick auf den Rahmen schließt; Klicks auf Bild oder Knöpfe im Rahmen nicht
+      if (ev.target === a || a.classList.contains('im-x')) {
+        t.lb = null;
+        renderSearchView();
+      }
+      break;
+    case 'im-prev':
+    case 'im-next':
+      ev.stopPropagation();
+      t.lb = Math.max(
+        0,
+        Math.min((t.images?.data?.images?.length || 1) - 1, t.lb + (d.act === 'im-next' ? 1 : -1)),
+      );
       renderSearchView();
       break;
     case 'sv-alt':
@@ -2693,6 +2867,7 @@ document.addEventListener('click', async (ev) => {
       localStorage.removeItem(MCP_COLORS);
       clearLegacyMCPColors();
       applyColorTheme(d.color, true);
+      if (d.color === DEEP_THEME && themeMode() !== 'dark') applyTheme('dark', true); // Tiefnacht ist ein Dunkel-Theme
       renderSettingsView();
       break;
     case 'theme':
@@ -2891,6 +3066,22 @@ document.addEventListener('submit', (ev) => {
 document.addEventListener('input', (ev) => {
   if (ev.target.id === 'startQ') armQuickSite(ev.target, ev);
 });
+// Luna Search: Lichtfleck folgt dem Zeiger über den Ergebniskarten.
+document.addEventListener('pointermove', (ev) => {
+  const tn = ev.target.closest?.('.tn');
+  if (tn) {
+    const r = tn.getBoundingClientRect();
+    tn.style.setProperty('--px', (((ev.clientX - r.left) / r.width - 0.5) * 2).toFixed(3));
+    tn.style.setProperty('--py', (((ev.clientY - r.top) / r.height - 0.5) * 2).toFixed(3));
+  }
+  const c = ev.target.closest?.(
+    '#searchView .sr, .music-card, .music-feature, .ext-entry, .sp-card, .chat-starters button, .lg-card',
+  );
+  if (!c) return;
+  const r = c.getBoundingClientRect();
+  c.style.setProperty('--mx', ev.clientX - r.left + 'px');
+  c.style.setProperty('--my', ev.clientY - r.top + 'px');
+});
 document.addEventListener('mousedown', (ev) => {
   if (menuOpen && !ev.target.closest('#menu, #bMenu')) closeMenu();
 });
@@ -2915,6 +3106,16 @@ document.addEventListener('keydown', (ev) => {
     }
   }
   const t = cur();
+  if (t?.mode === 'search' && t.filter === 'images' && t.lb != null) {
+    const last = (t.images?.data?.images?.length || 1) - 1;
+    if (ev.key === 'Escape') t.lb = null;
+    else if (ev.key === 'ArrowRight') t.lb = Math.min(last, t.lb + 1);
+    else if (ev.key === 'ArrowLeft') t.lb = Math.max(0, t.lb - 1);
+    else return;
+    ev.preventDefault();
+    renderSearchView();
+    return;
+  }
   if (
     t?.mode === 'search' &&
     t.provider !== 'spotify' &&
@@ -3321,6 +3522,7 @@ async function runMCPCommand(name, a) {
       if (a.color_theme !== undefined || a.reset_colors) {
         clearLegacyMCPColors();
         applyColorTheme(a.color_theme ?? 'luna', true);
+        if (a.color_theme === DEEP_THEME && themeMode() !== 'dark') applyTheme('dark', true);
       }
       if (a.sidebar_width) {
         document.documentElement.style.setProperty('--sidew', a.sidebar_width + 'px');

@@ -262,6 +262,24 @@ func (a *App) Search(q string, page int) (*search.Page, error) {
 	return result, err
 }
 
+// SearchImages liefert die Bildersuche für q. Sie läuft über Brave; mit Tavily gibt es keine Bilder.
+func (a *App) SearchImages(q string) (*search.ImagePage, error) {
+	ctx, cancel := context.WithTimeout(a.ctx, 14*time.Second)
+	defer cancel()
+	language := "de"
+	if a.englishUI() {
+		language = "en"
+	}
+	if a.useTavily() {
+		return &search.ImagePage{Query: q, Provider: "Tavily", Images: []search.Image{}}, nil
+	}
+	page, err := a.search.Images(ctx, q, language)
+	if page != nil {
+		page.Provider = "Brave"
+	}
+	return page, err
+}
+
 // SearchKeyStatus sagt nur, OB ein Schlüssel gespeichert ist.
 func (a *App) SearchKeyStatus() bool {
 	_, ok, _ := a.secrets.Get(a.searchKeyFile())

@@ -1,0 +1,336 @@
+/* ---------- Luna Glas: gemeinsamer Look für Startseite, Musik, Chat, Einstellungen, Erweiterungen ----------
+   Gleiche Sprache wie Luna Search: Glaskarten mit Lichtkante, runde Pillen, Lichtfleck unter dem Zeiger,
+   weiche Übergänge statt Trennlinien. Als letztes geladen, damit es die Einzelseiten sanft überschreibt. */
+:root {
+  --lg-hi: rgba(255, 255, 255, 0.55);
+  --lg-card: color-mix(in srgb, var(--card) 58%, transparent);
+  --lg-card-h: color-mix(in srgb, var(--card) 74%, transparent);
+  --lg-edge: color-mix(in srgb, var(--line3) 70%, transparent);
+  --lg-shadow: 0 8px 22px -16px rgba(58, 36, 51, 0.45);
+  --lg-shadow-h: 0 16px 34px -16px color-mix(in srgb, var(--acc) 50%, rgba(58, 36, 51, 0.5));
+}
+:root[data-theme='dark'] {
+  --lg-hi: rgba(255, 255, 255, 0.09);
+  --lg-shadow: 0 10px 26px -16px rgba(0, 0, 0, 0.7);
+}
+
+/* Keine Naht zwischen Werkzeugleiste und Seite */
+#page::before {
+  content: '';
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--panel), transparent);
+}
+
+/* Lichtfleck-Karten (wird in main.js per pointermove mit --mx/--my gefüttert) */
+.lg-card {
+  --mx: 50%;
+  --my: 0%;
+  position: relative;
+  overflow: hidden;
+  background: var(--lg-card);
+  border: 1px solid var(--lg-edge);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 var(--lg-hi),
+    var(--lg-shadow);
+  transition:
+    transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1),
+    box-shadow 0.25s,
+    border-color 0.25s,
+    background-color 0.25s;
+}
+.lg-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(
+    260px circle at var(--mx) var(--my),
+    color-mix(in srgb, var(--acc) 22%, transparent),
+    transparent 70%
+  );
+}
+.lg-card:hover {
+  background: var(--lg-card-h);
+  border-color: color-mix(in srgb, var(--acc) 45%, var(--line3));
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 var(--lg-hi),
+    var(--lg-shadow-h);
+}
+.lg-card:hover::after {
+  opacity: 1;
+}
+
+/* Gleiche Selektoren wie oben, direkt auf den bestehenden Klassen */
+.music-card,
+.music-feature,
+.ext-entry,
+.sp-card,
+.chat-history,
+.chat-starters button {
+  position: relative;
+  overflow: hidden;
+  background: var(--lg-card);
+  border: 1px solid var(--lg-edge);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 var(--lg-hi),
+    var(--lg-shadow);
+}
+.music-card,
+.music-feature,
+.ext-entry,
+.chat-starters button {
+  --mx: 50%;
+  --my: 0%;
+  transition:
+    transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1),
+    box-shadow 0.25s,
+    border-color 0.25s,
+    background-color 0.25s;
+}
+.music-card::after,
+.music-feature::after,
+.ext-entry::after,
+.sp-card::after,
+.chat-starters button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--acc) 22%, transparent),
+    transparent 70%
+  );
+}
+.music-card:hover,
+.music-feature:hover,
+.ext-entry:hover,
+.sp-card:hover,
+.chat-starters button:hover {
+  background: var(--lg-card-h);
+  border-color: color-mix(in srgb, var(--acc) 45%, var(--line3));
+  box-shadow:
+    inset 0 1px 0 var(--lg-hi),
+    var(--lg-shadow-h);
+}
+.music-card:hover,
+.music-feature:hover,
+.ext-entry:hover,
+.chat-starters button:hover {
+  transform: translateY(-2px);
+}
+.music-card:hover::after,
+.music-feature:hover::after,
+.ext-entry:hover::after,
+.sp-card:hover::after,
+.chat-starters button:hover::after {
+  opacity: 1;
+}
+.music-feature {
+  background:
+    linear-gradient(125deg, color-mix(in srgb, #1db954 14%, transparent), transparent 70%), var(--lg-card);
+}
+.music-track {
+  border-radius: 16px;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    transform 0.2s;
+}
+.music-track:hover {
+  background: var(--lg-card-h);
+  border-color: var(--lg-edge);
+  transform: translateX(2px);
+}
+
+/* Eingabefelder und Knöpfe als Pillen */
+.st-search,
+.chat-composer {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  border: 1px solid var(--line3);
+  box-shadow:
+    inset 0 1px 0 var(--lg-hi),
+    0 8px 24px -12px rgba(58, 36, 51, 0.4);
+}
+.st-search:focus-within,
+.chat-composer:focus-within {
+  border-color: var(--acc);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--acc) 22%, transparent),
+    inset 0 1px 0 var(--lg-hi);
+}
+.chat-composer {
+  border-radius: 28px;
+}
+.qa,
+.chat-model,
+.ext-filter,
+.sp-nav button,
+.sp-nav a {
+  border-radius: 999px;
+}
+.qa {
+  border-color: var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-hi);
+}
+.qa:hover {
+  background: var(--lg-card-h);
+  box-shadow:
+    inset 0 1px 0 var(--lg-hi),
+    var(--lg-shadow-h);
+}
+
+/* Chat: Leiste ohne Trennlinie, Glas statt Kante */
+.chat-topbar {
+  border-bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--panel) 85%, transparent),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+.chat-history {
+  margin: 12px 0 12px 12px;
+  border-radius: 22px;
+  border-right: 1px solid var(--lg-edge);
+}
+
+/* Einstellungen: Navigation als Glas */
+.sp-nav {
+  position: sticky;
+  top: 12px;
+}
+.sp-card:hover {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-card,
+  .music-card,
+  .music-feature,
+  .ext-entry,
+  .chat-starters button,
+  .music-track {
+    transition: none;
+    transform: none !important;
+  }
+}
+/* Großansicht der Bildersuche liegt über allem, auch über dem Übergangsverlauf */
+#page:has(.im-lb)::before {
+  display: none;
+}
+
+/* Tiefnacht: Vorschaukachel ist selbst tief dunkel mit Leuchtakzent */
+.color-theme.ct-abyss .palette-preview {
+  background: #07080d;
+  box-shadow: inset 0 0 0 1px #1a1d2a;
+}
+.color-theme.ct-abyss .palette-dots {
+  color: #8f9bff;
+}
+.color-theme.ct-abyss .palette-window {
+  background: #10121b;
+  box-shadow: 0 0 18px -4px #5b66ff;
+}
+:root[data-color-theme='abyss'][data-theme='dark'] body {
+  background-image: radial-gradient(
+    ellipse 60% 40% at 80% -10%,
+    rgba(80, 90, 255, 0.1),
+    transparent 70%
+  );
+}
+
+/* ---------- Weiche Übergänge zwischen Luna-Seiten (Start ↔ Luna Search ↔ Einstellungen ↔ Chat) ----------
+   Nur während des Wechsels trägt der Seitenbereich einen View-Transition-Namen; sonst bleibt alles wie es ist. */
+:root[data-page-to] {
+  view-transition-name: none;
+}
+:root[data-page-to] #page {
+  view-transition-name: lunapage;
+}
+::view-transition-group(lunapage) {
+  animation-duration: 0.6s;
+}
+::view-transition-image-pair(lunapage) {
+  isolation: auto;
+}
+::view-transition-old(lunapage),
+::view-transition-new(lunapage) {
+  mix-blend-mode: normal;
+  animation-fill-mode: both;
+}
+::view-transition-old(lunapage) {
+  animation: lpOut 0.6s linear both;
+}
+::view-transition-new(lunapage) {
+  animation: lpIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes lpOut {
+  0% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.99);
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.97) translateY(-8px);
+    filter: blur(10px);
+  }
+}
+@keyframes lpIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(1.012);
+    filter: blur(12px);
+  }
+}
+/* Zurück zur Startseite: die Richtung dreht sich um */
+:root[data-page-to='start']::view-transition-old(lunapage) {
+  animation-name: lpOutBack;
+}
+:root[data-page-to='start']::view-transition-new(lunapage) {
+  animation-name: lpInBack;
+}
+@keyframes lpOutBack {
+  0% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.01);
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.02) translateY(8px);
+    filter: blur(10px);
+  }
+}
+@keyframes lpInBack {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.985);
+    filter: blur(12px);
+  }
+}

@@ -4,7 +4,7 @@ test('Windows labels and unavailable local Spotify fallback', async ({ browser }
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0.0.0 Safari/537.36',
   });
-  await page.route('**/src/api.js', (route) =>
+  await page.route('**/src/api.js*', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `

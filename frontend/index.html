@@ -12,10 +12,10 @@
 var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
 document.documentElement.dataset.theme=d?'dark':'light';
 window.applyLunaBootTheme=function(id,dark){
- var colors={luna:[325,38],lavender:[265,42],ocean:[210,55],mint:[163,40],forest:[140,30],sand:[38,42],peach:[22,58],cherry:[350,46],arctic:[188,43],graphite:[220,5]};
+ var colors={luna:[325,38],lavender:[265,42],ocean:[210,55],mint:[163,40],forest:[140,30],sand:[38,42],peach:[22,58],cherry:[350,46],arctic:[188,43],graphite:[220,5],abyss:[250,30]};
  var c=colors[id]||colors.forest, root=document.documentElement;
- root.style.setProperty('--boot-bg','hsl('+c[0]+','+(dark?22:30)+'%,'+(dark?11:96)+'%)');
- root.style.setProperty('--boot-ink','hsl('+c[0]+','+c[1]+'%,'+(dark?73:38)+'%)');
+ root.style.setProperty('--boot-bg',id==='abyss'&&dark?'#090a10':'hsl('+c[0]+','+(dark?22:30)+'%,'+(dark?11:96)+'%)');
+ root.style.setProperty('--boot-ink',id==='abyss'&&dark?'#8f9bff':'hsl('+c[0]+','+c[1]+'%,'+(dark?73:38)+'%)');
 };
 var id='forest';try{id=localStorage.getItem('luna-color-theme')||'forest'}catch(e){}
 window.applyLunaBootTheme(id,d);})();
@@ -78,6 +78,7 @@ html{background:var(--boot-bg,#f2f8f4)}
           <div id="urlbox">
             <span id="lock"></span>
             <input id="url" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Suchen oder Adresse eingeben" aria-label="Adresse" data-i18n>
+            <div id="urlPills" hidden></div>
             <button type="button" id="bVault" data-state="fill" aria-label="Passwörter" hidden data-i18n></button>
             <button type="button" id="bMonitor" data-act="monitor-quick" aria-label="Seitenüberwachung öffnen" hidden><span>Überwachen</span></button>
             <button type="button" id="bLunaView" data-act="luna-view" aria-pressed="false" aria-label="Luna-Ansicht" hidden data-i18n><span aria-hidden="true">✦</span><span>Luna</span><i aria-hidden="true"></i></button>
