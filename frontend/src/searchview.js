@@ -1,5 +1,6 @@
 import { getLanguage } from './i18n.js';
 import { t as l10n, msg as l10nMsg } from './i18n.js';
+import { clockHTML } from './flipclock.js';
 // Suchansicht: Ergebnisse der eigenen Suche (Brave) als eingebaute Browser-Seite,
 // im selben Design wie Startseite und Seitenleiste (kein fremdes Web-Layout, keine Kopfzeile).
 const esc = (s) =>
@@ -82,6 +83,74 @@ function pager(t, d) {
     : '';
 }
 
+// ---------- Bildersuche ----------
+const IM = {
+  x: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  l: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  r: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+  go: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+};
+
+// Ladeansicht der Bildersuche: Karten fliegen durch einen Tunnel auf dich zu (nach „Perspective Tunnel Hero“
+// von 21st.dev, hier als reines CSS). Als Karten dienen Vorschaubilder der Websuche, sonst Farbflächen.
+function tunnelHTML(t) {
+  const d = t.data || {};
+  const pool = [
+    ...(d.results || []).map((r) => ({ src: r.thumb, label: r.host })),
+    ...(d.news || []).map((n) => ({ src: n.thumb, label: n.host })),
+    ...(d.videos || []).map((v) => ({ src: v.thumb, label: v.host })),
+  ].filter((x) => x.src);
+  const cards = Array.from({ length: 9 }, (_, i) => {
+    const item = pool[i];
+    const a = i * 137.5 * (Math.PI / 180); // Goldener Winkel: gleichmäßig um die Mitte verteilt
+    const bx = (Math.cos(a) * (0.28 + (i % 3) * 0.08) * 100).toFixed(2);
+    const by = (Math.sin(a) * (0.26 + (i % 2) * 0.09) * 100).toFixed(2);
+    const rot = (i % 2 === 0 ? 1 : -1) * (3 + (i % 5) * 2);
+    return `<span class="tn-card" style="--bx:${bx}cqw;--by:${by}cqh;--rot:${rot}deg;--i:${i};--k:${i % 5}">${
+      item
+        ? `<img src="${esc(item.src)}" alt="" referrerpolicy="no-referrer" draggable="false" onerror="this.remove()">`
+        : ''
+    }<em>${esc(item?.label || 'Luna')}</em></span>`;
+  }).join('');
+  return `<section class="tn" role="status" aria-live="polite" aria-label="${l10n('Luna sucht')}">
+    <i class="tn-ring a"></i><i class="tn-ring b"></i>
+    <div class="tn-copy"><p class="tn-eyebrow">${l10n('Bildersuche')}</p><h1 class="tn-title">${l10n('Luna sucht')}<span class="tn-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></h1><p class="tn-q">„${esc(t.q)}“</p></div>
+    <div class="tn-plane" aria-hidden="true">${cards}</div>
+  </section>`;
+}
+
+function imagesHTML(t) {
+  const im = t.images;
+  if (!im || im.loading) return tunnelHTML(t);
+  if (im.err)
+    return `<div class="sv-msg">${I.warn}<h2>${l10n('Bilder nicht verfügbar')}</h2><p>${esc(im.err)}</p><div class="row">${l10n('<button class="btn pri" data-act="sv-img-retry">Erneut versuchen</button>')}</div></div>`;
+  const list = im.data?.images || [];
+  if (im.data?.provider === 'Tavily')
+    return `<div class="sv-msg">${I.key}<h2>${l10n('Bildersuche braucht Brave')}</h2><p>${getLanguage() === 'en' ? 'Image search works with a Brave Search key. Add one in Settings.' : 'Die Bildersuche läuft über einen Brave-Search-Schlüssel. Hinterlege ihn in den Einstellungen.'}</p><div class="row">${l10n('<button class="btn pri" data-act="settings">Einstellungen öffnen</button>')}</div></div>`;
+  if (!list.length)
+    return l10nMsg`<div class="sv-msg"><h2>Keine Bilder</h2><p>Zu „${esc(t.q)}“ hat Luna Search keine Bilder gefunden.</p></div>`;
+  return `<div class="im-grid">${list
+    .map((m, i) => {
+      const ratio = m.w > 0 && m.h > 0 ? Math.max(0.5, Math.min(2, m.w / m.h)) : 1.2;
+      return `<button class="im lg-card" data-act="im-open" data-i="${i}" style="animation-delay:${Math.min(i, 12) * 24}ms" aria-label="${esc(m.title || m.host)}"><img src="${esc(m.thumb)}" alt="" referrerpolicy="no-referrer" loading="lazy" style="aspect-ratio:${ratio.toFixed(3)}" onerror="this.closest('.im')?.remove()"><span class="im-cap"><b>${esc(m.host)}</b>${m.w && m.h ? `<em>${m.w}×${m.h}</em>` : ''}</span></button>`;
+    })
+    .join('')}</div>`;
+}
+
+function lightbox(t) {
+  const list = t.images?.data?.images;
+  if (t.filter !== 'images' || t.lb == null || !list?.[t.lb]) return '';
+  const m = list[t.lb];
+  const n = list.length;
+  return `<div class="im-lb" data-act="im-close" role="dialog" aria-modal="true" aria-label="${esc(m.title || 'Bild')}">
+    <button class="im-x" data-act="im-close" aria-label="Schließen">${IM.x}</button>
+    ${t.lb > 0 ? `<button class="im-nav prev" data-act="im-prev" aria-label="Zurück">${IM.l}</button>` : ''}
+    ${t.lb < n - 1 ? `<button class="im-nav next" data-act="im-next" aria-label="Weiter">${IM.r}</button>` : ''}
+    <figure class="im-fig"><img src="${esc(m.full)}" alt="${esc(m.title)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${esc(m.thumb)}'">
+      <figcaption><div class="im-t"><b>${esc(m.title || m.host)}</b><span>${esc(m.host)}${m.w && m.h ? ' · ' + m.w + '×' + m.h : ''} · ${t.lb + 1}/${n}</span></div>
+      <div class="im-btns">${m.url ? l10nMsg`<button class="btn pri" data-act="sr-open" data-url="${esc(m.url)}">Seite besuchen ${IM.go}</button><button class="btn" data-act="sr-tab" data-url="${esc(m.url)}">In neuem Tab</button>` : ''}</div></figcaption></figure></div>`;
+}
+
 function skeleton() {
   return Array.from(
     { length: 6 },
@@ -98,17 +167,27 @@ function problem(t) {
     <div class="row">${key ? l10n('<button class="btn pri" data-act="settings">Einstellungen öffnen</button><button class="btn" data-act="open-brave">API-Key holen</button>') : l10n('<button class="btn pri" data-act="sv-retry">Erneut versuchen</button>')}</div></div>`;
 }
 
+const FILTERS = ['all', 'images', 'news', 'video'];
+
+// Filterleiste (Alle · Bilder · Nachrichten · Videos): sitzt in der Adressleiste, nicht auf der Seite.
+export function filterPillsHTML(t) {
+  const d = t.data;
+  if (!d || t.sErr || t.sLoading || d.local || t.provider === 'spotify') return '';
+  const fi = Math.max(0, FILTERS.indexOf(t.filter));
+  const ff = t.filterFrom == null ? fi : Math.max(0, t.filterFrom);
+  const cnt = (n) => (n ? ' · ' + n : '');
+  return l10nMsg`<div class="sv-pills sv-filter" role="tablist" style="--i:${fi};--from:${ff};--n:${FILTERS.length}"><i class="sv-drop" aria-hidden="true"></i>
+    <button class="${t.filter === 'all' ? 'on' : ''}" data-act="sv-filter" data-k="all">Alle</button>
+    <button class="${t.filter === 'images' ? 'on' : ''}" data-act="sv-filter" data-k="images">Bilder${cnt(t.images?.data?.images?.length)}</button>
+    <button class="${t.filter === 'news' ? 'on' : ''}" data-act="sv-filter" data-k="news">Nachrichten${cnt(d.news?.length)}</button>
+    <button class="${t.filter === 'video' ? 'on' : ''}" data-act="sv-filter" data-k="video">Videos${cnt(d.videos?.length)}</button></div>`;
+}
+
 // t: Tab mit q, page, data, sErr, sLoading, sel, filter; bm(url) sagt, ob ein Lesezeichen existiert.
 export function searchHTML(t, bm) {
   const d = t.data;
-  const head = `<div class="sv-top"><div class="sv-title"><div class="luna-search-brand">Luna Search</div><h1>${esc(t.q)}</h1><span class="sv-meta">${t.sLoading ? l10n('Suche läuft …') : d ? l10nMsg`Seite ${t.page + 1} · ${secs(d.millis)} s · ${esc(d.provider || 'Brave')}` : ''}</span></div>${
-    d && !t.sErr
-      ? l10nMsg`<div class="stabs sv-filter" role="tablist">
-    <button class="${t.filter === 'all' ? 'on' : ''}" data-act="sv-filter" data-k="all">Alle</button>
-    <button class="${t.filter === 'news' ? 'on' : ''}" data-act="sv-filter" data-k="news">Nachrichten${d.news?.length ? ' · ' + d.news.length : ''}</button>
-    <button class="${t.filter === 'video' ? 'on' : ''}" data-act="sv-filter" data-k="video">Videos${d.videos?.length ? ' · ' + d.videos.length : ''}</button></div>`
-      : ''
-  }</div>`;
+  const head = `<div class="sv-top"><div class="sv-bar"><div class="sv-brand"><span class="sv-moon" aria-hidden="true"></span><span class="luna-search-brand">Luna Search</span></div><span class="sv-meta">${t.sLoading ? l10n('Suche läuft …') : d && !d.local ? l10nMsg`Seite ${t.page + 1} · ${secs(d.millis)} s · ${esc(d.provider || 'Brave')}` : ''}</span>${t.sLoading ? '<i class="sv-prog" aria-hidden="true"></i>' : ''}</div></div>`;
+  if (d?.local) return `<div class="sv">${head}${clockHTML()}</div>`;
   if (t.sErr) return `<div class="sv">${head}${problem(t)}</div>`;
   if (t.sLoading || !d)
     return `<div class="sv">${head}<div class="sv-grid"><div class="sv-main">${skeleton()}</div></div></div>`;
@@ -132,6 +211,8 @@ export function searchHTML(t, bm) {
     main = res.length
       ? first + strips(d, 'all') + faq + rest
       : l10nMsg`<div class="sv-msg"><h2>Keine Treffer</h2><p>Zu „${esc(t.q)}“ hat Luna Search nichts gefunden.</p></div>`;
+  } else if (t.filter === 'images') {
+    main = imagesHTML(t);
   } else {
     main =
       strips(d, t.filter) ||
@@ -141,5 +222,5 @@ export function searchHTML(t, bm) {
     d.info && t.filter === 'all' && t.page === 0
       ? `<aside class="sv-side"><div class="info">${thumb(d.info.thumb, 'in-im')}<div class="ib"><h2>${esc(d.info.title)}</h2>${d.info.desc ? `<p>${d.info.desc}</p>` : ''}${(d.info.attrs || []).length ? `<dl>${d.info.attrs.map((a) => `<dt>${esc(a[0])}</dt><dd>${esc(a[1])}</dd>`).join('')}</dl>` : ''}${d.info.url ? `<a class="go" href="${esc(d.info.url)}" data-act="sr-open" data-url="${esc(d.info.url)}">${esc(d.info.host)} ↗</a>` : ''}</div></div></aside>`
       : '';
-  return `<div class="sv">${head}${alt}<div class="sv-grid ${info ? 'two' : ''}"><div class="sv-main">${main}${t.filter === 'all' ? pager(t, d) : ''}</div>${info}</div></div>`;
+  return `<div class="sv">${head}${alt}<div class="sv-grid ${info ? 'two' : ''}"><div class="sv-main">${main}${t.filter === 'all' ? pager(t, d) : ''}</div>${info}</div>${lightbox(t)}</div>`;
 }

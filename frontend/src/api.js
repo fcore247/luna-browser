@@ -88,6 +88,7 @@ export const spotifyCommand = (cmd, arg) => App.SpotifyCommand(cmd, arg);
 
 // Eigene Suche (Brave); der Schlüssel wird nur gesendet, nie gelesen
 export const search = (q, page) => App.Search(q, page);
+export const searchImages = (q) => App.SearchImages(q);
 export const keyStatus = () => App.SearchKeyStatus();
 export const keySet = (key) => App.SearchKeySet(key);
 export const keyClear = () => App.SearchKeyClear();

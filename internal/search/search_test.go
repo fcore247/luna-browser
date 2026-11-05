@@ -108,3 +108,33 @@ func TestErrorsAndRetry(t *testing.T) {
 		t.Fatalf("429-Retry: hits=%d err=%v", *hits, err)
 	}
 }
+
+func TestImages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Subscription-Token") != "KEY" || r.URL.Query().Get("q") != "katze" {
+			w.WriteHeader(401)
+			return
+		}
+		io.WriteString(w, `{"results":[
+ {"title":"Katze &amp; Maus","url":"https://a.de/k","source":"a.de","thumbnail":{"src":"https://imgs.search.brave.com/t1.jpg","width":300,"height":200},"properties":{"url":"https://a.de/k.jpg","width":1200,"height":800}},
+ {"title":"Unsicher","url":"javascript:x","thumbnail":{"src":"http://evil/t.jpg"},"properties":{"url":"javascript:evil"}},
+ {"title":"Ohne Original","url":"https://b.de/","thumbnail":{"src":"https://imgs.search.brave.com/t2.jpg","width":100,"height":100},"properties":{}}]}`)
+	}))
+	t.Cleanup(srv.Close)
+	c := NewClient(func() (string, error) { return "KEY", nil })
+	c.ImageEndpoint = srv.URL
+	p, err := c.Images(context.Background(), "katze", "de")
+	if err != nil || len(p.Images) != 2 {
+		t.Fatalf("%+v %v", p, err)
+	}
+	if p.Images[0].Title != "Katze & Maus" || p.Images[0].Full != "https://a.de/k.jpg" || p.Images[0].W != 1200 || p.Images[0].Host != "a.de" {
+		t.Errorf("Bild 1: %+v", p.Images[0])
+	}
+	if p.Images[1].Full != p.Images[1].Thumb || p.Images[1].W != 100 {
+		t.Errorf("Rückfall auf Vorschau: %+v", p.Images[1])
+	}
+	c.Key = func() (string, error) { return "", nil }
+	if _, err := c.Images(context.Background(), "katze", "de"); err != ErrNoKey {
+		t.Fatalf("ohne Schlüssel: %v", err)
+	}
+}

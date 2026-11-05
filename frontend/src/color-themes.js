@@ -13,7 +13,36 @@ export const COLOR_THEMES = [
   ['cherry', l10n('Kirschblüte'), 350, 46],
   ['arctic', l10n('Arktis'), 188, 43],
   ['graphite', l10n('Graphit'), 220, 5],
+  ['abyss', l10n('Tiefnacht'), 250, 30],
 ];
+// Tiefnacht: fast schwarz (OLED-tauglich) mit indigoblauem Schimmer und einem leuchtenden Akzent.
+// Sie ist ein Dunkel-Theme: Beim Wählen schaltet Luna auf „Dunkel". Im hellen Modus gibt es eine kühle Variante.
+export const DEEP_THEME = 'abyss';
+const ABYSS_DARK = {
+  desk: '#04050a',
+  body: '#07080d',
+  panel: '#090a10',
+  input: '#10121b',
+  card: '#10121b',
+  hover: '#1a1d2b',
+  soft: '#0d0f17',
+  line: '#1a1d2a',
+  line2: '#121420',
+  line3: '#272b3e',
+  ink: '#eef0fb',
+  ink2: '#d8dcef',
+  mute2: '#a3a9c2',
+  mute: '#7d839d',
+  acc: '#8f9bff',
+  link: '#aab4ff',
+  'link-h': '#d0d5ff',
+  pri: '#e8ebff',
+  'pri-fg': '#07080f',
+  'pri-h': '#ffffff',
+  tab: '#0f111a',
+  'tab-h': '#171a27',
+  menu: '#0b0c13',
+};
 const KEY = 'luna-color-theme';
 export function colorTheme() {
   try {
@@ -50,7 +79,10 @@ export function applyColorTheme(id = colorTheme(), persist = false) {
   const [, , h, s] = theme,
     dark = root.dataset.theme === 'dark';
   const c = (l, sat = s) => `hsl(${h} ${sat}% ${l}%)`;
-  const values = dark
+  const deep = id === DEEP_THEME && dark;
+  const values = deep
+    ? ABYSS_DARK
+    : dark
     ? {
         desk: c(14),
         body: c(11, 22),
@@ -108,7 +140,11 @@ export function applyColorTheme(id = colorTheme(), persist = false) {
     [1, 2, 3, 4]
       .map(
         (n) =>
-          `:root[data-color-theme="${id}"] .st-bg .a${n}{background:hsl(${h + (n - 1) * 12} ${s}% ${dark ? 35 : 76}%);}`,
+          `:root[data-color-theme="${id}"] .st-bg .a${n}{background:${
+            deep
+              ? ['#11134a', '#2a1260', '#0b2a52', '#181a5c'][n - 1]
+              : `hsl(${h + (n - 1) * 12} ${s}% ${dark ? 35 : 76}%)`
+          };}`,
       )
       .join('');
   syncErrorPalette();
@@ -128,7 +164,7 @@ function syncErrorPalette() {
 }
 export function colorThemesHTML() {
   const current = colorTheme();
-  return l10nMsg`<div class="palette-heading"><h3>Deine Farbwelt</h3><p class="muted">Zehn Looks für Luna. Jeder passt sich an Hell und Dunkel an.</p></div><div class="color-themes" role="group" aria-label="Farbthemes">${COLOR_THEMES.map(([id, name, h, s]) => `<button class="color-theme" data-act="color-theme" data-color="${id}" aria-pressed="${id === current}" style="--preview-h:${h};--preview-s:${s}%"><span class="palette-preview" aria-hidden="true"><i class="palette-dots">•••</i><i class="palette-window"><i></i><i></i></i><span class="palette-check">✓</span></span><span class="palette-name">${name}</span></button>`).join('')}</div>`;
+  return l10nMsg`<div class="palette-heading"><h3>Deine Farbwelt</h3><p class="muted">Elf Looks für Luna. Jeder passt sich an Hell und Dunkel an, Tiefnacht ist fürs Dunkle gemacht.</p></div><div class="color-themes" role="group" aria-label="Farbthemes">${COLOR_THEMES.map(([id, name, h, s]) => `<button class="color-theme ct-${id}" data-act="color-theme" data-color="${id}" aria-pressed="${id === current}" style="--preview-h:${h};--preview-s:${s}%"><span class="palette-preview" aria-hidden="true"><i class="palette-dots">•••</i><i class="palette-window"><i></i><i></i></i><span class="palette-check">✓</span></span><span class="palette-name">${name}</span></button>`).join('')}</div>`;
 }
 
 let currentIcon = '',

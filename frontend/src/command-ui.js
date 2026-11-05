@@ -299,6 +299,10 @@ export function createCommandUI({
         dropEl.querySelectorAll('[data-pick]').forEach((b) => {
           b.setAttribute('aria-pressed', String(b === pick));
         });
+        // Tiefnacht schaltet auf Dunkel: die Hell/Dunkel/Auto-Schalter ziehen mit
+        dropEl.querySelectorAll('[data-mode]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b.dataset.mode === getMode()));
+        });
         return;
       }
       const mode = ev.target.closest('[data-mode]');
