@@ -153,3 +153,64 @@ func TestDeleteAndValidation(t *testing.T) {
 		t.Fatalf("DeleteAll: %v, %d left", err, len(v.All()))
 	}
 }
+
+func TestAutoLoginBelongsToOneAccountPerOriginAndSurvivesPasswordUpdate(t *testing.T) {
+	v, dir := newVault(t)
+	origin, other := "https://accounts.example.test", "https://accounts.example.test:8443"
+	if _, err := v.Add(origin, "existing", "synthetic-manual"); err != nil {
+		t.Fatal(err)
+	}
+	if v.List(origin)[0].AutoLogin {
+		t.Fatal("manual account was opted in")
+	}
+	for _, pair := range [][2]string{{origin, "first"}, {other, "other"}, {origin, "second"}} {
+		if _, err := v.SaveLogin(pair[0], pair[1], "synthetic", true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := v.Add(origin, "second", "synthetic-rotated"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := New(dir, testKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range v.All() {
+		want := e.Username == "second" || e.Origin == other
+		if e.AutoLogin != want {
+			t.Errorf("%s %s auto-login = %v, want %v", e.Origin, e.Username, e.AutoLogin, want)
+		}
+	}
+	if err := v.SetAutoLogin(origin, "second", false); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range v.List(origin) {
+		if e.AutoLogin {
+			t.Fatal("disabled account was automatically replaced", e.Username)
+		}
+	}
+}
+
+func TestFailedAutoLoginWritePreservesAccountsAndPreference(t *testing.T) {
+	v, _ := newVault(t)
+	origin := "https://accounts.example.test"
+	if _, err := v.SaveLogin(origin, "first", "synthetic-first", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Add(origin, "second", "synthetic-second"); err != nil {
+		t.Fatal(err)
+	}
+	// A file where a parent directory would be needed makes both writes fail,
+	// independent of filesystem permissions on the machine running the suite.
+	v.file = filepath.Join(v.file, "impossible.json")
+	if err := v.SetAutoLogin(origin, "second", true); err == nil {
+		t.Fatal("preference write unexpectedly succeeded")
+	}
+	if _, err := v.SaveLogin(origin, "third", "synthetic-third", true); err == nil {
+		t.Fatal("save unexpectedly succeeded")
+	}
+	entries := v.List(origin)
+	if len(entries) != 2 || entries[0].Username != "first" || !entries[0].AutoLogin || entries[1].AutoLogin {
+		t.Fatalf("failed write changed in-memory permissions: %+v", entries)
+	}
+}

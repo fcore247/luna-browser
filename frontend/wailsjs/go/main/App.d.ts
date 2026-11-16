@@ -223,13 +223,21 @@ export function VaultDelete(arg1:string,arg2:string):Promise<void>;
 
 export function VaultDeleteAll():Promise<void>;
 
+export function VaultDismissOffer(arg1:number,arg2:string):Promise<void>;
+
 export function VaultDismissPending(arg1:number):Promise<void>;
 
 export function VaultEntries(arg1:string):Promise<Array<vault.Entry>>;
 
 export function VaultFill(arg1:number,arg2:string,arg3:string):Promise<main.VaultFillResult>;
 
+export function VaultLogin(arg1:number,arg2:string,arg3:string,arg4:string,arg5:boolean,arg6:string):Promise<main.VaultFillResult>;
+
+export function VaultSaveOffer(arg1:number,arg2:string,arg3:boolean):Promise<vault.Entry>;
+
 export function VaultSavePending(arg1:number):Promise<vault.Entry>;
+
+export function VaultSetAutoLogin(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function VaultStatus():Promise<main.VaultStatus>;
 

@@ -335,6 +335,10 @@ export namespace main {
 	    username: boolean;
 	    password: boolean;
 	    message?: string;
+	    submitted?: boolean;
+	    stage?: string;
+	    continuation?: string;
+	    deferred?: boolean;
 
 	    static createFrom(source: any = {}) {
 	        return new VaultFillResult(source);
@@ -346,6 +350,10 @@ export namespace main {
 	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.message = source["message"];
+	        this.submitted = source["submitted"];
+	        this.stage = source["stage"];
+	        this.continuation = source["continuation"];
+	        this.deferred = source["deferred"];
 	    }
 	}
 	export class VaultStatus {
@@ -1406,6 +1414,7 @@ export namespace vault {
 	    origin: string;
 	    username: string;
 	    updated: number;
+	    autoLogin: boolean;
 
 	    static createFrom(source: any = {}) {
 	        return new Entry(source);
@@ -1416,6 +1425,7 @@ export namespace vault {
 	        this.origin = source["origin"];
 	        this.username = source["username"];
 	        this.updated = source["updated"];
+	        this.autoLogin = source["autoLogin"];
 	    }
 	}
 

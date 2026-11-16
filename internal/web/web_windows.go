@@ -103,10 +103,20 @@ func SetCredentialHandler(func(tab int, origin, username, password string)) {}
 func ConfigureCredentials(string)                                           {}
 
 type FillResult struct {
-	OK       bool   `json:"ok"`
-	Username bool   `json:"username"`
-	Password bool   `json:"password"`
-	Error    string `json:"error,omitempty"`
+	Stage     string `json:"stage,omitempty"`
+	Submitted bool   `json:"submitted,omitempty"`
+	OK        bool   `json:"ok"`
+	Username  bool   `json:"username"`
+	Password  bool   `json:"password"`
+	Error     string `json:"error,omitempty"`
+}
+
+func SubmitLogin(tab int, origin, username, password, form string) (FillResult, error) {
+	return FillCredential(tab, origin, username, password)
+}
+
+func ProbeLogin(tab int, origin, username, form string) (FillResult, error) {
+	return FillCredential(tab, origin, username, "")
 }
 
 func FillCredential(int, string, string, string) (FillResult, error) {

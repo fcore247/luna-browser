@@ -92,7 +92,14 @@ export function createSettings({
   document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-vault]');
     if (!button || button.disabled) return;
+    button.disabled = true;
     try {
+      if (button.dataset.vault === 'auto-login')
+        await api.vaultSetAutoLogin(
+          button.dataset.origin,
+          button.dataset.user,
+          button.getAttribute('aria-checked') !== 'true',
+        );
       if (button.dataset.vault === 'delete')
         await api.vaultDelete(button.dataset.origin, button.dataset.user);
       if (button.dataset.vault === 'delete-all') await api.vaultDeleteAll();
@@ -101,22 +108,24 @@ export function createSettings({
       window.dispatchEvent(new Event('luna-vault-changed'));
     } catch (error) {
       toast(String(error?.message || error));
+    } finally {
+      button.disabled = false;
     }
   });
   function vaultSettingsHTML() {
     const { status, entries } = vaultInfo;
     const intro = l10n(
-      'Luna speichert Anmeldungen verschlüsselt auf diesem Mac. Den Schlüssel dafür verwahrt der macOS-Schlüsselbund. Ausgefüllt wird nur nach deinem Klick und mit Touch ID, und nur auf genau der Seite, für die du das Passwort gespeichert hast. Deine KI kann Passwörter weder lesen noch ausfüllen. Webseiten und Benutzernamen siehst du in der Liste, Passwörter nie.',
+      'Luna speichert deine Anmeldungen verschlüsselt auf diesem Mac. Wähle pro Website ein Konto für die automatische Anmeldung. Sobald Luna das Anmeldeformular erkennt, bestätigst du mit Touch ID oder deinem Mac-Passwort. Deine KI kann Passwörter weder lesen noch ausfüllen.',
     );
     if (!status.supported)
       return l10nMsg`<section id="set-passwords" class="sp-card"><h2>Passwörter</h2><p class="pp-settings-intro">Der Passwort-Tresor ist auf diesem System noch nicht verfügbar. Es gibt ihn bisher auf dem Mac.</p></section>`;
     const rows = entries
       .map(
         (entry) =>
-          l10nMsg`<article class="pp-settings-entry"><div><h3>${esc(entry.origin.replace(/^https?:\/\//, ''))}</h3><p>${esc(entry.username || l10n('Ohne Benutzername'))} · gespeichert am ${esc(new Date(entry.updated * 1000).toLocaleDateString(locale()))}</p></div><div class="pp-settings-actions"><button class="btn sm" data-vault="delete" data-origin="${esc(entry.origin)}" data-user="${esc(entry.username)}">Löschen</button></div></article>`,
+          l10nMsg`<article class="pp-settings-entry"><div><h3>${esc(entry.origin.replace(/^https?:\/\//, ''))}</h3><p>${esc(entry.username || l10n('Ohne Benutzername'))} · gespeichert am ${esc(new Date(entry.updated * 1000).toLocaleDateString(locale()))}</p></div><div class="pp-settings-actions"><label class="vault-account-choice"><span>Automatisch anmelden</span><button type="button" class="switch ${entry.autoLogin ? 'on' : ''}" data-vault="auto-login" data-origin="${esc(entry.origin)}" data-user="${esc(entry.username)}" role="switch" aria-label="${esc(l10n('Automatisch anmelden') + ' · ' + (entry.username || l10n('Ohne Benutzername')) + ' · ' + entry.origin)}" aria-checked="${!!entry.autoLogin}"><i></i></button></label><button class="btn sm" data-vault="delete" data-origin="${esc(entry.origin)}" data-user="${esc(entry.username)}">Löschen</button></div></article>`,
       )
       .join('');
-    return l10nMsg`<section id="set-passwords" class="sp-card"><h2>Passwörter</h2><p class="pp-settings-intro">${intro}</p>${status.error ? l10nMsg`<p class="muted">Tresor nicht verfügbar: ${esc(status.error)}</p>` : ''}<div class="swrow"><div><b>Nach der Anmeldung fragen, ob Luna das Passwort speichern soll</b><span>${status.offers ? l10n('An: Nach einem Login erscheint ein Schlüssel in der Adressleiste.') : l10n('Aus: Luna fragt nicht mehr nach.')}</span></div><button class="switch ${status.offers ? 'on' : ''}" role="switch" aria-checked="${!!status.offers}" aria-label="Speichern anbieten" data-vault="offers"><i></i></button></div><div class="pp-settings-list">${rows || l10n('<p class="muted">Noch nichts gespeichert. Melde dich auf einer Seite an, dann fragt Luna, ob sie das Passwort speichern soll.</p>')}</div>${entries.length ? l10n('<div class="row"><button class="btn sm" data-vault="delete-all">Alle löschen …</button></div>') : ''}</section>`;
+    return l10nMsg`<section id="set-passwords" class="sp-card"><h2>Passwörter</h2><p class="pp-settings-intro">${intro}</p>${status.error ? l10nMsg`<p class="muted">Tresor nicht verfügbar: ${esc(status.error)}</p>` : ''}<div class="swrow"><div><b>Nach der Anmeldung fragen, ob Luna das Passwort speichern soll</b><span>${status.offers ? l10n('Nach der Anmeldung kannst du das Passwort direkt über der Webseite speichern.') : l10n('Aus: Luna fragt nicht mehr nach.')}</span></div><button class="switch ${status.offers ? 'on' : ''}" role="switch" aria-checked="${!!status.offers}" aria-label="Speichern anbieten" data-vault="offers"><i></i></button></div><div class="pp-settings-list">${rows || l10n('<p class="muted">Noch nichts gespeichert. Melde dich auf einer Seite an, dann fragt Luna, ob sie das Passwort speichern soll.</p>')}</div>${entries.length ? l10n('<div class="row"><button class="btn sm" data-vault="delete-all">Alle löschen …</button></div>') : ''}</section>`;
   }
   window.addEventListener('luna-personalized-list', () =>
     api

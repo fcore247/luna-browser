@@ -254,19 +254,35 @@ func ConfigureCredentials(src string) {
 
 // FillResult describes what a fill attempt changed. It never contains the password.
 type FillResult struct {
-	OK       bool   `json:"ok"`
-	Username bool   `json:"username"`
-	Password bool   `json:"password"`
-	Error    string `json:"error,omitempty"`
+	Stage     string `json:"stage,omitempty"`
+	Submitted bool   `json:"submitted,omitempty"`
+	OK        bool   `json:"ok"`
+	Username  bool   `json:"username"`
+	Password  bool   `json:"password"`
+	Error     string `json:"error,omitempty"`
 }
 
 // FillCredential fills the login form of a tab, but only while the tab still shows exactly origin.
 func FillCredential(tab int, origin, username, password string) (FillResult, error) {
+	return credentialForm(tab, origin, username, password, "", 0)
+}
+
+func SubmitLogin(tab int, origin, username, password, form string) (FillResult, error) {
+	return credentialForm(tab, origin, username, password, form, 1)
+}
+
+func ProbeLogin(tab int, origin, username, form string) (FillResult, error) {
+	return credentialForm(tab, origin, username, "", form, 2)
+}
+
+func credentialForm(tab int, origin, username, password, form string, mode C.int) (FillResult, error) {
+	f := C.CString(form)
+	defer C.free(unsafe.Pointer(f))
 	o, u, p := C.CString(origin), C.CString(username), C.CString(password)
 	defer C.free(unsafe.Pointer(o))
 	defer C.free(unsafe.Pointer(u))
 	defer C.free(unsafe.Pointer(p))
-	raw, err := snapshotVia(func(req C.int) { C.fmwFillCredential(C.int(tab), o, u, p, req) })
+	raw, err := snapshotVia(func(req C.int) { C.fmwFillCredential(C.int(tab), o, u, p, mode, f, req) })
 	if err != nil {
 		return FillResult{}, err
 	}

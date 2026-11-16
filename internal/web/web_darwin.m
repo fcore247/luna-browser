@@ -68,6 +68,13 @@ static int gGestureOn = 1;
 // JavaScript-Welt. Die Seite kann die Funktionen weder überschreiben noch beobachten.
 extern void goCredSubmit(int tab, char *origin, char *user, char *pass);
 static NSString *gCredSrc;
+static NSString *originOfURL(NSURL *url);
+static NSString *credentialPageLocation(NSURL *url) {
+	if (!url.host.length) return @"";
+	NSURLComponents *parts = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:YES];
+	parts.user = parts.password = parts.query = parts.fragment = nil;
+	return parts.URL.absoluteString ?: @"";
+}
 static WKContentWorld *credWorld(void) {
 	static WKContentWorld *world;
 	static dispatch_once_t once;
@@ -229,6 +236,9 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @property (nonatomic) BOOL cinemaSnapshotPending;
 - (void)leaveCinema;
 @property (nonatomic) BOOL isError;
+@property (nonatomic, copy) NSString *credentialStepOrigin;
+@property (nonatomic, copy) NSString *credentialStepUser;
+@property (nonatomic) NSTimeInterval credentialStepTime;
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg;
 - (void)teardown;
 @end
@@ -512,6 +522,9 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)webView:(WKWebView *)wv navigationResponse:(WKNavigationResponse *)r didBecomeDownload:(WKDownload *)d { d.delegate = self; }
 
 - (void)webView:(WKWebView *)wv didCommitNavigation:(WKNavigation *)nav {
+	NSString *origin = originOfURL(wv.URL);
+	if (![_credentialStepOrigin isEqual:origin]) _credentialStepOrigin = _credentialStepUser = nil;
+	emit(@{@"t":@"loginForm", @"id":@(_tid), @"tab":@(_tid), @"origin":origin, @"url":credentialPageLocation(wv.URL), @"form":@"", @"stage":@""});
 	if (_tid == gActive && cinemaSite(wv.URL.host)) [_cinemaExitCover prepareForWindow:wv.window label:L(@"Augenblick")];
 }
 
@@ -598,20 +611,64 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 @implementation FMCredHandler
+- (instancetype)init {
+	if (!(self = [super init])) return nil;
+	NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+	[center addObserver:self selector:@selector(focusChanged:) name:NSWindowDidBecomeKeyNotification object:nil];
+	[center addObserver:self selector:@selector(focusChanged:) name:NSApplicationDidBecomeActiveNotification object:nil];
+	return self;
+}
+- (void)focusChanged:(NSNotification *)notification {
+	FMTab *tab = gTabs[@(gActive)];
+	if (tab && NSApp.isActive && tab.view.window.isKeyWindow && !tab.hostView.isHiddenOrHasHiddenAncestor &&
+	    !tab.view.window.attachedSheet)
+		emit(@{@"t":@"loginFocus", @"tab":@(tab.tid)});
+}
 // Der Ursprung kommt aus WebKit (frameInfo.securityOrigin), nie aus dem, was die Seite behauptet.
 // Das Passwort geht nur an Go und nie über die Ereignisse an die Oberfläche.
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
 	if (![msg.name isEqualToString:@"lunaCreds"] || !msg.frameInfo.isMainFrame) return;
 	NSDictionary *b = [msg.body isKindOfClass:[NSDictionary class]] ? msg.body : nil;
-	NSString *user = b[@"username"], *pass = b[@"password"];
-	if (![user isKindOfClass:[NSString class]] || ![pass isKindOfClass:[NSString class]]) return;
-	if (!pass.length || pass.length > 1024 || user.length > 320) return;
 	WKSecurityOrigin *o = msg.frameInfo.securityOrigin;
-	if (!o.protocol.length || !o.host.length) return;
-	NSString *origin = o.port > 0 ? [NSString stringWithFormat:@"%@://%@:%ld", o.protocol, o.host, (long)o.port] : [NSString stringWithFormat:@"%@://%@", o.protocol, o.host];
-	int tid = -1;
-	for (FMTab *t in gTabs.allValues) if (t.view == msg.webView) tid = t.tid;
-	if (tid < 0) return;
+	NSString *scheme = o.protocol.lowercaseString, *host = o.host.lowercaseString;
+	if (!host.length || (![scheme isEqual:@"https"] && !([scheme isEqual:@"http"] &&
+	    [@[@"localhost", @"127.0.0.1", @"::1", @"[::1]"] containsObject:host]))) return;
+	if ([host containsString:@":"] && ![host hasPrefix:@"["]) host = [NSString stringWithFormat:@"[%@]",host];
+	BOOL defaultPort = o.port <= 0 || ([scheme isEqual:@"https"] ? o.port == 443 : o.port == 80);
+	NSString *origin = defaultPort ? [NSString stringWithFormat:@"%@://%@", scheme, host] :
+		[NSString stringWithFormat:@"%@://%@:%ld", scheme, host, (long)o.port];
+	FMTab *tab = nil;
+	for (FMTab *t in gTabs.allValues) if (t.view == msg.webView) { tab = t; break; }
+	if (!tab || tab.isError) return;
+	int tid = tab.tid;
+	if ([b[@"kind"] isEqual:@"loginForm"]) {
+		NSString *form = b[@"form"], *stage = b[@"stage"];
+		if (![form isKindOfClass:NSString.class] || form.length > 128 ||
+		    ![@[@"", @"username", @"password"] containsObject:stage ?: NSNull.null] || !!form.length != !!stage.length) return;
+		emit(@{@"t":@"loginForm", @"id":@(tid), @"tab":@(tid), @"origin":origin,
+		       @"url":credentialPageLocation(tab.view.URL), @"form":form, @"stage":stage});
+		return;
+	}
+	NSString *user = b[@"username"];
+	if (![user isKindOfClass:NSString.class] || user.length > 320) return;
+	NSTimeInterval now = NSProcessInfo.processInfo.systemUptime;
+	if ([b[@"kind"] isEqual:@"usernameStep"]) {
+		if (!user.length) return;
+		tab.credentialStepOrigin = origin;
+		tab.credentialStepUser = user;
+		tab.credentialStepTime = now;
+		__weak FMTab *weakTab = tab;
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+			FMTab *current = weakTab;
+			if (current.credentialStepTime == now) current.credentialStepOrigin = current.credentialStepUser = nil;
+		});
+		return;
+	}
+	NSString *pass = b[@"password"];
+	if (b[@"kind"] || ![pass isKindOfClass:NSString.class] || !pass.length || pass.length > 1024) return;
+	if (!user.length && [origin isEqual:tab.credentialStepOrigin] && now - tab.credentialStepTime <= 300)
+		user = tab.credentialStepUser ?: @"";
+	tab.credentialStepOrigin = tab.credentialStepUser = nil;
 	char *co = strdup(origin.lowercaseString.UTF8String), *cu = strdup(user.UTF8String), *cp = strdup(pass.UTF8String);
 	goCredSubmit(tid, co, cu, cp);
 	memset(cp, 0, strlen(cp));
@@ -992,7 +1049,7 @@ void fmwConfigureCredentials(const char *src) {
 static NSString *originOfURL(NSURL *url) {
 	NSString *scheme = url.scheme.lowercaseString, *host = url.host.lowercaseString;
 	if (!scheme.length || !host.length) return @"";
-	if ([host containsString:@":"]) host = [NSString stringWithFormat:@"[%@]", host];
+	if ([host containsString:@":"] && ![host hasPrefix:@"["]) host = [NSString stringWithFormat:@"[%@]", host];
 	NSNumber *port = url.port;
 	BOOL isDefault = !port || ([scheme isEqualToString:@"https"] && port.intValue == 443) || ([scheme isEqualToString:@"http"] && port.intValue == 80);
 	return isDefault ? [NSString stringWithFormat:@"%@://%@", scheme, host] : [NSString stringWithFormat:@"%@://%@:%@", scheme, host, port];
@@ -1002,18 +1059,21 @@ static NSString *originOfURL(NSURL *url) {
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 // Füllt Anmeldedaten ein, aber nur, wenn die Seite gerade noch genau den erwarteten Ursprung hat.
 // Das Ergebnis (JSON ohne Passwort) kommt über goSnapshotDone zurück.
-void fmwFillCredential(int tabID, const char *origin, const char *user, const char *pass, int req) {
+void fmwFillCredential(int tabID, const char *origin, const char *user, const char *pass, int submit, const char *form, int req) {
 	NSString *expect = [NSString stringWithUTF8String:origin ?: ""];
 	NSString *u = [NSString stringWithUTF8String:user ?: ""], *p = [NSString stringWithUTF8String:pass ?: ""];
+	NSString *token = [NSString stringWithUTF8String:form ?: ""];
 	dispatch_async(dispatch_get_main_queue(), ^{
 		void (^finish)(NSString *) = ^(NSString *json) { char *out = strdup(json.UTF8String); goSnapshotDone(req, out); free(out); };
 		FMTab *t = gTabs[@(tabID)];
-		if (!t || t.isError) { finish(@"{\"ok\":false,\"error\":\"tab\"}"); return; }
+		if (!t || t.isError || (submit && (gActive != tabID || t.hostView.isHiddenOrHasHiddenAncestor ||
+		    !NSApp.isActive || !t.view.window.isKeyWindow || t.view.window.attachedSheet))) {
+			finish(@"{\"ok\":false,\"error\":\"tab\"}"); return;
+		}
 		if (![originOfURL(t.view.URL) isEqualToString:expect]) { finish(@"{\"ok\":false,\"error\":\"origin\"}"); return; }
-		NSData *j = [NSJSONSerialization dataWithJSONObject:@[u, p] options:0 error:nil];
-		NSString *arg = [[NSString alloc] initWithData:j encoding:NSUTF8StringEncoding];
-		NSString *src = [NSString stringWithFormat:@"(function(a){return JSON.stringify(window.__lunaFill?window.__lunaFill(a[0],a[1]):{ok:false,error:'script'})})(%@)", arg];
-		[t.view evaluateJavaScript:src inFrame:nil inContentWorld:credWorld() completionHandler:^(id r, NSError *e) {
+		NSDictionary *args = @{@"user":u, @"pass":submit == 2 ? @"" : p, @"mode":@(submit), @"token":token, @"origin":expect};
+		NSString *src = @"return JSON.stringify(window.__lunaFill ? await window.__lunaFill(user,pass,mode,token,origin) : {ok:false,error:'script'})";
+		[t.view callAsyncJavaScript:src arguments:args inFrame:nil inContentWorld:credWorld() completionHandler:^(id r, NSError *e) {
 			finish(e || ![r isKindOfClass:[NSString class]] ? @"{\"ok\":false,\"error\":\"script\"}" : r);
 		}];
 	});

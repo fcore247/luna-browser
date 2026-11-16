@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -30,20 +31,26 @@ var (
 
 // Entry is the public, password-free view of a stored login.
 type Entry struct {
-	Origin   string `json:"origin"`
-	Username string `json:"username"`
-	Updated  int64  `json:"updated"`
+	Origin    string `json:"origin"`
+	Username  string `json:"username"`
+	Updated   int64  `json:"updated"`
+	AutoLogin bool   `json:"autoLogin"`
 }
 
 // KeyFunc returns the 32 byte vault key. It may ask the user (keychain) and may fail.
 type KeyFunc func() ([]byte, error)
 
 type record struct {
-	Origin   string `json:"origin"`
-	Username string `json:"username"`
-	Nonce    []byte `json:"nonce"`
-	Cipher   []byte `json:"cipher"`
-	Updated  int64  `json:"updated"`
+	Origin    string `json:"origin"`
+	Username  string `json:"username"`
+	Nonce     []byte `json:"nonce"`
+	Cipher    []byte `json:"cipher"`
+	Updated   int64  `json:"updated"`
+	AutoLogin bool   `json:"autoLogin,omitempty"`
+}
+
+func (r record) entry() Entry {
+	return Entry{Origin: r.Origin, Username: r.Username, Updated: r.Updated, AutoLogin: r.AutoLogin}
 }
 
 type Vault struct {
@@ -138,8 +145,8 @@ func (v *Vault) aead() (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
-func (v *Vault) save() error {
-	data, err := json.Marshal(v.records)
+func (v *Vault) save(next []record) error {
+	data, err := json.Marshal(next)
 	if err != nil {
 		return err
 	}
@@ -147,7 +154,11 @@ func (v *Vault) save() error {
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, v.file)
+	if err := os.Rename(tmp, v.file); err != nil {
+		return err
+	}
+	v.records = next
+	return nil
 }
 
 func (v *Vault) index(origin, username string) int {
@@ -161,6 +172,14 @@ func (v *Vault) index(origin, username string) int {
 
 // Add stores or replaces the login for origin and user name.
 func (v *Vault) Add(origin, username, password string) (Entry, error) {
+	return v.saveLogin(origin, username, password, nil)
+}
+
+func (v *Vault) SaveLogin(origin, username, password string, autoLogin bool) (Entry, error) {
+	return v.saveLogin(origin, username, password, &autoLogin)
+}
+
+func (v *Vault) saveLogin(origin, username, password string, autoLogin *bool) (Entry, error) {
 	origin, err := validate(origin, username, password, true)
 	if err != nil {
 		return Entry{}, err
@@ -180,15 +199,49 @@ func (v *Vault) Add(origin, username, password string) (Entry, error) {
 		Cipher:  gcm.Seal(nil, nonce, []byte(password), aad(origin, username)),
 		Updated: time.Now().Unix(),
 	}
-	if i := v.index(origin, username); i >= 0 {
-		v.records[i] = r
+	next := slices.Clone(v.records)
+	i := v.index(origin, username)
+	if i >= 0 {
+		r.AutoLogin = next[i].AutoLogin
+		next[i] = r
 	} else {
-		v.records = append(v.records, r)
+		i = len(next)
+		next = append(next, r)
 	}
-	if err := v.save(); err != nil {
+	if autoLogin != nil {
+		setPreferredLogin(next, i, *autoLogin)
+	}
+	if err := v.save(next); err != nil {
 		return Entry{}, err
 	}
-	return Entry{Origin: origin, Username: username, Updated: r.Updated}, nil
+	return next[i].entry(), nil
+}
+
+func setPreferredLogin(records []record, index int, enabled bool) {
+	if enabled {
+		for i := range records {
+			if records[i].Origin == records[index].Origin {
+				records[i].AutoLogin = false
+			}
+		}
+	}
+	records[index].AutoLogin = enabled
+}
+
+func (v *Vault) SetAutoLogin(origin, username string, enabled bool) error {
+	origin, err := validate(origin, username, "", false)
+	if err != nil {
+		return err
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	i := v.index(origin, username)
+	if i < 0 {
+		return ErrNotFound
+	}
+	next := slices.Clone(v.records)
+	setPreferredLogin(next, i, enabled)
+	return v.save(next)
 }
 
 // Password decrypts one password. Call it only after the user confirmed.
@@ -239,7 +292,7 @@ func (v *Vault) Matches(origin, username, password string) (bool, error) {
 func entries(records []record) []Entry {
 	out := make([]Entry, 0, len(records))
 	for _, r := range records {
-		out = append(out, Entry{Origin: r.Origin, Username: r.Username, Updated: r.Updated})
+		out = append(out, r.entry())
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Origin != out[j].Origin {
@@ -286,14 +339,12 @@ func (v *Vault) Delete(origin, username string) error {
 	if i < 0 {
 		return ErrNotFound
 	}
-	v.records = append(v.records[:i], v.records[i+1:]...)
-	return v.save()
+	return v.save(slices.Delete(slices.Clone(v.records), i, i+1))
 }
 
 // DeleteAll removes every login.
 func (v *Vault) DeleteAll() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.records = nil
-	return v.save()
+	return v.save(nil)
 }

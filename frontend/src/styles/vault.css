@@ -57,6 +57,58 @@
 .vault-sheet {
   padding: 28px;
 }
+#vaultOffer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 10px 14px;
+  border-block: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+}
+#vaultOffer[hidden] {
+  display: none;
+}
+.vault-offer-info,
+.vault-offer-actions,
+.vault-auto-choice,
+.vault-account-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vault-offer-info {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.vault-offer-info > div {
+  min-width: 0;
+}
+.vault-offer-info > span {
+  color: var(--acc);
+}
+.vault-offer-account {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--mute2);
+}
+.vault-auto-choice {
+  font-size: 12px;
+  cursor: pointer;
+}
+.vault-auto-choice input {
+  accent-color: var(--acc);
+}
+.vault-offer-error {
+  flex-basis: 100%;
+  color: var(--err);
+}
+.vault-account-choice {
+  font-size: 12px;
+}
 .vault-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -77,30 +129,12 @@
   line-height: 1.7;
   color: var(--mute2);
 }
-.vault-fact {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 18px 0 4px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--soft);
-}
-.vault-fact span {
-  font-size: 11px;
-  color: var(--mute2);
-}
-.vault-fact strong {
-  overflow-wrap: anywhere;
-}
 .vault-rows {
   display: grid;
   gap: 8px;
   margin: 18px 0 10px;
 }
 .vault-row,
-.vault-actions button,
 .vault-quiet {
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -126,22 +160,6 @@
 }
 .vault-row small {
   color: var(--mute2);
-}
-.vault-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-.vault-actions button {
-  padding: 11px 18px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.vault-actions .vault-primary {
-  background: var(--pri);
-  color: var(--pri-fg);
-  border-color: transparent;
 }
 .vault-quiet {
   width: 100%;

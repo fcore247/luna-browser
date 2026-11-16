@@ -34,4 +34,4 @@ char *fmwOnboardingClipboard(int tab, const char *provider, int previousCount);
 void fmwExtension(const char *json, int req);
 
 void fmwConfigureCredentials(const char *src);
-void fmwFillCredential(int tab, const char *origin, const char *user, const char *pass, int req);
+void fmwFillCredential(int tab, const char *origin, const char *user, const char *pass, int submit, const char *form, int req);

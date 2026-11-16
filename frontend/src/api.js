@@ -218,6 +218,16 @@ export const vaultEntries = nat((url) => window.go.main.App.VaultEntries(url), [
 export const vaultAll = nat(() => window.go.main.App.VaultAll(), []);
 export const vaultSavePending = nat((tab) => window.go.main.App.VaultSavePending(tab), null);
 export const vaultDismissPending = nat((tab) => window.go.main.App.VaultDismissPending(tab), null);
+export const vaultSaveOffer = nat((tab, id, autoLogin) =>
+  window.go.main.App.VaultSaveOffer(tab, id, autoLogin),
+);
+export const vaultDismissOffer = nat((tab, id) => window.go.main.App.VaultDismissOffer(tab, id));
+export const vaultSetAutoLogin = nat((origin, username, enabled) =>
+  window.go.main.App.VaultSetAutoLogin(origin, username, enabled),
+);
+export const vaultLogin = nat((tab, url, username, form, automatic, continuation) =>
+  window.go.main.App.VaultLogin(tab, url, username, form, automatic, continuation),
+);
 export const vaultFill = nat(
   (tab, url, username) => window.go.main.App.VaultFill(tab, url, username),
   null,
