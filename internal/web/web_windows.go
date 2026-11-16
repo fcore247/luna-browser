@@ -42,6 +42,10 @@ func SetLanguage(messages string) { send("language", map[string]any{"messages": 
 func Find(id int, text string, forward bool) {
 	send("find", map[string]any{"tab": id, "text": text, "forward": forward})
 }
+
+// WebView2 presents fullscreen video directly on Windows.
+func SetCinemaCoverDuration(seconds float64) {}
+
 func image(op string, id int) (string, error) {
 	var s string
 	e := winhost.Call(op, map[string]any{"tab": id}, &s)
@@ -99,10 +103,20 @@ func SetCredentialHandler(func(tab int, origin, username, password string)) {}
 func ConfigureCredentials(string)                                           {}
 
 type FillResult struct {
-	OK       bool   `json:"ok"`
-	Username bool   `json:"username"`
-	Password bool   `json:"password"`
-	Error    string `json:"error,omitempty"`
+	Stage     string `json:"stage,omitempty"`
+	Submitted bool   `json:"submitted,omitempty"`
+	OK        bool   `json:"ok"`
+	Username  bool   `json:"username"`
+	Password  bool   `json:"password"`
+	Error     string `json:"error,omitempty"`
+}
+
+func SubmitLogin(tab int, origin, username, password, form string) (FillResult, error) {
+	return FillCredential(tab, origin, username, password)
+}
+
+func ProbeLogin(tab int, origin, username, form string) (FillResult, error) {
+	return FillCredential(tab, origin, username, "")
 }
 
 func FillCredential(int, string, string, string) (FillResult, error) {

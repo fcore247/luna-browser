@@ -5,15 +5,18 @@ Seiten mit Login (zum Beispiel einem Schulportal) schnell anmelden kannst. Es gi
 
 ## So funktioniert es
 
-1. Du meldest dich auf einer Webseite an. Danach erscheint in der Adressleiste ein Schlüssel mit
-   **Speichern** (oder **Aktualisieren**, wenn es das Konto schon gibt).
-2. Ein Klick darauf fragt nach, ob Luna das Passwort speichern soll.
-3. Später zeigt ein Schlüssel in der Adressleiste, dass für diese Seite ein Konto gespeichert ist. Ein Klick,
-   dann **Touch ID** (oder das Mac-Passwort), und Luna füllt die Felder aus. Bei mehreren Konten wählst du
-   zuerst eines aus. Zweistufige Logins (erst Benutzername, dann Passwort) füllt Luna in zwei Klicks.
+1. Wenn du eine Anmeldung abschickst, bietet Luna über der Webseite **Speichern** oder **Nicht jetzt** an.
+   Hast du für ein bekanntes Konto ein anderes Passwort eingegeben, erscheint **Aktualisieren**.
+2. Beim Speichern kannst du **Automatisch mit Touch ID anmelden** wählen. Erkennt Luna beim nächsten
+   Besuch das Anmeldeformular, bestätigst du mit Touch ID oder deinem Mac-Passwort. Luna füllt das
+   Formular aus. Würde ein Formular das Passwort in der URL übertragen, überlässt Luna dir das Absenden.
+   Unterstützte Anmeldeformulare sendet Luna automatisch ab. Eine Zwei-Faktor-Abfrage beantwortest du auf der Webseite.
+3. Über den Schlüssel in der Adressleiste kannst du eine Anmeldung auch selbst starten und zwischen
+   gespeicherten Konten wählen. Bei erkannten zweistufigen Anmeldungen auf derselben Website verwendet
+   Luna die Bestätigung auch für den unmittelbar folgenden Passwortschritt.
 
-Verwaltet wird alles unter **Einstellungen → Passwörter**: Liste ohne Passwörter, einzelne Einträge löschen,
-alle löschen (mit Touch ID) und das Speichern-Angebot ausschalten.
+Unter **Einstellungen → Passwörter** wählst du pro Website das Konto für die automatische Anmeldung.
+Dort kannst du gespeicherte Einträge löschen und das Speicherangebot ausschalten.
 
 ## Was Luna schützt
 
@@ -23,7 +26,9 @@ alle löschen (mit Touch ID) und das Speichern-Angebot ausschalten.
   Entsperren weiß, wo ein Konto existiert.
 - **Der Schlüssel liegt im Schlüsselbund.** Ein einziger Eintrag (`com.luna.browser.vault`), nicht in iCloud
   synchronisiert. Unsignierte Testversionen können nach einem Update einmal nach dem Anmeldepasswort fragen.
-- **Nur auf Klick und mit Touch ID.** Ausgefüllt wird nie von selbst.
+- **Freigabe am Mac.** Jede neue Anmeldung mit gespeicherten Zugangsdaten erfordert Touch ID oder das
+  Mac-Passwort. Für eine zweistufige Anmeldung gilt die Freigabe höchstens 90 Sekunden und nur für
+  den nächsten Passwortschritt im selben Tab, für dieselbe Website und dasselbe Konto.
 - **Nur auf derselben Seite.** Luna vergleicht den Ursprung (Schema, Host, Port) beim Speichern und noch
   einmal direkt vor dem Einsetzen. Nur `https://` ist erlaubt, `http://` nur für `localhost`.
 - **Getrennte Skript-Welt.** Die Formular-Erkennung läuft in einer eigenen JavaScript-Welt von WebKit.
@@ -42,5 +47,5 @@ auch nicht über `browser_settings` öffnen. Ein Test (`vault_boundary_test.go`)
 - Passkeys (WebAuthn) und der iCloud-Schlüsselbund von Safari sind nicht eingebunden. Dafür verlangt Apple
   für Browser ein besonderes Entitlement, das nur Apple vergibt.
 - Windows hat den Tresor noch nicht. Der Einstellungsbereich sagt das.
-- Passwörter, die du über die Zwischenablage oder Formulare ohne Anmelde-Schaltfläche eingibst, erkennt Luna
-  nur, wenn sie über ein Formular, die Eingabetaste oder eine Anmelde-Schaltfläche abgeschickt werden.
+- Das direkte Anmelden setzt ein erkennbares Anmeldeformular voraus. Bei zusätzlichen
+  Bestätigungsschritten oder mehreren uneindeutigen Formularen kannst du auf der Website fortfahren.

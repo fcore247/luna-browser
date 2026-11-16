@@ -30,11 +30,15 @@ async function setup(page, { supported = true, saved = [] } = {}) {
     mcpCommandActive: 'async()=>true',
     mcpReply: 'async()=>{}',
     vaultStatus: `async()=>({supported:${supported},ready:${supported},count:(window.vault||[]).length,offers:window.vaultOffers!==false})`,
-    vaultEntries: 'async(url)=>(window.vault||[]).filter(e=>url.startsWith(e.origin))',
+    vaultEntries: 'async(url)=>(window.vault||[]).filter(e=>new URL(url).origin===e.origin)',
     vaultAll: 'async()=>window.vault||[]',
-    vaultSavePending:
-      'async(tab)=>{window.saved=tab;(window.vault ||= []).push({origin:window.offer.origin,username:window.offer.username,updated:1730000000});return {}}',
-    vaultDismissPending: 'async(tab)=>{window.dismissed=tab}',
+    vaultSaveOffer:
+      'async(tab,id,autoLogin)=>{window.saved={tab,id,autoLogin};(window.vault ||= []).push({...window.offer,autoLogin});return {}}',
+    vaultDismissOffer: 'async(tab,id)=>{window.dismissed={tab,id}}',
+    vaultSetAutoLogin:
+      'async(origin,username,enabled)=>{window.changedAuto={origin,username,enabled};for(const e of window.vault)if(e.origin===origin)e.autoLogin=enabled&&e.username===username}',
+    vaultLogin:
+      'async(tab,url,username,form,automatic,continuation)=>{(window.logins||=[]).push({tab,url,username,form,automatic,continuation});return form==="user-step" ? {filled:true,submitted:true,stage:"username",continuation:"test-grant"} : {filled:true,username:true,password:true,submitted:true,stage:"password"}}',
     vaultFill:
       'async(tab,url,username)=>{window.filled={tab,url,username};return {filled:true,username:true,password:true}}',
     vaultDelete:
@@ -89,6 +93,59 @@ test('several saved logins open a chooser before anything is filled', async ({ p
   await expect.poll(() => page.evaluate(() => window.filled?.username)).toBe('anna');
 });
 
+async function reportLoginForm(page, site, form, stage = 'password') {
+  await page.evaluate(
+    ([origin, form, stage]) =>
+      window.nativeState({ t: 'loginForm', id: window.nativeTab, origin, form, stage }),
+    [site, form, stage],
+  );
+}
+
+test('only the chosen account signs in automatically, once for its own form', async ({ page }) => {
+  await setup(page, { saved: [max, { ...anna, autoLogin: true }] });
+  await expect(page.locator('#bVault')).toBeVisible();
+  await reportLoginForm(page, 'https://other.example.test', 'wrong-origin');
+  await reportLoginForm(page, origin, 'native-form');
+  await reportLoginForm(page, origin, 'native-form');
+  await expect.poll(() => page.evaluate(() => window.logins?.length)).toBe(1);
+  const [attempt] = await page.evaluate(() => window.logins);
+  expect(attempt).toMatchObject({
+    url: source,
+    username: 'anna',
+    form: 'native-form',
+    automatic: true,
+  });
+});
+
+test('manual-only accounts still need a choice on a recognized login form', async ({ page }) => {
+  await setup(page, { saved: [max, anna] });
+  await expect(page.locator('#bVault')).toBeVisible();
+  await reportLoginForm(page, origin, 'native-form');
+  await page.locator('#bVault').click();
+  const chooser = page.locator('.vault-dialog');
+  await expect(chooser).toBeVisible();
+  expect(await page.evaluate(() => window.logins)).toBeUndefined();
+  await chooser.locator('.vault-row', { hasText: 'max' }).click();
+  await expect.poll(() => page.evaluate(() => window.logins?.[0]?.automatic)).toBe(false);
+});
+
+test('a two-step login passes the returned grant only to its password form', async ({ page }) => {
+  await setup(page, { saved: [{ ...anna, autoLogin: true }] });
+  await expect(page.locator('#bVault')).toBeVisible();
+  await reportLoginForm(page, origin, 'user-step', 'username');
+  await expect.poll(() => page.evaluate(() => window.logins?.length)).toBe(1);
+  await reportLoginForm(page, 'https://other.example.test', 'wrong-form');
+  await reportLoginForm(page, origin, 'password-step');
+  await expect.poll(() => page.evaluate(() => window.logins?.length)).toBe(2);
+  const [, completion] = await page.evaluate(() => window.logins);
+  expect(completion).toMatchObject({
+    url: source,
+    username: 'anna',
+    form: 'password-step',
+    continuation: 'test-grant',
+  });
+});
+
 test('after a login Luna offers to save it, never showing the password', async ({ page }) => {
   await setup(page);
   await page.evaluate(
@@ -96,19 +153,24 @@ test('after a login Luna offers to save it, never showing the password', async (
       window.offer = o;
       window.sendOffer({ tab: window.nativeTab, ...o, update: false });
     },
-    { origin, username: 'max' },
+    { id: 'offer-1', origin, username: 'max', autoLogin: true },
   );
   const key = page.locator('#bVault');
-  await expect(key).toBeVisible();
-  await expect(key).toHaveAttribute('data-state', 'offer');
-  await expect(key).toContainText('Speichern');
-  await key.click();
-  const dialog = page.locator('.vault-dialog');
-  await expect(dialog).toContainText('Passwort speichern?');
-  await expect(dialog).toContainText('schule.example.org');
-  await expect(dialog).toContainText('max');
-  await dialog.locator('.vault-primary').click();
-  await expect.poll(() => page.evaluate(() => window.saved)).toBeTruthy();
+  const bar = page.locator('#vaultOffer');
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText('schule.example.org');
+  await expect(bar).toContainText('max');
+  const auto = bar.locator('#vaultOfferAutoLogin');
+  await expect(auto).toBeChecked();
+  await auto.uncheck();
+  await bar.locator('[data-vault-choice="save"]').click();
+  await expect
+    .poll(() => page.evaluate(() => window.saved))
+    .toEqual({
+      id: 'offer-1',
+      tab: await page.evaluate(() => window.nativeTab),
+      autoLogin: false,
+    });
   await expect(key).toHaveAttribute('data-state', 'fill');
   await expect(key).toHaveAttribute('title', /max/);
 });
@@ -120,12 +182,13 @@ test('"Nicht jetzt" drops the offer without saving', async ({ page }) => {
       window.offer = o;
       window.sendOffer({ tab: window.nativeTab, ...o, update: true });
     },
-    { origin, username: 'max' },
+    { id: 'update-1', origin, username: 'max', autoLogin: false },
   );
-  await expect(page.locator('#bVault')).toContainText('Aktualisieren');
-  await page.locator('#bVault').click();
-  await page.locator('.vault-dialog [data-vault-choice=""]').click();
-  await expect.poll(() => page.evaluate(() => window.dismissed)).toBeTruthy();
+  const bar = page.locator('#vaultOffer');
+  await expect(bar).toContainText(/aktualisieren/i);
+  await expect(bar.locator('#vaultOfferAutoLogin')).not.toBeChecked();
+  await bar.locator('[data-vault-choice="dismiss"]').click();
+  await expect.poll(() => page.evaluate(() => window.dismissed?.id)).toBe('update-1');
   expect(await page.evaluate(() => window.saved)).toBeUndefined();
   await expect(page.locator('#bVault')).toBeHidden();
 });
@@ -148,6 +211,10 @@ test('settings list logins without passwords, delete them and switch the save of
   await expect(section).toContainText('max');
   await expect(section).toContainText('Deine KI kann Passwörter weder lesen noch ausfüllen');
   await expect(section.locator('.pp-settings-entry')).toHaveCount(2);
+  await section.locator('[data-vault="auto-login"][data-user="anna"]').click();
+  await expect
+    .poll(() => page.evaluate(() => window.changedAuto))
+    .toEqual({ origin, username: 'anna', enabled: true });
   await section.locator('[data-vault="delete"][data-user="max"]').click();
   await expect(section.locator('.pp-settings-entry')).toHaveCount(1);
   await section.locator('[data-vault="offers"]').click();

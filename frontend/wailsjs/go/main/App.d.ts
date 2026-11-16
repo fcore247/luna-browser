@@ -77,6 +77,8 @@ export function GestureBindings():Promise<Record<string, store.GestureBinding>>;
 
 export function GestureWriteSound(arg1:boolean):Promise<void>;
 
+export function GetFullscreenCoverDuration():Promise<number>;
+
 export function History(arg1:string,arg2:number):Promise<Array<store.Visit>>;
 
 export function HistoryAdd(arg1:string,arg2:string):Promise<void>;
@@ -171,6 +173,8 @@ export function SetDockIcon(arg1:string):Promise<void>;
 
 export function SetErrorPalette(arg1:string):Promise<void>;
 
+export function SetFullscreenCoverDuration(arg1:number):Promise<number>;
+
 export function SetGesture(arg1:boolean):Promise<void>;
 
 export function SetGestureBinding(arg1:string,arg2:string,arg3:string):Promise<Record<string, store.GestureBinding>>;
@@ -219,13 +223,21 @@ export function VaultDelete(arg1:string,arg2:string):Promise<void>;
 
 export function VaultDeleteAll():Promise<void>;
 
+export function VaultDismissOffer(arg1:number,arg2:string):Promise<void>;
+
 export function VaultDismissPending(arg1:number):Promise<void>;
 
 export function VaultEntries(arg1:string):Promise<Array<vault.Entry>>;
 
 export function VaultFill(arg1:number,arg2:string,arg3:string):Promise<main.VaultFillResult>;
 
+export function VaultLogin(arg1:number,arg2:string,arg3:string,arg4:string,arg5:boolean,arg6:string):Promise<main.VaultFillResult>;
+
+export function VaultSaveOffer(arg1:number,arg2:string,arg3:boolean):Promise<vault.Entry>;
+
 export function VaultSavePending(arg1:number):Promise<vault.Entry>;
+
+export function VaultSetAutoLogin(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function VaultStatus():Promise<main.VaultStatus>;
 

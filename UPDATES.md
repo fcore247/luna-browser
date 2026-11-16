@@ -16,6 +16,15 @@ Der private Schlüssel verbleibt im Schlüsselbund dieses Macs. CI erhält keine
 privaten Schlüssel. Während der Testphase werden nur CI-Artefakte erzeugt; ein Push
 allein veröffentlicht weiterhin **kein** Update.
 
+## Version 1.3.6 · 16. November 2026
+
+- Auf dem Mac können Webseiten Videos und andere Elemente über die Vollbild-API öffnen. Der YouTube-Player bleibt beim Wechsel im Luna-Fenster. Beim Verlassen stellt Luna die Fenstergröße und den Tastaturfokus wieder her.
+- Unter **Einstellungen → Darstellung → Vollbild-Ladebildschirm** lässt sich die Sanduhr von 0 bis 60 Sekunden einstellen. Standard ist eine Sekunde. Mit 0 lässt sich die Sanduhr abschalten.
+- Nach einer Anmeldung auf dem Mac bietet Luna **Speichern**, **Aktualisieren** oder **Nicht jetzt** direkt über der Webseite an. Unter **Einstellungen → Passwörter** lässt sich pro Website ein Konto für die automatische Anmeldung wählen. Erkannte Anmeldeformulare lassen sich mit Touch ID oder dem Mac-Passwort bestätigen.
+- Luna Search zeigt die Ladeansicht sofort in der Größe der Seite. Die Ergebnisse erscheinen an derselben Stelle.
+
+Windows bleibt **experimentell / instabil**.
+
 ## Version 1.3.5 · 5. November 2026
 
 - Luna Search im Glas-Look mit Filtern direkt in der Adressleiste.

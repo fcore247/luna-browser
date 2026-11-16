@@ -130,6 +130,10 @@ export function GestureWriteSound(arg1) {
   return window['go']['main']['App']['GestureWriteSound'](arg1);
 }
 
+export function GetFullscreenCoverDuration() {
+  return window['go']['main']['App']['GetFullscreenCoverDuration']();
+}
+
 export function History(arg1, arg2) {
   return window['go']['main']['App']['History'](arg1, arg2);
 }
@@ -318,6 +322,10 @@ export function SetErrorPalette(arg1) {
   return window['go']['main']['App']['SetErrorPalette'](arg1);
 }
 
+export function SetFullscreenCoverDuration(arg1) {
+  return window['go']['main']['App']['SetFullscreenCoverDuration'](arg1);
+}
+
 export function SetGesture(arg1) {
   return window['go']['main']['App']['SetGesture'](arg1);
 }
@@ -414,6 +422,10 @@ export function VaultDeleteAll() {
   return window['go']['main']['App']['VaultDeleteAll']();
 }
 
+export function VaultDismissOffer(arg1, arg2) {
+  return window['go']['main']['App']['VaultDismissOffer'](arg1, arg2);
+}
+
 export function VaultDismissPending(arg1) {
   return window['go']['main']['App']['VaultDismissPending'](arg1);
 }
@@ -426,8 +438,20 @@ export function VaultFill(arg1, arg2, arg3) {
   return window['go']['main']['App']['VaultFill'](arg1, arg2, arg3);
 }
 
+export function VaultLogin(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['VaultLogin'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function VaultSaveOffer(arg1, arg2, arg3) {
+  return window['go']['main']['App']['VaultSaveOffer'](arg1, arg2, arg3);
+}
+
 export function VaultSavePending(arg1) {
   return window['go']['main']['App']['VaultSavePending'](arg1);
+}
+
+export function VaultSetAutoLogin(arg1, arg2, arg3) {
+  return window['go']['main']['App']['VaultSetAutoLogin'](arg1, arg2, arg3);
 }
 
 export function VaultStatus() {

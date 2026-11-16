@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "web_darwin.h"
+#import "cinema_window_darwin.h"
+#import "cinema_exit_cover_darwin.h"
 
 extern void goWebEvent(char *json);
 extern void goSnapshotDone(int req, char *b64);
@@ -47,10 +49,12 @@ static WKWebView *findWebView(NSView *root) {
  for (NSView *child in root.subviews) { WKWebView *found = findWebView(child); if (found) return found; }
  return nil;
 }
+static __weak NSWindow *gBrowserWindow;
 static NSWindow *fmWindow(void) {
+ if (gBrowserWindow) return gBrowserWindow;
  // Hilfsfenster (z.B. Bildschirmfreigabe) sind keine Browserfenster.
- for (NSWindow *w in NSApp.windows) if (w.isVisible && findWebView(w.contentView)) return w;
- for (NSWindow *w in NSApp.windows) if (findWebView(w.contentView)) return w;
+ for (NSWindow *w in NSApp.windows) if (w.isVisible && findWebView(w.contentView)) { gBrowserWindow = w; return w; }
+ for (NSWindow *w in NSApp.windows) if (findWebView(w.contentView)) { gBrowserWindow = w; return w; }
  return nil;
 }
 
@@ -64,6 +68,13 @@ static int gGestureOn = 1;
 // JavaScript-Welt. Die Seite kann die Funktionen weder überschreiben noch beobachten.
 extern void goCredSubmit(int tab, char *origin, char *user, char *pass);
 static NSString *gCredSrc;
+static NSString *originOfURL(NSURL *url);
+static NSString *credentialPageLocation(NSURL *url) {
+	if (!url.host.length) return @"";
+	NSURLComponents *parts = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:YES];
+	parts.user = parts.password = parts.query = parts.fragment = nil;
+	return parts.URL.absoluteString ?: @"";
+}
 static WKContentWorld *credWorld(void) {
 	static WKContentWorld *world;
 	static dispatch_once_t once;
@@ -89,6 +100,41 @@ static FMGestureHandler *gGestureHandler;
 
 #pragma clang diagnostic pop
 
+@interface FMCinemaHandler : NSObject <WKScriptMessageHandler>
+@end
+
+static NSString *gCinemaScript;
+static NSTimeInterval gCinemaCoverDuration = 1.0;
+
+void fmwSetCinemaCoverDuration(double seconds) {
+	NSTimeInterval duration = isfinite(seconds) && seconds >= 0 && seconds <= 60 ? seconds : 1.0;
+	dispatch_async(dispatch_get_main_queue(), ^{ gCinemaCoverDuration = duration; });
+}
+
+static void installCinemaScripts(WKUserContentController *controller) API_AVAILABLE(macos(11.0)) {
+	if (!gCinemaScript.length) return;
+	static FMCinemaHandler *handler;
+	if (!handler) handler = [FMCinemaHandler new];
+	WKContentWorld *world = [WKContentWorld worldWithName:@"LunaCinema"];
+	[controller removeScriptMessageHandlerForName:@"lunaCinema" contentWorld:world];
+	[controller addScriptMessageHandler:handler contentWorld:world name:@"lunaCinema"];
+
+	// Only this isolated world can call the window bridge. Check WebKit's own
+	// user activation and permissions policy before honoring a site's request.
+	NSString *gate =
+		@"if(location.protocol==='https:' && ['youtube.com','www.youtube.com','m.youtube.com','netflix.com','www.netflix.com'].includes(location.hostname))"
+		 "window.addEventListener('luna-cinema-request', e=>{"
+		 "  if(typeof e.detail!=='string' || e.detail.length>256) return;"
+		 "  let r; try {r=JSON.parse(e.detail)} catch {return}"
+		 "  if(!r || !Number.isSafeInteger(r.id) || r.id<=0 || !['enter','exit','ready'].includes(r.action))return;"
+		 "  e.preventDefault();"
+		 "  const allowed=r.action!=='enter'||(navigator.userActivation?.isActive && document.fullscreenEnabled);"
+		 "  window.webkit.messageHandlers.lunaCinema.postMessage({action:allowed?r.action:'denied',id:r.id});"
+		 "},true)";
+	[controller addUserScript:[[WKUserScript alloc] initWithSource:gate injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES inContentWorld:world]];
+	[controller addUserScript:[[WKUserScript alloc] initWithSource:gCinemaScript injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
+}
+
 static void applyGesture(WKWebViewConfiguration *c) {
 	WKUserContentController *u = c.userContentController;
 	if (!gGestureHandler) gGestureHandler = [FMGestureHandler new];
@@ -100,6 +146,15 @@ static void applyGesture(WKWebViewConfiguration *c) {
 		[u addUserScript:[[WKUserScript alloc] initWithSource:src injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 	}
 	applyCredentials(c);
+	if (@available(macOS 11.0, *)) installCinemaScripts(u);
+}
+
+void fmwConfigureCinemaScript(const char *src) {
+	NSString *script = [NSString stringWithUTF8String:src];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		gCinemaScript = script;
+		if (gConfig) applyGesture(gConfig);
+	});
 }
 
 static WKWebExtensionController *extensionController(void) API_AVAILABLE(macos(15.4));
@@ -171,19 +226,39 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @interface FMTab : NSObject <WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, WKWebExtensionTab>
 @property (nonatomic) int tid;
 @property (nonatomic, strong) WKWebView *view;
+@property (nonatomic, strong) NSView *hostView;
+@property (nonatomic, strong) FMCinemaWindowSession *cinemaSession;
+@property (nonatomic, strong) FMCinemaExitCover *cinemaExitCover;
+@property (nonatomic, strong) FMCinemaFocus *transitionFocus;
+@property (nonatomic, weak) NSView *preCinemaResponder;
+@property (nonatomic) NSInteger transitionTicket;
+@property (nonatomic) BOOL enteringCinema;
+@property (nonatomic) BOOL cinemaSnapshotPending;
+- (void)leaveCinema;
 @property (nonatomic) BOOL isError;
+@property (nonatomic, copy) NSString *credentialStepOrigin;
+@property (nonatomic, copy) NSString *credentialStepUser;
+@property (nonatomic) NSTimeInterval credentialStepTime;
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg;
 - (void)teardown;
 @end
 
 static id extensionWindow(void) API_AVAILABLE(macos(15.4));
 
+static BOOL cinemaSite(NSString *host) {
+	static NSSet *sites;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ sites = [NSSet setWithArray:@[@"youtube.com", @"www.youtube.com", @"m.youtube.com", @"netflix.com", @"www.netflix.com"]]; });
+	return [sites containsObject:host.lowercaseString];
+}
+
 static void layoutTab(FMTab *t) {
-	NSView *cv = fmWindow().contentView;
-	if (!cv) return;
-	CGFloat H = cv.bounds.size.height;
-	t.view.frame = NSMakeRect(gRect.origin.x, H - gRect.origin.y - gRect.size.height, gRect.size.width, gRect.size.height);
-	t.view.hidden = (t.tid != gActive);
+	if (t.cinemaSession.active) return;
+	NSView *parent = t.hostView.superview;
+	if (!parent) return;
+	NSRect frame = NSMakeRect(gRect.origin.x, NSMaxY(parent.bounds) - NSMaxY(gRect),
+	                          gRect.size.width, gRect.size.height);
+	if (!NSEqualRects(t.hostView.frame, frame)) t.hostView.frame = frame;
 }
 
 static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
@@ -203,17 +278,30 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg {
 	if (!(self = [super init])) return nil;
 	_tid = tid;
+	// Enable the standard Fullscreen API for every website, including popup tabs.
+	if (@available(macOS 12.3, *)) cfg.preferences.elementFullscreenEnabled = YES;
 	_view = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:cfg];
 	_view.navigationDelegate = self;
 	_view.UIDelegate = self;
 	_view.allowsBackForwardNavigationGestures = YES;
 	_view.allowsMagnification = YES;
-	_view.wantsLayer = YES;
-	_view.layer.cornerRadius = 12;
-	_view.layer.masksToBounds = YES;
-	[fmWindow().contentView addSubview:_view positioned:NSWindowAbove relativeTo:nil];
+	// WebKit swaps its own placeholder for the live page during the fullscreen
+	// zoom. Keep the destination and its rounded clipping in the browser window.
+	_hostView = [[NSView alloc] initWithFrame:NSZeroRect];
+	_hostView.wantsLayer = YES;
+	_hostView.layer.cornerRadius = 12;
+	_hostView.layer.masksToBounds = YES;
+	_hostView.hidden = (tid != gActive);
+	_view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+	[_hostView addSubview:_view];
+	[fmWindow().contentView addSubview:_hostView positioned:NSWindowAbove relativeTo:nil];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view addObserver:self forKeyPath:k options:0 context:NULL];
+	_cinemaSession = [FMCinemaWindowSession new];
+	// Only one tab can occupy this browser window. Share its full-display bitmap.
+	static FMCinemaExitCover *exitCover;
+	if (!exitCover) exitCover = [FMCinemaExitCover new];
+	_cinemaExitCover = exitCover;
 	return self;
 }
 
@@ -226,7 +314,156 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); }
 - (void)reloadFromOrigin:(BOOL)origin forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view reload]; done(nil); }
 
+- (void)replyToCinemaRequest:(NSInteger)request state:(NSString *)state {
+	NSString *reply = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@')", (long)request, state];
+	[_view evaluateJavaScript:reply completionHandler:nil];
+}
+
+- (void)finishCinemaTransition:(NSInteger)ticket {
+	if (ticket <= 0 || ticket != _transitionTicket) return;
+	FMCinemaFocus *focus = _transitionFocus;
+	if (!_enteringCinema && _tid == gActive) [focus orderPlayerFrontForReveal];
+	[_cinemaExitCover dismissTicket:ticket];
+	_transitionTicket = 0;
+	_cinemaSnapshotPending = NO;
+	if (!focus || _tid != gActive) {
+		_transitionFocus = nil;
+		return;
+	}
+	[focus restoreAfterResize:NO];
+	// WindowServer and AppKit can finish changing the key window after
+	// orderOut returns. Skip the follow-up if another transition has begun.
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (self.transitionFocus != focus) return;
+		if (self.tid == gActive) {
+			[focus restoreAfterResize:NO];
+			if (focus.playerHasKeyboardFocus) {
+				NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaRestoreFocus?.(%ld)", (long)ticket];
+				[self.view evaluateJavaScript:js completionHandler:nil];
+			}
+		}
+		self.transitionFocus = nil;
+	});
+}
+
+- (void)leaveCinema {
+	_transitionFocus = nil;
+	_preCinemaResponder = nil;
+	if (!_cinemaSession.active && !_transitionTicket) return;
+	[self finishCinemaTransition:_transitionTicket];
+	[_cinemaSession end];
+	[self replyToCinemaRequest:0 state:@"exited"];
+}
+
+- (void)cinemaLayoutReady:(NSInteger)ticket {
+	if (ticket <= 0 || ticket != _transitionTicket || _cinemaSession.active != _enteringCinema ||
+	    _cinemaSnapshotPending) return;
+	if (!_view.window || _tid != gActive || _hostView.isHiddenOrHasHiddenAncestor || NSIsEmptyRect(_view.bounds)) {
+		[self finishCinemaTransition:ticket];
+		return;
+	}
+	// The page measured its player in the destination viewport. Wait for
+	// WebKit to incorporate that update. This one-point image is discarded.
+	_cinemaSnapshotPending = YES;
+	WKSnapshotConfiguration *config = [WKSnapshotConfiguration new];
+	config.afterScreenUpdates = YES;
+	config.rect = NSMakeRect(NSMinX(_view.bounds), NSMinY(_view.bounds), 1, 1);
+	__weak FMTab *weakSelf = self;
+	[_view takeSnapshotWithConfiguration:config completionHandler:^(NSImage *image, NSError *error) {
+		FMTab *tab = weakSelf;
+		if (image && !error && [tab.cinemaExitCover canRevealTicket:ticket]) [tab finishCinemaTransition:ticket];
+	}];
+}
+
+- (void)setCinemaActive:(BOOL)entering request:(NSInteger)request {
+	if (_transitionTicket && _enteringCinema == entering) {
+		if (entering) [self replyToCinemaRequest:request state:@"denied"];
+		return;
+	}
+	if (_cinemaSession.active == entering) {
+		// Escape can arrive in the frame before the window expands.
+		if (!entering && _transitionTicket) {
+			FMCinemaFocus *focus = _transitionFocus;
+			[self leaveCinema];
+			if (_tid == gActive) [focus restoreAfterResize:NO];
+		}
+		if (request) [self replyToCinemaRequest:request state:entering ? @"denied" : @"exited"];
+		return;
+	}
+	NSWindow *window = _hostView.window;
+	if (entering && (!NSApp.isActive || !window.isOnActiveSpace || window.attachedSheet || NSApp.modalWindow ||
+	                 (NSApp.keyWindow && NSApp.keyWindow != window) ||
+	                 _hostView.isHiddenOrHasHiddenAncestor || !_hostView.window.isVisible)) {
+		[self replyToCinemaRequest:request state:@"denied"];
+		return;
+	}
+	if (entering) [_cinemaExitCover prepareForWindow:_hostView.window label:L(@"Augenblick")];
+	// The page's request ID can repeat across documents. A native ticket is
+	// unique across tabs and directions, including reversals under the same panel.
+	static NSInteger nativeTicket = (1LL << 32);
+	NSInteger previousTicket = _transitionTicket;
+	NSInteger ticket = ++nativeTicket;
+	_transitionTicket = ticket;
+	_enteringCinema = entering;
+	_cinemaSnapshotPending = NO;
+	_transitionFocus = [[FMCinemaFocus alloc] initWithPlayer:_view entering:entering previous:_preCinemaResponder];
+	if (entering) _preCinemaResponder = _transitionFocus.originalResponder;
+	__weak FMTab *weakSelf = self;
+	void (^escape)(void) = ^{
+		FMTab *tab = weakSelf;
+		if (tab.transitionTicket == ticket) [tab setCinemaActive:NO request:0];
+	};
+	NSTimeInterval duration = gCinemaCoverDuration;
+	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket duration:duration
+		onEscape:entering ? escape : nil onInterrupt:^(BOOL cancelled) {
+			FMTab *tab = weakSelf;
+			if (tab.transitionTicket != ticket) return;
+			if (cancelled) tab.transitionFocus = nil;
+			if (tab.cinemaSession.active == entering) [tab finishCinemaTransition:ticket];
+			else if (cancelled) [tab leaveCinema];
+			// If the timer expired before the resize, changeWindow still
+			// completes the requested transition and retires this ticket.
+		}];
+	if (!shown) [_cinemaExitCover dismissTicket:previousTicket];
+	void (^changeWindow)(void) = ^{
+		FMTab *tab = weakSelf;
+		if (tab.transitionTicket != ticket) return;
+		if (entering) {
+			BOOL entered = [tab.cinemaSession beginWithHost:tab.hostView player:tab.view onExit:^(BOOL interrupted) {
+				if (interrupted) [weakSelf leaveCinema];
+				else [weakSelf setCinemaActive:NO request:0];
+			}];
+			if (!entered) {
+				[tab finishCinemaTransition:ticket];
+				[tab replyToCinemaRequest:request state:@"denied"];
+				return;
+			}
+		} else {
+			[tab.cinemaSession end];
+			tab.preCinemaResponder = nil;
+		}
+		if (tab.tid == gActive) [tab.transitionFocus restoreAfterResize:YES];
+		NSSize viewport = tab.view.bounds.size;
+		CGFloat zoom = tab.view.pageZoom;
+		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@',%ld,%.4f,%.4f,%.3f)",
+			(long)request, entering ? @"entered" : @"exited", (long)ticket, viewport.width/zoom, viewport.height/zoom,
+			shown ? duration * 1000 : 0.0];
+		[tab.view evaluateJavaScript:js completionHandler:^(id value, NSError *error) {
+			FMTab *current = weakSelf;
+			if (!error || current.transitionTicket != ticket) return;
+			if (entering) [current leaveCinema];
+			else [current finishCinemaTransition:ticket];
+		}];
+		if ([tab.cinemaExitCover canRevealTicket:ticket]) [tab finishCinemaTransition:ticket];
+	};
+	// Reserve at most half of a short cover for its first composited frame.
+	NSTimeInterval leadIn = MIN(0.032, duration / 2);
+	if (shown) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(leadIn * NSEC_PER_SEC)), dispatch_get_main_queue(), changeWindow);
+	else changeWindow();
+}
+
 - (void)teardown {
+	[self leaveCinema];
     if (@available(macOS 15.4, *)) [extensionController() didCloseTab:self windowIsClosing:NO];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view removeObserver:self forKeyPath:k];
@@ -234,6 +471,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	_view.UIDelegate = nil;
 	[_view stopLoading];
 	[_view removeFromSuperview];
+	[_hostView removeFromSuperview];
 }
 
 - (void)push {
@@ -284,6 +522,13 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)webView:(WKWebView *)wv navigationAction:(WKNavigationAction *)a didBecomeDownload:(WKDownload *)d { d.delegate = self; }
 - (void)webView:(WKWebView *)wv navigationResponse:(WKNavigationResponse *)r didBecomeDownload:(WKDownload *)d { d.delegate = self; }
 
+- (void)webView:(WKWebView *)wv didCommitNavigation:(WKNavigation *)nav {
+	NSString *origin = originOfURL(wv.URL);
+	if (![_credentialStepOrigin isEqual:origin]) _credentialStepOrigin = _credentialStepUser = nil;
+	emit(@{@"t":@"loginForm", @"id":@(_tid), @"tab":@(_tid), @"origin":origin, @"url":credentialPageLocation(wv.URL), @"form":@"", @"stage":@""});
+	if (_tid == gActive && cinemaSite(wv.URL.host)) [_cinemaExitCover prepareForWindow:wv.window label:L(@"Augenblick")];
+}
+
 - (void)webView:(WKWebView *)wv didFinishNavigation:(WKNavigation *)nav {
 	emit(@{@"t": @"loaded", @"tab": @(_tid), @"url": nn(wv.URL.absoluteString), @"title": nn(wv.title), @"error": @(_isError)});
 	int tid = _tid;
@@ -301,7 +546,8 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 }
 - (void)webView:(WKWebView *)wv didFailProvisionalNavigation:(WKNavigation *)n withError:(NSError *)e { [self failed:wv error:e]; }
 - (void)webView:(WKWebView *)wv didFailNavigation:(WKNavigation *)n withError:(NSError *)e { [self failed:wv error:e]; }
-- (void)webViewWebContentProcessDidTerminate:(WKWebView *)wv { [wv reload]; }
+- (void)webView:(WKWebView *)wv didStartProvisionalNavigation:(WKNavigation *)navigation { [self leaveCinema]; }
+- (void)webViewWebContentProcessDidTerminate:(WKWebView *)wv { [self leaveCinema]; [wv reload]; }
 
 #pragma mark UI-Delegate
 
@@ -366,20 +612,64 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 @implementation FMCredHandler
+- (instancetype)init {
+	if (!(self = [super init])) return nil;
+	NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+	[center addObserver:self selector:@selector(focusChanged:) name:NSWindowDidBecomeKeyNotification object:nil];
+	[center addObserver:self selector:@selector(focusChanged:) name:NSApplicationDidBecomeActiveNotification object:nil];
+	return self;
+}
+- (void)focusChanged:(NSNotification *)notification {
+	FMTab *tab = gTabs[@(gActive)];
+	if (tab && NSApp.isActive && tab.view.window.isKeyWindow && !tab.hostView.isHiddenOrHasHiddenAncestor &&
+	    !tab.view.window.attachedSheet)
+		emit(@{@"t":@"loginFocus", @"tab":@(tab.tid)});
+}
 // Der Ursprung kommt aus WebKit (frameInfo.securityOrigin), nie aus dem, was die Seite behauptet.
 // Das Passwort geht nur an Go und nie über die Ereignisse an die Oberfläche.
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
 	if (![msg.name isEqualToString:@"lunaCreds"] || !msg.frameInfo.isMainFrame) return;
 	NSDictionary *b = [msg.body isKindOfClass:[NSDictionary class]] ? msg.body : nil;
-	NSString *user = b[@"username"], *pass = b[@"password"];
-	if (![user isKindOfClass:[NSString class]] || ![pass isKindOfClass:[NSString class]]) return;
-	if (!pass.length || pass.length > 1024 || user.length > 320) return;
 	WKSecurityOrigin *o = msg.frameInfo.securityOrigin;
-	if (!o.protocol.length || !o.host.length) return;
-	NSString *origin = o.port > 0 ? [NSString stringWithFormat:@"%@://%@:%ld", o.protocol, o.host, (long)o.port] : [NSString stringWithFormat:@"%@://%@", o.protocol, o.host];
-	int tid = -1;
-	for (FMTab *t in gTabs.allValues) if (t.view == msg.webView) tid = t.tid;
-	if (tid < 0) return;
+	NSString *scheme = o.protocol.lowercaseString, *host = o.host.lowercaseString;
+	if (!host.length || (![scheme isEqual:@"https"] && !([scheme isEqual:@"http"] &&
+	    [@[@"localhost", @"127.0.0.1", @"::1", @"[::1]"] containsObject:host]))) return;
+	if ([host containsString:@":"] && ![host hasPrefix:@"["]) host = [NSString stringWithFormat:@"[%@]",host];
+	BOOL defaultPort = o.port <= 0 || ([scheme isEqual:@"https"] ? o.port == 443 : o.port == 80);
+	NSString *origin = defaultPort ? [NSString stringWithFormat:@"%@://%@", scheme, host] :
+		[NSString stringWithFormat:@"%@://%@:%ld", scheme, host, (long)o.port];
+	FMTab *tab = nil;
+	for (FMTab *t in gTabs.allValues) if (t.view == msg.webView) { tab = t; break; }
+	if (!tab || tab.isError) return;
+	int tid = tab.tid;
+	if ([b[@"kind"] isEqual:@"loginForm"]) {
+		NSString *form = b[@"form"], *stage = b[@"stage"];
+		if (![form isKindOfClass:NSString.class] || form.length > 128 ||
+		    ![@[@"", @"username", @"password"] containsObject:stage ?: NSNull.null] || !!form.length != !!stage.length) return;
+		emit(@{@"t":@"loginForm", @"id":@(tid), @"tab":@(tid), @"origin":origin,
+		       @"url":credentialPageLocation(tab.view.URL), @"form":form, @"stage":stage});
+		return;
+	}
+	NSString *user = b[@"username"];
+	if (![user isKindOfClass:NSString.class] || user.length > 320) return;
+	NSTimeInterval now = NSProcessInfo.processInfo.systemUptime;
+	if ([b[@"kind"] isEqual:@"usernameStep"]) {
+		if (!user.length) return;
+		tab.credentialStepOrigin = origin;
+		tab.credentialStepUser = user;
+		tab.credentialStepTime = now;
+		__weak FMTab *weakTab = tab;
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+			FMTab *current = weakTab;
+			if (current.credentialStepTime == now) current.credentialStepOrigin = current.credentialStepUser = nil;
+		});
+		return;
+	}
+	NSString *pass = b[@"password"];
+	if (b[@"kind"] || ![pass isKindOfClass:NSString.class] || !pass.length || pass.length > 1024) return;
+	if (!user.length && [origin isEqual:tab.credentialStepOrigin] && now - tab.credentialStepTime <= 300)
+		user = tab.credentialStepUser ?: @"";
+	tab.credentialStepOrigin = tab.credentialStepUser = nil;
 	char *co = strdup(origin.lowercaseString.UTF8String), *cu = strdup(user.UTF8String), *cp = strdup(pass.UTF8String);
 	goCredSubmit(tid, co, cu, cp);
 	memset(cp, 0, strlen(cp));
@@ -387,6 +677,26 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 }
 @end
 #pragma clang diagnostic pop
+
+@implementation FMCinemaHandler
+- (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message {
+	FMTab *tab = gTabs[@(gActive)];
+	if (!tab || tab.view != message.webView || !message.frameInfo.isMainFrame) return;
+	WKSecurityOrigin *origin = message.frameInfo.securityOrigin;
+	if (![origin.protocol isEqual:@"https"] || !cinemaSite(origin.host)) return;
+	NSDictionary *request = [message.body isKindOfClass:NSDictionary.class] ? message.body : nil;
+	if (![request[@"id"] isKindOfClass:NSNumber.class]) return;
+	NSInteger rid = [request[@"id"] integerValue];
+	NSString *action = request[@"action"];
+	if ([action isEqual:@"ready"]) {
+		[tab cinemaLayoutReady:rid];
+	} else if ([action isEqual:@"exit"] || [action isEqual:@"enter"]) {
+		[tab setCinemaActive:[action isEqual:@"enter"] request:rid];
+	} else {
+		[tab replyToCinemaRequest:rid state:@"denied"];
+	}
+}
+@end
 
 @implementation FMGestureHandler
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
@@ -435,7 +745,14 @@ void fmwShow(int id) {
         gActive = id;
         if (id >= 0 && gTabs[@(id)]) gLastWebTab = id;
         if (@available(macOS 15.4, *)) if (gTabs[@(id)]) [extensionController() didActivateTab:gTabs[@(id)] previousActiveTab:previous];
-		for (FMTab *t in gTabs.allValues) t.view.hidden = (t.tid != gActive);
+		for (FMTab *t in gTabs.allValues) {
+			BOOL hidden = t.tid != gActive;
+			if (t.hostView.hidden != hidden) {
+				t.hostView.hidden = hidden;
+				if (!hidden && cinemaSite(t.view.URL.host)) [t.cinemaExitCover prepareForWindow:t.view.window label:L(@"Augenblick")];
+			}
+			if (hidden && (t.cinemaSession.active || t.transitionTicket)) [t leaveCinema];
+		}
 	});
 }
 void fmwClose(int id) {
@@ -689,7 +1006,7 @@ char *fmwOnboardingClipboard(int tab, const char *provider, int previousCount) {
  void (^read)(void) = ^{
   FMTab *t = gTabs[@(tab)];
   NSURL *url = t.view.URL;
-  BOOL eligible = NSApp.isActive && gActive == tab && !t.view.hidden && !t.isError && !t.view.loading && setupKeyPage(url, service);
+  BOOL eligible = NSApp.isActive && gActive == tab && !t.hostView.hidden && !t.isError && !t.view.loading && setupKeyPage(url, service);
   // Read only a new copy on an active trusted key page, never the baseline clipboard.
   NSMutableDictionary *status = [@{@"count": @(NSPasteboard.generalPasteboard.changeCount), @"eligible": @(eligible), @"host": url.host ?: @"", @"loading": @(t.view.loading), @"error": @(t.isError)} mutableCopy];
   if (eligible && previousCount >= 0 && NSPasteboard.generalPasteboard.changeCount != previousCount) {
@@ -733,7 +1050,7 @@ void fmwConfigureCredentials(const char *src) {
 static NSString *originOfURL(NSURL *url) {
 	NSString *scheme = url.scheme.lowercaseString, *host = url.host.lowercaseString;
 	if (!scheme.length || !host.length) return @"";
-	if ([host containsString:@":"]) host = [NSString stringWithFormat:@"[%@]", host];
+	if ([host containsString:@":"] && ![host hasPrefix:@"["]) host = [NSString stringWithFormat:@"[%@]", host];
 	NSNumber *port = url.port;
 	BOOL isDefault = !port || ([scheme isEqualToString:@"https"] && port.intValue == 443) || ([scheme isEqualToString:@"http"] && port.intValue == 80);
 	return isDefault ? [NSString stringWithFormat:@"%@://%@", scheme, host] : [NSString stringWithFormat:@"%@://%@:%@", scheme, host, port];
@@ -743,18 +1060,21 @@ static NSString *originOfURL(NSURL *url) {
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 // Füllt Anmeldedaten ein, aber nur, wenn die Seite gerade noch genau den erwarteten Ursprung hat.
 // Das Ergebnis (JSON ohne Passwort) kommt über goSnapshotDone zurück.
-void fmwFillCredential(int tabID, const char *origin, const char *user, const char *pass, int req) {
+void fmwFillCredential(int tabID, const char *origin, const char *user, const char *pass, int submit, const char *form, int req) {
 	NSString *expect = [NSString stringWithUTF8String:origin ?: ""];
 	NSString *u = [NSString stringWithUTF8String:user ?: ""], *p = [NSString stringWithUTF8String:pass ?: ""];
+	NSString *token = [NSString stringWithUTF8String:form ?: ""];
 	dispatch_async(dispatch_get_main_queue(), ^{
 		void (^finish)(NSString *) = ^(NSString *json) { char *out = strdup(json.UTF8String); goSnapshotDone(req, out); free(out); };
 		FMTab *t = gTabs[@(tabID)];
-		if (!t || t.isError) { finish(@"{\"ok\":false,\"error\":\"tab\"}"); return; }
+		if (!t || t.isError || (submit && (gActive != tabID || t.hostView.isHiddenOrHasHiddenAncestor ||
+		    !NSApp.isActive || !t.view.window.isKeyWindow || t.view.window.attachedSheet))) {
+			finish(@"{\"ok\":false,\"error\":\"tab\"}"); return;
+		}
 		if (![originOfURL(t.view.URL) isEqualToString:expect]) { finish(@"{\"ok\":false,\"error\":\"origin\"}"); return; }
-		NSData *j = [NSJSONSerialization dataWithJSONObject:@[u, p] options:0 error:nil];
-		NSString *arg = [[NSString alloc] initWithData:j encoding:NSUTF8StringEncoding];
-		NSString *src = [NSString stringWithFormat:@"(function(a){return JSON.stringify(window.__lunaFill?window.__lunaFill(a[0],a[1]):{ok:false,error:'script'})})(%@)", arg];
-		[t.view evaluateJavaScript:src inFrame:nil inContentWorld:credWorld() completionHandler:^(id r, NSError *e) {
+		NSDictionary *args = @{@"user":u, @"pass":submit == 2 ? @"" : p, @"mode":@(submit), @"token":token, @"origin":expect};
+		NSString *src = @"return JSON.stringify(window.__lunaFill ? await window.__lunaFill(user,pass,mode,token,origin) : {ok:false,error:'script'})";
+		[t.view callAsyncJavaScript:src arguments:args inFrame:nil inContentWorld:credWorld() completionHandler:^(id r, NSError *e) {
 			finish(e || ![r isKindOfClass:[NSString class]] ? @"{\"ok\":false,\"error\":\"script\"}" : r);
 		}];
 	});

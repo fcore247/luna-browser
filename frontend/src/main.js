@@ -162,7 +162,8 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
 
 /* ---------- Native Ansichten: während des Startbildschirms verborgen ---------- */
 let splashing = true,
-  pendingShow = -1;
+  pendingShow = -1,
+  visibleNativeTab = -1;
 function nativeShow(id) {
   if (onboarding?.active) {
     onboarding.layout();
@@ -179,6 +180,7 @@ function nativeShow(id) {
     pendingShow = id;
     return;
   }
+  visibleNativeTab = id;
   api.show(id);
 }
 
@@ -190,6 +192,7 @@ const S = {
   onboardingComplete: false,
   onboardingDeferred: false,
   autoNextAlways: false,
+  fullscreenCoverDuration: 1,
   restore: false,
   gesture: true,
   notes: {},
@@ -345,6 +348,7 @@ function openChatPage(t) {
   saveSession();
 }
 function openWeb(t, url) {
+  vaultUI?.navigated(t, url);
   if (t.id === S.active) $('#url').blur();
   if (t.mode === 'search') {
     t.cameFromSearch = true;
@@ -649,6 +653,7 @@ function activate(id) {
   }
   nativeShow(t.mode === 'web' && t.native ? t.id : -1);
   if (t.native) api.zoom(t.id, t.zoom);
+  vaultUI?.activated(t);
   renderAll();
   if (t.mode === 'start') setTimeout(() => $('#url').focus(), 0);
   saveSession();
@@ -695,6 +700,7 @@ function closeTabNow(id) {
   const i = S.tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
   const t = S.tabs[i];
+  vaultUI?.forget(t);
   if (t.native) api.close(id);
   S.tabs.splice(i, 1);
   if (t.group && !S.tabs.some((x) => x.group === t.group)) delete S.groups[t.group];
@@ -772,13 +778,22 @@ async function restoreSession() {
 /* ---------- Ereignisse aus den nativen Tabs ---------- */
 api.onWeb((e) => {
   if (onboarding?.handleWeb(e)) return;
-  const t = tabById(e.tab);
+  const t = tabById(e.tab ?? e.id);
   switch (e.t) {
+    case 'loginFocus':
+      if (t) vaultUI?.activated(t);
+      break;
+    case 'loginForm':
+      if (t) vaultUI?.formChanged(t, e);
+      break;
     case 'command':
       runCmd(e.name);
       break;
     case 'state':
       if (!t) return;
+      if ((e.loading && !t.loading) || (e.url && e.url !== t.webUrl)) {
+        vaultUI?.navigated(t, e.url || t.url, e.loading && !t.loading);
+      }
       t.back = e.back;
       t.fwd = e.fwd;
       if (e.url && !(t.error && e.url === t.webUrl)) t.webUrl = e.url;
@@ -1254,14 +1269,25 @@ function paintAll() {
   renderSide();
   updateFrame();
 }
-// Wechselt ein Tab zwischen Luna-Seiten (Start ↔ Luna Search ↔ Einstellungen ↔ Chat), blendet der Seitenbereich
-// weich über (alte Seite löst sich mit leichter Unschärfe, neue steigt auf) statt hart umzuspringen.
+// Andere interne Seiten können weich überblenden. Suchergebnisse belegen sofort die ganze Seitenfläche.
 const LUNA_PAGES = new Set(['start', 'search', 'settings', 'chat']);
 let lastPaint = { id: null, mode: null };
+let pageTransition = null;
 function renderAll() {
   const t = cur();
   const from = lastPaint;
   lastPaint = { id: t?.id ?? null, mode: t?.mode ?? null };
+  if (t?.mode === 'search' && t.provider !== 'spotify') {
+    if (pageTransition) {
+      const previous = pageTransition;
+      pageTransition = null;
+      previous.ready.catch(() => {}); // Skipping before the snapshots are ready aborts this promise.
+      previous.skipTransition();
+      delete document.documentElement.dataset.pageFrom;
+      delete document.documentElement.dataset.pageTo;
+    }
+    return paintAll();
+  }
   const smooth =
     !!t &&
     from.id === t.id &&
@@ -1276,8 +1302,13 @@ function renderAll() {
   root.dataset.pageFrom = from.mode;
   root.dataset.pageTo = t.mode;
   try {
-    const vt = document.startViewTransition(() => paintAll());
+    const vt = document.startViewTransition(() => {
+      if (pageTransition === vt) paintAll();
+    });
+    pageTransition = vt;
     const done = () => {
+      if (pageTransition !== vt) return;
+      pageTransition = null;
       delete root.dataset.pageFrom;
       delete root.dataset.pageTo;
     };
@@ -1343,6 +1374,7 @@ async function cover(on) {
     if (t && t.native && t.mode === 'web') {
       updateFrame();
       nativeShow(t.id);
+      vaultUI?.update(t);
     } // Maße vor dem Einblenden erneut senden
   }
 }
@@ -2230,7 +2262,21 @@ personalizedPages = createPersonalizedPages({
   toast,
   ask: (options) => notifications.ask(options),
 });
-vaultUI = createVault({ currentTab: cur, toast, cover, refreshUI: renderToolbar });
+vaultUI = createVault({
+  currentTab: cur,
+  toast,
+  cover,
+  refreshUI: renderToolbar,
+  pageVisible: (t) =>
+    visibleNativeTab === t.id &&
+    !splashing &&
+    !S.cover &&
+    !isOverlayOpen() &&
+    !onboarding?.active &&
+    !slowSetupVisible() &&
+    !personalizedPages?.owns(t) &&
+    !storeInstall?.owns(t),
+});
 storeInstall = createStoreInstall({
   currentTab: cur,
   showNative: nativeShow,
@@ -3191,6 +3237,7 @@ function dismissSplash() {
     startupWatchdog.stop();
     splashing = false;
     nativeShow(pendingShow);
+    vaultUI?.update(cur());
     splash.setAttribute('aria-busy', 'false');
     splash.classList.add('out');
     setTimeout(() => splash.classList.add('gone'), 340);
@@ -3265,7 +3312,11 @@ onboarding = createOnboarding({
       0.14,
       async () => {
         await loadGestures();
-        const p = await api.prefs();
+        const [p, coverDuration] = await Promise.all([
+          api.prefs(),
+          WINDOWS ? null : api.getFullscreenCoverDuration().catch(() => null),
+        ]);
+        if (Number.isFinite(coverDuration)) S.fullscreenCoverDuration = coverDuration;
         S.autoNextAlways = !!p.spotifyAutoNextAlways;
         S.googleSearch = !!p.googleSearch;
         S.tavilySearch = p.tavilySearch !== false;

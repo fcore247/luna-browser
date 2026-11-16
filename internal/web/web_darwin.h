@@ -3,6 +3,8 @@
 
 // Native Browser-Tabs (WKWebView) als Unteransichten des Fensters.
 // Alle Funktionen sind thread-sicher (sie wechseln selbst auf den Main-Thread).
+void fmwConfigureCinemaScript(const char *src);
+void fmwSetCinemaCoverDuration(double seconds);
 void fmwLoad(int id, const char *url);
 void fmwHistory(int id, int action); // 0 zurück, 1 vor, 2 neu laden, 3 stopp
 void fmwSetFrame(double x, double y, double w, double h);
@@ -32,4 +34,4 @@ char *fmwOnboardingClipboard(int tab, const char *provider, int previousCount);
 void fmwExtension(const char *json, int req);
 
 void fmwConfigureCredentials(const char *src);
-void fmwFillCredential(int tab, const char *origin, const char *user, const char *pass, int req);
+void fmwFillCredential(int tab, const char *origin, const char *user, const char *pass, int submit, const char *form, int req);

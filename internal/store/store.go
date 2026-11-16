@@ -73,15 +73,16 @@ func (s *Store) read(name string, v any) {
 	}
 }
 
-func (s *Store) write(name string, v any) {
+func (s *Store) write(name string, v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
-		return
+		return err
 	}
 	tmp := filepath.Join(s.dir, name+".tmp")
-	if os.WriteFile(tmp, b, 0o600) == nil {
-		_ = os.Rename(tmp, filepath.Join(s.dir, name))
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
 	}
+	return os.Rename(tmp, filepath.Join(s.dir, name))
 }
 
 /* Lesezeichen */
@@ -320,14 +321,15 @@ func (s *Store) ResetSettings() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Write preferences first; report filesystem failures instead of claiming success.
-	dst := filepath.Join(s.dir, "prefs.json")
-	if err := os.WriteFile(dst+".tmp", []byte("{}"), 0600); err != nil {
-		return err
-	}
-	if err := os.Rename(dst+".tmp", dst); err != nil {
+	if err := s.write("prefs.json", map[string]bool{}); err != nil {
 		return err
 	}
 	s.prefs = map[string]bool{}
-	_, err := s.saveGesturesLocked(defaultGestures())
-	return err
+	if _, err := s.saveGesturesLocked(defaultGestures()); err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Join(s.dir, fullscreenDurationFile)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
