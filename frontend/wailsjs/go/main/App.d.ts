@@ -77,6 +77,8 @@ export function GestureBindings():Promise<Record<string, store.GestureBinding>>;
 
 export function GestureWriteSound(arg1:boolean):Promise<void>;
 
+export function GetFullscreenCoverDuration():Promise<number>;
+
 export function History(arg1:string,arg2:number):Promise<Array<store.Visit>>;
 
 export function HistoryAdd(arg1:string,arg2:string):Promise<void>;
@@ -170,6 +172,8 @@ export function SetBookmark(arg1:string,arg2:string,arg3:boolean):Promise<Array<
 export function SetDockIcon(arg1:string):Promise<void>;
 
 export function SetErrorPalette(arg1:string):Promise<void>;
+
+export function SetFullscreenCoverDuration(arg1:number):Promise<number>;
 
 export function SetGesture(arg1:boolean):Promise<void>;
 

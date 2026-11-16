@@ -13,7 +13,7 @@
 @interface FMCinemaExitCover : NSObject
 @property (nonatomic, strong, readonly) NSWindow *window;
 - (BOOL)prepareForWindow:(NSWindow *)player label:(NSString *)label;
-- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket
+- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket duration:(NSTimeInterval)duration
               onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(BOOL cancelled))onInterrupt;
 - (BOOL)canRevealTicket:(NSInteger)ticket;
 - (void)dismissTicket:(NSInteger)ticket;
@@ -90,9 +90,9 @@
     return YES;
 }
 
-- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket
+- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket duration:(NSTimeInterval)duration
               onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(BOOL cancelled))onInterrupt {
-    if (player != _player || !_imageLabel || !NSApp.isActive ||
+    if (duration <= 0 || player != _player || !_imageLabel || !NSApp.isActive ||
         !player.isVisible || !player.isOnActiveSpace || !NSEqualRects(_window.frame, player.screen.frame))
         return NO;
     // This is the same desktop as the playing window. A transient, independent
@@ -133,14 +133,12 @@
         [self dismissTicket:ticket];
         return NO;
     }
-    // The same three seconds cover the resize and WebKit's work, even when
-    // a site never acknowledges the new layout. A reversal gets a fresh clock.
-    NSTimeInterval duration = FMCinemaCoverDuration;
+    // Each showing captures its own duration, including a quick reversal.
     _revealAt = NSProcessInfo.processInfo.systemUptime + duration;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (self->_visibleTicket == ticket) [self interrupt:nil];
     });
-    [(FMCinemaSurface *)_window.contentView startSand];
+    [(FMCinemaSurface *)_window.contentView startSandWithDuration:duration];
     return YES;
 }
 

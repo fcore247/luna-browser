@@ -97,6 +97,13 @@ static FMGestureHandler *gGestureHandler;
 @end
 
 static NSString *gCinemaScript;
+static NSTimeInterval gCinemaCoverDuration = 1.0;
+
+void fmwSetCinemaCoverDuration(double seconds) {
+	NSTimeInterval duration = isfinite(seconds) && seconds >= 0 && seconds <= 60 ? seconds : 1.0;
+	dispatch_async(dispatch_get_main_queue(), ^{ gCinemaCoverDuration = duration; });
+}
+
 static void installCinemaScripts(WKUserContentController *controller) API_AVAILABLE(macos(11.0)) {
 	if (!gCinemaScript.length) return;
 	static FMCinemaHandler *handler;
@@ -395,13 +402,16 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 		FMTab *tab = weakSelf;
 		if (tab.transitionTicket == ticket) [tab setCinemaActive:NO request:0];
 	};
-	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket
+	NSTimeInterval duration = gCinemaCoverDuration;
+	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket duration:duration
 		onEscape:entering ? escape : nil onInterrupt:^(BOOL cancelled) {
 			FMTab *tab = weakSelf;
 			if (tab.transitionTicket != ticket) return;
 			if (cancelled) tab.transitionFocus = nil;
 			if (tab.cinemaSession.active == entering) [tab finishCinemaTransition:ticket];
-			else [tab leaveCinema];
+			else if (cancelled) [tab leaveCinema];
+			// If the timer expired before the resize, changeWindow still
+			// completes the requested transition and retires this ticket.
 		}];
 	if (!shown) [_cinemaExitCover dismissTicket:previousTicket];
 	void (^changeWindow)(void) = ^{
@@ -424,18 +434,20 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 		if (tab.tid == gActive) [tab.transitionFocus restoreAfterResize:YES];
 		NSSize viewport = tab.view.bounds.size;
 		CGFloat zoom = tab.view.pageZoom;
-		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@',%ld,%.4f,%.4f)",
-			(long)request, entering ? @"entered" : @"exited", (long)ticket, viewport.width/zoom, viewport.height/zoom];
+		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@',%ld,%.4f,%.4f,%.3f)",
+			(long)request, entering ? @"entered" : @"exited", (long)ticket, viewport.width/zoom, viewport.height/zoom,
+			shown ? duration * 1000 : 0.0];
 		[tab.view evaluateJavaScript:js completionHandler:^(id value, NSError *error) {
 			FMTab *current = weakSelf;
 			if (!error || current.transitionTicket != ticket) return;
 			if (entering) [current leaveCinema];
 			else [current finishCinemaTransition:ticket];
 		}];
-		if (!shown) [tab finishCinemaTransition:ticket];
+		if ([tab.cinemaExitCover canRevealTicket:ticket]) [tab finishCinemaTransition:ticket];
 	};
-	// Let the already-rendered cover reach WindowServer before changing size.
-	if (shown) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 32 * NSEC_PER_MSEC), dispatch_get_main_queue(), changeWindow);
+	// Reserve at most half of a short cover for its first composited frame.
+	NSTimeInterval leadIn = MIN(0.032, duration / 2);
+	if (shown) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(leadIn * NSEC_PER_SEC)), dispatch_get_main_queue(), changeWindow);
 	else changeWindow();
 }
 

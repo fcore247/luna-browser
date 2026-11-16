@@ -203,10 +203,10 @@
            Math.min(innerHeight, rect.bottom) > Math.max(0, rect.top) ? rect : null;
   }
 
-  function reportLayout(ticket, stillCurrent, geometryIsReady, focus) {
+  function reportLayout(ticket, durationMs, stillCurrent, geometryIsReady, focus) {
     if (!Number.isSafeInteger(ticket) || ticket <= 0) return;
     focusRepair = focus ? { ticket, bookmark:focus } : null;
-    const deadline = performance.now() + 3000;
+    const deadline = performance.now() + Math.min(durationMs, 60_000);
     // A covering window can throttle rAF. Measure after the site's event
     // handlers and promise reactions; native WebKit fences the actual repaint.
     function checkLayout() {
@@ -225,9 +225,9 @@
     return Math.abs(innerWidth - width) <= 1 && Math.abs(innerHeight - height) <= 1;
   }
 
-  function reportCinemaLayout(ticket, current, width, height, focus) {
+  function reportCinemaLayout(ticket, current, width, height, focus, durationMs) {
     const { player, surface } = current;
-    reportLayout(ticket, () => session === current && pending?.action !== 'exit', () => {
+    reportLayout(ticket, durationMs, () => session === current && pending?.action !== 'exit', () => {
       if (!viewportMatches(width, height) || !surface.matches(':popover-open')) return false;
       const bounds = visibleRect(surface);
       if (!bounds || Math.abs(bounds.width - width) > 2 || Math.abs(bounds.height - height) > 2) return false;
@@ -246,10 +246,10 @@
     }, focus);
   }
 
-  function reportRestoredLayout(ticket, previous, focus) {
+  function reportRestoredLayout(ticket, previous, focus, durationMs) {
     if (!previous) return;
     const { player, surface, viewport } = previous;
-    reportLayout(ticket, () => !session && player.isConnected, () => {
+    reportLayout(ticket, durationMs, () => !session && player.isConnected, () => {
       const siteInline = !youtube || viewport.hadFullscreenClass || !player.classList.contains('ytp-fullscreen');
       return viewportMatches(viewport.width, viewport.height) && siteInline && !surface.matches(':popover-open') &&
              visibleRect(player) && [...player.querySelectorAll('video')].some(visibleRect);
@@ -286,13 +286,13 @@
     return promise;
   }
 
-  Object.defineProperty(window, '__lunaCinemaReply', { value(id, state, nativeTicket, width, height) {
+  Object.defineProperty(window, '__lunaCinemaReply', { value(id, state, nativeTicket, width, height, durationMs = 0) {
     if (id === 0 && state === 'exited') {
       focusRepair = null;
       const previous = pending;
       if (previous) { clearTimeout(previous.timer); pending = null; }
       const focus = previous?.focus || (session && rememberControl(session.player));
-      reportRestoredLayout(nativeTicket, restore(), focus);
+      reportRestoredLayout(nativeTicket, restore(), focus, durationMs);
       if (previous?.action === 'exit') previous.resolve();
       else if (previous) previous.reject(new TypeError('Luna Cinema was closed'));
       return;
@@ -306,9 +306,9 @@
         if (!request.player.isConnected || !request.target.isConnected) throw new TypeError('Player was removed');
         session = preparePlayer(request.target, request.player, request.viewport);
         notify('fullscreenchange', request.target);
-        reportCinemaLayout(nativeTicket, session, width, height, request.focus);
+        reportCinemaLayout(nativeTicket, session, width, height, request.focus, durationMs);
       } else if (state === 'exited' && request.action === 'exit') {
-        reportRestoredLayout(nativeTicket || id, restore(), request.focus);
+        reportRestoredLayout(nativeTicket || id, restore(), request.focus, durationMs);
       } else {
         throw new TypeError('Luna Cinema is unavailable');
       }

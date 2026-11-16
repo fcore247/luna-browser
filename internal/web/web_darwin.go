@@ -37,6 +37,8 @@ func SetEmitter(f func(string)) {
 	C.fmwConfigureCinemaScript(src)
 }
 
+func SetCinemaCoverDuration(seconds float64) { C.fmwSetCinemaCoverDuration(C.double(seconds)) }
+
 //export goWebEvent
 func goWebEvent(j *C.char) {
 	if emitFn != nil {

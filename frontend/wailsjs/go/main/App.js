@@ -130,6 +130,10 @@ export function GestureWriteSound(arg1) {
   return window['go']['main']['App']['GestureWriteSound'](arg1);
 }
 
+export function GetFullscreenCoverDuration() {
+  return window['go']['main']['App']['GetFullscreenCoverDuration']();
+}
+
 export function History(arg1, arg2) {
   return window['go']['main']['App']['History'](arg1, arg2);
 }
@@ -316,6 +320,10 @@ export function SetDockIcon(arg1) {
 
 export function SetErrorPalette(arg1) {
   return window['go']['main']['App']['SetErrorPalette'](arg1);
+}
+
+export function SetFullscreenCoverDuration(arg1) {
+  return window['go']['main']['App']['SetFullscreenCoverDuration'](arg1);
 }
 
 export function SetGesture(arg1) {

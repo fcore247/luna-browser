@@ -42,6 +42,10 @@ func SetLanguage(messages string) { send("language", map[string]any{"messages": 
 func Find(id int, text string, forward bool) {
 	send("find", map[string]any{"tab": id, "text": text, "forward": forward})
 }
+
+// WebView2 presents fullscreen video directly on Windows.
+func SetCinemaCoverDuration(seconds float64) {}
+
 func image(op string, id int) (string, error) {
 	var s string
 	e := winhost.Call(op, map[string]any{"tab": id}, &s)

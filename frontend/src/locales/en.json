@@ -1,4 +1,8 @@
 {
+  "Vollbild-Ladebildschirm": "Fullscreen loading screen",
+  "Dauer der Sanduhr beim Öffnen und Verlassen des Video-Vollbilds auf YouTube und Netflix. Mit 0 Sekunden schaltest du sie aus.": "How long the hourglass appears when entering or leaving fullscreen on YouTube and Netflix. Set it to 0 seconds to turn it off.",
+  "Gib eine Dauer von 0 bis 60 Sekunden mit höchstens einer Nachkommastelle ein.": "Enter a duration from 0 to 60 seconds with at most one decimal place.",
+  "Die Dauer konnte nicht gespeichert werden.": "The duration could not be saved.",
   "Hintergrundquelle": "Background source",
   "Tempo": "Speed",
   "Bewegung": "Movement",

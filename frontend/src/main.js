@@ -190,6 +190,7 @@ const S = {
   onboardingComplete: false,
   onboardingDeferred: false,
   autoNextAlways: false,
+  fullscreenCoverDuration: 1,
   restore: false,
   gesture: true,
   notes: {},
@@ -3281,7 +3282,11 @@ onboarding = createOnboarding({
       0.14,
       async () => {
         await loadGestures();
-        const p = await api.prefs();
+        const [p, coverDuration] = await Promise.all([
+          api.prefs(),
+          WINDOWS ? null : api.getFullscreenCoverDuration().catch(() => null),
+        ]);
+        if (Number.isFinite(coverDuration)) S.fullscreenCoverDuration = coverDuration;
         S.autoNextAlways = !!p.spotifyAutoNextAlways;
         S.googleSearch = !!p.googleSearch;
         S.tavilySearch = p.tavilySearch !== false;

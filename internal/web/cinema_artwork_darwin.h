@@ -2,8 +2,6 @@
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
 
-static const NSTimeInterval FMCinemaCoverDuration = 3.0;
-
 // A static vector illustration keeps the cover crisp on Retina screens and
 // leaves the compositor free to run the fullscreen transition underneath it.
 @interface FMCinemaArtworkView : NSView
@@ -120,7 +118,7 @@ static CGPathRef fmCoverSandPath(BOOL upper, CGFloat progress) CF_RETURNS_RETAIN
 
 @interface FMCinemaSurface : NSImageView
 - (void)prepareSandForLabel:(NSString *)label;
-- (void)startSand;
+- (void)startSandWithDuration:(NSTimeInterval)duration;
 - (void)stopSand;
 @end
 
@@ -169,7 +167,7 @@ static CGPathRef fmCoverSandPath(BOOL upper, CGFloat progress) CF_RETURNS_RETAIN
     _grains = [grains copy];
 }
 
-- (void)startSand {
+- (void)startSandWithDuration:(NSTimeInterval)duration {
     [self stopSand];
     if (NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion) return;
     for (CAShapeLayer *pile in @[_upperSand, _lowerSand]) {
@@ -177,7 +175,7 @@ static CGPathRef fmCoverSandPath(BOOL upper, CGFloat progress) CF_RETURNS_RETAIN
         CABasicAnimation *flow = [CABasicAnimation animationWithKeyPath:@"path"];
         flow.fromValue = (__bridge id)pile.path;
         flow.toValue = (__bridge id)end;
-        flow.duration = FMCinemaCoverDuration;
+        flow.duration = duration;
         flow.fillMode = kCAFillModeForwards;
         flow.removedOnCompletion = NO;
         [pile addAnimation:flow forKey:@"sand-level"];

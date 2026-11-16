@@ -65,6 +65,8 @@ export const downloads = () => App.Downloads();
 export const downloadAdd = (name, path) => App.DownloadAdd(name, path);
 export const downloadsClear = () => App.DownloadsClear();
 export const prefs = () => App.Prefs();
+export const getFullscreenCoverDuration = async () => App.GetFullscreenCoverDuration();
+export const setFullscreenCoverDuration = (seconds) => App.SetFullscreenCoverDuration(seconds);
 export const setPref = (key, v) => App.SetPref(key, v);
 export const notes = () => App.Notes();
 export const setNote = (key, title, text) => App.SetNote(key, title, text);

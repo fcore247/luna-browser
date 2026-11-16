@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"browser-mac/internal/browsermcp"
@@ -40,6 +41,7 @@ type App struct {
 	ctx              context.Context
 	stopSonos        context.CancelFunc
 	st               *store.Store
+	fullscreenMu     sync.Mutex
 	out              chan [2]string // Ereignisse ans Frontend
 
 	secrets    *secret.Store
@@ -68,6 +70,7 @@ func (a *App) startup(ctx context.Context) {
 	if a.st, err = store.New(dir); err != nil {
 		println("Speicher nicht verfügbar:", err.Error())
 	}
+	web.SetCinemaCoverDuration(a.GetFullscreenCoverDuration())
 	// Ereignisse dürfen nie direkt vom Main-Thread aus an wr.EventsEmit gehen: Wails' ExecJS gibt dort
 	// einen bereits autoreleasten String frei und stürzt ab. Darum eine Warteschlange mit eigenem Thread.
 	a.out = make(chan [2]string, 2048)
@@ -223,6 +226,26 @@ func (a *App) SetPref(key string, v bool) map[string]bool {
 }
 func (a *App) SessionSave(js string) { a.st.SessionSave(js) }
 func (a *App) SessionLoad() string   { return a.st.SessionLoad() }
+
+func (a *App) GetFullscreenCoverDuration() float64 {
+	if a.st == nil {
+		return store.DefaultFullscreenCoverDuration
+	}
+	return a.st.FullscreenCoverDuration()
+}
+
+func (a *App) SetFullscreenCoverDuration(seconds float64) (float64, error) {
+	a.fullscreenMu.Lock()
+	defer a.fullscreenMu.Unlock()
+	if a.st == nil {
+		return store.DefaultFullscreenCoverDuration, errors.New("Speicher nicht verfügbar.")
+	}
+	if err := a.st.SetFullscreenCoverDuration(seconds); err != nil {
+		return a.GetFullscreenCoverDuration(), err
+	}
+	web.SetCinemaCoverDuration(seconds)
+	return seconds, nil
+}
 
 // OpenFile öffnet eine heruntergeladene Datei; reveal zeigt sie stattdessen im Finder.
 func (a *App) OpenFile(path string, reveal bool) error {
@@ -402,9 +425,12 @@ func (a *App) SetErrorPalette(palette string) { web.SetErrorPalette(palette) }
 
 // ResetBrowserSettings deliberately preserves accounts, personal data and web sessions.
 func (a *App) ResetBrowserSettings() error {
+	a.fullscreenMu.Lock()
+	defer a.fullscreenMu.Unlock()
 	if err := a.st.ResetSettings(); err != nil {
 		return err
 	}
+	web.SetCinemaCoverDuration(store.DefaultFullscreenCoverDuration)
 	web.ConfigureGesture("", true)
 	a.applyNativeLanguage()
 	if menu := buildMenu(a); menu != nil {

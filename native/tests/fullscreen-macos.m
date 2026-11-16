@@ -118,11 +118,11 @@ static BOOL coverIsInFront(NSWindow *cover, NSWindow *player, CGRect displayBoun
 }
 @end
 
-static void checkCoverDuration(NSTimeInterval since, NSString *direction) {
+static void checkCoverDuration(NSTimeInterval since, NSTimeInterval expected, NSString *direction) {
     NSTimeInterval elapsed = NSProcessInfo.processInfo.systemUptime - since;
-    check(since > 0 && elapsed >= 2.85 && elapsed < 3.55,
-          [NSString stringWithFormat:@"Expected three-second %@ loader, observed %.3f seconds", direction, elapsed]);
-    fprintf(stderr, "%s cover: %.3f s\n", direction.UTF8String, elapsed);
+    check(since > 0 && elapsed >= expected - .15 && elapsed < expected + .55,
+          [NSString stringWithFormat:@"Expected %.2f-second %@ loader, observed %.3f seconds", expected, direction, elapsed]);
+    fprintf(stderr, "%s cover: %.3f s (expected %.2f)\n", direction.UTF8String, elapsed, expected);
 }
 
 static void checkPageFocus(WKWebView *view, NSString *expected) {
@@ -157,7 +157,8 @@ static void checkKeyboardTarget(NSWindow *browser, WKWebView *view, NSString *ph
             [@"Page missed a trusted keyboard shortcut " stringByAppendingString:phase]);
 }
 
-static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *playerClass) {
+static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *playerClass,
+                       NSTimeInterval entryDuration, NSTimeInterval exitDuration) {
     WKWebView *view = tab.view;
     NSString *fixture = @"<!doctype html><meta name=viewport content='width=device-width'>"
               "<style>body{margin:0} #movie_player{position:relative;width:70vw;height:55vh;background:black}"
@@ -214,8 +215,15 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
     NSTimer *probe = [NSTimer scheduledTimerWithTimeInterval:0.01 repeats:YES block:^(NSTimer *timer) {
         if (view.fullscreenState != WKFullscreenStateNotInFullscreen) nativeFullscreenStarted = YES;
         if (!tab.cinemaExitCover.window.isVisible) return;
-        if (!exiting && !entryShown) entryShown = NSProcessInfo.processInfo.systemUptime;
-        if (exiting && !exitShown) exitShown = NSProcessInfo.processInfo.systemUptime;
+        if (!exiting && !entryShown) {
+            entryShown = NSProcessInfo.processInfo.systemUptime;
+            // A changed preference applies to the next transition.
+            if (entryDuration != exitDuration) fmwSetCinemaCoverDuration(exitDuration);
+        }
+        if (exiting && !exitShown) {
+            exitShown = NSProcessInfo.processInfo.systemUptime;
+            if (exitDuration != 1.0) fmwSetCinemaCoverDuration(1.0);
+        }
         if (!exiting && !viewFillsScreen(view) && coverIsInFront(cover, browser, audit.displayBounds))
             coverSeenBeforeEnlarging = YES;
         else if (exiting && viewFillsScreen(view) && coverIsInFront(cover, browser, audit.displayBounds))
@@ -236,7 +244,7 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
             @"Video stopped advancing in Cinema");
     waitFor(^BOOL{ return audit.enlargedAt > 0 && !cover.isVisible; }, @"Entry cover did not clear after the video enlarged");
     check(coverSeenBeforeEnlarging, @"Entry cover was never above the inline player before the window enlarged");
-    checkCoverDuration(entryShown, @"entry");
+    checkCoverDuration(entryShown, entryDuration, @"entry");
     checkPageFocus(view, @"toggle");
     checkKeyboardTarget(browser, view, @"after entry cover dismissed");
     NSNumber *during = evaluate(view, @"video.currentTime");
@@ -257,7 +265,7 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
                           (useEscape || pageHas(view, @"exitResult==='exited'")); },
             @"Exit did not restore original browser window and fullscreen API state");
     waitFor(^BOOL{ return audit.restoredAt > 0 && !cover.isVisible; }, @"Exit cover did not clear after inline layout");
-    checkCoverDuration(exitShown, @"exit");
+    checkCoverDuration(exitShown, exitDuration, @"exit");
     check(coverSeenBeforeRestore, @"Exit cover was never above the fullscreen player before restoration");
     [view.configuration.userContentController removeScriptMessageHandlerForName:@"layoutAudit"];
     [probe invalidate];
@@ -288,14 +296,14 @@ static void testLostReady(FMTab *tab) {
             @"Lost-ready fixture did not enter Cinema");
     waitFor(^BOOL{ return !tab.transitionTicket && !tab.cinemaExitCover.window.isVisible; },
             @"Missing readiness message left entry cover open");
-    checkCoverDuration(entryWait, @"missing ready on entry");
+    checkCoverDuration(entryWait, 1.0, @"missing ready on entry");
     check(pageHas(view, @"droppedReady===1 && document.fullscreenElement===player && checkIdentity()"),
           @"Lost entry-ready signal interrupted fullscreen playback");
     NSTimeInterval started = NSProcessInfo.processInfo.systemUptime;
     evaluate(view, @"document.exitFullscreen();undefined");
     waitFor(^BOOL{ return !tab.cinemaSession.active && !tab.transitionTicket && !tab.cinemaExitCover.window.isVisible; },
             @"Missing readiness message left exit window or session open");
-    checkCoverDuration(started, @"missing ready on exit");
+    checkCoverDuration(started, 1.0, @"missing ready on exit");
     check(pageHas(view, @"droppedReady===2 && document.fullscreenElement===null && checkIdentity()"),
           @"Lost-ready fixture missed the signal or interrupted playback");
     // Reverse an entry while its ready acknowledgement is pending. The stale
@@ -317,7 +325,7 @@ static void testLostReady(FMTab *tab) {
     waitFor(^BOOL{ return !tab.transitionTicket && !tab.cinemaExitCover.window.isVisible; },
             @"Next exit was affected by the lost readiness message");
     evaluate(view, @"delete window.dispatchEvent");
-    checkCoverDuration(reversal, @"reversal");
+    checkCoverDuration(reversal, 1.0, @"reversal");
 }
 
 static void testFocusChangeDuringCover(FMTab *tab, NSWindow *browser, BOOL anotherWindow) {
@@ -354,6 +362,24 @@ static void testFocusChangeDuringCover(FMTab *tab, NSWindow *browser, BOOL anoth
     [browser makeFirstResponder:view];
     evaluate(view, @"delete window.dispatchEvent; if(document.fullscreenElement) document.exitFullscreen(); undefined");
     waitFor(^BOOL{ return !tab.cinemaSession.active && !tab.transitionTicket; }, @"Focus fixture did not exit Cinema");
+}
+
+static void testDisabledCover(FMTab *tab) {
+    fmwSetCinemaCoverDuration(0);
+    NSRect original = tab.hostView.frame;
+    __block BOOL shown = NO;
+    NSTimer *probe = [NSTimer scheduledTimerWithTimeInterval:.005 repeats:YES block:^(NSTimer *timer) {
+        if (tab.cinemaExitCover.window.isVisible) shown = YES;
+    }];
+    evaluate(tab.view, @"player.requestFullscreen();undefined");
+    waitFor(^BOOL{ return viewFillsScreen(tab.view) && pageHas(tab.view, @"document.fullscreenElement === player"); },
+            @"Setting zero prevented fullscreen entry");
+    evaluate(tab.view, @"document.exitFullscreen();undefined");
+    waitFor(^BOOL{ return !tab.cinemaSession.active && !tab.transitionTicket &&
+                          pageHas(tab.view, @"document.fullscreenElement === null && checkIdentity()"); },
+            @"Setting zero did not return the live player to the page");
+    [probe invalidate];
+    check(!shown && NSEqualRects(original, tab.hostView.frame), @"Setting zero displayed a cover or lost the inline geometry");
 }
 
 static void testGenericFullscreen(FMTab *tab) {
@@ -393,15 +419,17 @@ int main(int argc, const char **argv) {
         fmwShow(1);
         pumpEvents(0.1);
         FMTab *tab = tabFor(1, nil);
-        testCinema(tab, window, @"https://www.youtube.com/watch?v=luna-cinema-fixture", @"html5-video-player");
+        testCinema(tab, window, @"https://www.youtube.com/watch?v=luna-cinema-fixture", @"html5-video-player", 1.0, 1.0);
         testLostReady(tab);
-        testCinema(tab, window, @"https://www.netflix.com/watch/12345678", @"watch-video");
+        fmwSetCinemaCoverDuration(2.0);
+        testCinema(tab, window, @"https://www.netflix.com/watch/12345678", @"watch-video", 2.0, 4.0);
         testFocusChangeDuringCover(tab, window, NO);
         testFocusChangeDuringCover(tab, window, YES);
+        testDisabledCover(tab);
         testGenericFullscreen(tab);
         fmwClose(1);
         pumpEvents(0.2);
-        puts("MACOS_FULLSCREEN_PASSED (entry and exit cover ordering and delayed layouts, lost signals and stale replies, reentry, Escape, live playback, key/main state, trusted keys, responder recovery, selected window/editor, DOM focus, generic fullscreen)");
+        puts("MACOS_FULLSCREEN_PASSED (default, custom and disabled cover timing, entry and exit cover ordering and delayed layouts, lost signals and stale replies, reentry, Escape, live playback, key/main state, trusted keys, responder recovery, selected window/editor, DOM focus, generic fullscreen)");
     }
     return 0;
 }

@@ -77,6 +77,21 @@
 .sp-card .muted {
   margin: 0;
 }
+.fullscreen-cover-duration {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.fullscreen-cover-duration input {
+  width: 5.5em;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--body);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
 .themes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

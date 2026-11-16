@@ -28,6 +28,50 @@ export function createSettings({
   toast,
   onSearchKeyChanged,
 }) {
+  // WebKit otherwise drops the comma before a number field receives beforeinput
+  // (typing “2,5” becomes 25). Use its editor to preserve selection and undo.
+  function insertDecimal(event) {
+    if (event.target.id !== 'fullscreenCoverDuration') return;
+    const text = event.data ?? event.clipboardData?.getData('text/plain');
+    if (
+      text?.includes(',') &&
+      document.execCommand('insertText', false, text.replaceAll(',', '.'))
+    ) {
+      event.preventDefault();
+    }
+  }
+  document.addEventListener('textInput', insertDecimal);
+  document.addEventListener('paste', insertDecimal);
+  let savingCoverDuration = false;
+  document.addEventListener('change', async ({ target }) => {
+    if (target.id !== 'fullscreenCoverDuration' || savingCoverDuration) return;
+    const previous = S.fullscreenCoverDuration;
+    if (!target.validity.valid) {
+      target.value = previous;
+      toast(l10n('Gib eine Dauer von 0 bis 60 Sekunden mit höchstens einer Nachkommastelle ein.'));
+      return;
+    }
+    const seconds = target.valueAsNumber;
+    if (seconds === previous) return;
+    savingCoverDuration = true;
+    target.readOnly = true;
+    S.fullscreenCoverDuration = seconds;
+    try {
+      S.fullscreenCoverDuration = await api.setFullscreenCoverDuration(seconds);
+    } catch (error) {
+      S.fullscreenCoverDuration = previous;
+      toast(
+        l10n('Die Dauer konnte nicht gespeichert werden.') + ' ' + String(error?.message || error),
+      );
+    } finally {
+      savingCoverDuration = false;
+      const field = $('#fullscreenCoverDuration');
+      if (field) {
+        field.readOnly = false;
+        field.value = S.fullscreenCoverDuration;
+      }
+    }
+  });
   let personalPagesList = [];
   window.addEventListener('luna-monitors-changed', () => {
     if (
@@ -226,6 +270,15 @@ export function createSettings({
               `<button class="theme ${th === k ? 'on' : ''}" data-act="theme" data-m="${k}"><span class="tp tp-${k}"><i></i><i></i><i></i></span><b>${l}</b></button>`,
           )
           .join('')}</div>
+        ${
+          WINDOWS
+            ? ''
+            : l10nMsg`<div class="swrow">
+          <div><label for="fullscreenCoverDuration"><b>Vollbild-Ladebildschirm</b></label>
+            <span id="fullscreenCoverHelp">Dauer der Sanduhr beim Öffnen und Verlassen des Video-Vollbilds auf YouTube und Netflix. Mit 0 Sekunden schaltest du sie aus.</span></div>
+          <div class="fullscreen-cover-duration"><input id="fullscreenCoverDuration" type="number" lang="${locale()}" inputmode="decimal" min="0" max="60" step="0.1" required value="${S.fullscreenCoverDuration}" aria-describedby="fullscreenCoverHelp" ${savingCoverDuration ? 'readonly' : ''}><span aria-hidden="true">s</span></div>
+        </div>`
+        }
         ${colorThemesHTML()}
         ${personalSettingsHTML()}
         <div class="swrow"><div><b>Lesezeichenleiste anzeigen</b><span>${S.bar ? l10n('Die Leiste unter der Adressleiste ist sichtbar.') : l10n('Aus: Lesezeichen findest du weiter in der Seitenleiste und auf der Startseite.')}</span></div>
