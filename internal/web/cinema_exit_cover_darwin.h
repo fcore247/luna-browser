@@ -97,7 +97,7 @@ static void fmDrawHourglass(void) {
 }
 @end
 
-// Neither the player nor the web page may lose keyboard focus during exit.
+// The player and the web page keep keyboard focus in both directions.
 @interface FMCinemaExitPanel : NSPanel
 @end
 @implementation FMCinemaExitPanel
@@ -109,7 +109,8 @@ static void fmDrawHourglass(void) {
 @interface FMCinemaExitCover : NSObject
 @property (nonatomic, strong, readonly) NSWindow *window;
 - (BOOL)prepareForWindow:(NSWindow *)player label:(NSString *)label;
-- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket onInterrupt:(void (^)(void))onInterrupt;
+- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket
+              onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(void))onInterrupt;
 - (void)dismissTicket:(NSInteger)ticket;
 @end
 
@@ -120,6 +121,7 @@ static void fmDrawHourglass(void) {
     __weak NSWindow *_player;
     NSInteger _visibleTicket;
     void (^_onInterrupt)(void);
+    id _keyMonitor;
 }
 
 - (BOOL)prepareForWindow:(NSWindow *)player label:(NSString *)label {
@@ -181,17 +183,34 @@ static void fmDrawHourglass(void) {
     return YES;
 }
 
-- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket onInterrupt:(void (^)(void))onInterrupt {
+- (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket
+              onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(void))onInterrupt {
     if (player != _player || !_imageLabel || !NSApp.isActive ||
         !player.isVisible || !player.isOnActiveSpace || !NSEqualRects(_window.frame, player.screen.frame))
         return NO;
     // This is the same desktop as the playing window. A transient, independent
-    // panel stays display-sized when the browser restores its previous frame.
+    // panel stays display-sized when the browser changes its frame.
     // The menu bar and Dock may return while the browser is being restored.
     // The foreground-app and active-Space guards bound this transient level.
-    if (_visibleTicket) [self interrupt:nil];
+    if (_visibleTicket) {
+        // A quick reversal reuses the visible surface. Retire the previous
+        // owner's callbacks without flashing the intermediate browser frame.
+        void (^previousInterrupt)(void) = _onInterrupt;
+        [self clearTicket];
+        if (previousInterrupt) previousInterrupt();
+    }
     _visibleTicket = ticket;
     _onInterrupt = [onInterrupt copy];
+    if (onEscape) {
+        _keyMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
+            if (event.window == player && event.keyCode == 53 &&
+                !(event.modifierFlags & (NSEventModifierFlagCommand | NSEventModifierFlagControl | NSEventModifierFlagOption))) {
+                onEscape();
+                return nil;
+            }
+            return event;
+        }];
+    }
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     [center addObserver:self selector:@selector(interrupt:) name:NSApplicationWillResignActiveNotification object:NSApp];
     [center addObserver:self selector:@selector(interrupt:) name:NSApplicationWillHideNotification object:NSApp];
@@ -218,12 +237,18 @@ static void fmDrawHourglass(void) {
     if (onInterrupt) onInterrupt();
 }
 
-- (void)dismissTicket:(NSInteger)ticket {
-    if (!ticket || ticket != _visibleTicket) return;
+- (void)clearTicket {
     _visibleTicket = 0;
     _onInterrupt = nil;
+    if (_keyMonitor) [NSEvent removeMonitor:_keyMonitor];
+    _keyMonitor = nil;
     [NSNotificationCenter.defaultCenter removeObserver:self];
     [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:self];
+}
+
+- (void)dismissTicket:(NSInteger)ticket {
+    if (!ticket || ticket != _visibleTicket) return;
+    [self clearTicket];
     [_window orderOut:nil];
 }
 @end

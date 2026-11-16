@@ -215,8 +215,9 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @property (nonatomic, strong) NSView *hostView;
 @property (nonatomic, strong) FMCinemaWindowSession *cinemaSession;
 @property (nonatomic, strong) FMCinemaExitCover *cinemaExitCover;
-@property (nonatomic) NSInteger exitTicket;
-@property (nonatomic) BOOL exitSnapshotPending;
+@property (nonatomic) NSInteger transitionTicket;
+@property (nonatomic) BOOL enteringCinema;
+@property (nonatomic) BOOL cinemaSnapshotPending;
 - (void)leaveCinema;
 @property (nonatomic) BOOL isError;
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg;
@@ -299,72 +300,108 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	[_view evaluateJavaScript:reply completionHandler:nil];
 }
 
+- (void)finishCinemaTransition:(NSInteger)ticket {
+	if (ticket <= 0 || ticket != _transitionTicket) return;
+	[_cinemaExitCover dismissTicket:ticket];
+	_transitionTicket = 0;
+	_cinemaSnapshotPending = NO;
+}
+
 - (void)leaveCinema {
-	if (!_cinemaSession.active && !_exitTicket) return;
-	[_cinemaExitCover dismissTicket:_exitTicket];
-	_exitTicket = 0;
-	_exitSnapshotPending = NO;
+	if (!_cinemaSession.active && !_transitionTicket) return;
+	[self finishCinemaTransition:_transitionTicket];
 	[_cinemaSession end];
 	[self replyToCinemaRequest:0 state:@"exited"];
 }
 
-- (void)finishCinemaExit:(NSInteger)ticket {
-	if (ticket <= 0 || ticket != _exitTicket || _cinemaSession.active) return;
-	[_cinemaExitCover dismissTicket:ticket];
-	_exitTicket = 0;
-	_exitSnapshotPending = NO;
-}
-
-- (void)restoredCinemaLayout:(NSInteger)ticket {
-	if (ticket <= 0 || ticket != _exitTicket || _cinemaSession.active || _exitSnapshotPending) return;
+- (void)cinemaLayoutReady:(NSInteger)ticket {
+	if (ticket <= 0 || ticket != _transitionTicket || _cinemaSession.active != _enteringCinema ||
+	    _cinemaSnapshotPending) return;
 	if (!_view.window || _tid != gActive || _hostView.isHiddenOrHasHiddenAncestor || NSIsEmptyRect(_view.bounds)) {
-		[self finishCinemaExit:ticket];
+		[self finishCinemaTransition:ticket];
 		return;
 	}
-	// The page has measured the inline player in its restored viewport. Wait
-	// for WebKit to incorporate that update before exposing the window. Only
-	// a single point is requested; its image is never retained or displayed.
-	_exitSnapshotPending = YES;
+	// The page measured its player in the destination viewport. Wait for
+	// WebKit to incorporate that update. This one-point image is discarded.
+	_cinemaSnapshotPending = YES;
 	WKSnapshotConfiguration *config = [WKSnapshotConfiguration new];
 	config.afterScreenUpdates = YES;
 	config.rect = NSMakeRect(NSMinX(_view.bounds), NSMinY(_view.bounds), 1, 1);
 	__weak FMTab *weakSelf = self;
 	[_view takeSnapshotWithConfiguration:config completionHandler:^(NSImage *image, NSError *error) {
-		if (image && !error) [weakSelf finishCinemaExit:ticket];
+		if (image && !error) [weakSelf finishCinemaTransition:ticket];
 	}];
 }
 
-- (void)exitCinemaForRequest:(NSInteger)request {
-	if (_exitTicket) return;
-	if (!_cinemaSession.active) {
-		if (request) [self replyToCinemaRequest:request state:@"exited"];
+- (void)setCinemaActive:(BOOL)entering request:(NSInteger)request {
+	if (_transitionTicket && _enteringCinema == entering) {
+		if (entering) [self replyToCinemaRequest:request state:@"denied"];
 		return;
 	}
-	// Request IDs can repeat after navigation and across tabs. Every showing
-	// of the shared window gets its own ticket for all asynchronous callbacks.
+	if (_cinemaSession.active == entering) {
+		// Escape can arrive in the frame before the window expands.
+		if (!entering && _transitionTicket) [self leaveCinema];
+		if (request) [self replyToCinemaRequest:request state:entering ? @"denied" : @"exited"];
+		return;
+	}
+	if (entering && (!NSApp.isActive || !_hostView.window.isOnActiveSpace ||
+	                 _hostView.isHiddenOrHasHiddenAncestor || !_hostView.window.isVisible)) {
+		[self replyToCinemaRequest:request state:@"denied"];
+		return;
+	}
+	if (entering) [_cinemaExitCover prepareForWindow:_hostView.window label:L(@"Augenblick")];
+	// The page's request ID can repeat across documents. A native ticket is
+	// unique across tabs and directions, including reversals under the same panel.
 	static NSInteger nativeTicket = (1LL << 32);
+	NSInteger previousTicket = _transitionTicket;
 	NSInteger ticket = ++nativeTicket;
-	_exitTicket = ticket;
+	_transitionTicket = ticket;
+	_enteringCinema = entering;
+	_cinemaSnapshotPending = NO;
 	__weak FMTab *weakSelf = self;
-	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket onInterrupt:^{
+	void (^escape)(void) = ^{
 		FMTab *tab = weakSelf;
-		if (tab.exitTicket != ticket) return;
-		if (tab.cinemaSession.active) [tab leaveCinema];
-		else [tab finishCinemaExit:ticket];
-	}];
-	void (^restore)(void) = ^{
-		if (self.exitTicket != ticket) return;
-		[self.cinemaSession end];
-		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'exited',%ld)", (long)request, (long)ticket];
-		[self.view evaluateJavaScript:js completionHandler:^(id value, NSError *error) {
-			if (error) [weakSelf finishCinemaExit:ticket];
-		}];
-		if (!shown) [self finishCinemaExit:ticket];
+		if (tab.transitionTicket == ticket) [tab setCinemaActive:NO request:0];
 	};
-	// Give WindowServer a frame to present the already drawn cover before
-	// restoring the original window. The page then acknowledges its new layout.
-	if (shown) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 32 * NSEC_PER_MSEC), dispatch_get_main_queue(), restore);
-	else restore();
+	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket
+		onEscape:entering ? escape : nil onInterrupt:^{
+			FMTab *tab = weakSelf;
+			if (tab.transitionTicket != ticket) return;
+			if (tab.cinemaSession.active == entering) [tab finishCinemaTransition:ticket];
+			else [tab leaveCinema];
+		}];
+	if (!shown) [_cinemaExitCover dismissTicket:previousTicket];
+	void (^changeWindow)(void) = ^{
+		FMTab *tab = weakSelf;
+		if (tab.transitionTicket != ticket) return;
+		if (entering) {
+			BOOL entered = [tab.cinemaSession beginWithHost:tab.hostView player:tab.view onExit:^(BOOL interrupted) {
+				if (interrupted) [weakSelf leaveCinema];
+				else [weakSelf setCinemaActive:NO request:0];
+			}];
+			if (!entered) {
+				[tab finishCinemaTransition:ticket];
+				[tab replyToCinemaRequest:request state:@"denied"];
+				return;
+			}
+		} else {
+			[tab.cinemaSession end];
+		}
+		NSSize viewport = tab.view.bounds.size;
+		CGFloat zoom = tab.view.pageZoom;
+		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@',%ld,%.4f,%.4f)",
+			(long)request, entering ? @"entered" : @"exited", (long)ticket, viewport.width/zoom, viewport.height/zoom];
+		[tab.view evaluateJavaScript:js completionHandler:^(id value, NSError *error) {
+			FMTab *current = weakSelf;
+			if (!error || current.transitionTicket != ticket) return;
+			if (entering) [current leaveCinema];
+			else [current finishCinemaTransition:ticket];
+		}];
+		if (!shown) [tab finishCinemaTransition:ticket];
+	};
+	// Let the already-rendered cover reach WindowServer before changing size.
+	if (shown) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 32 * NSEC_PER_MSEC), dispatch_get_main_queue(), changeWindow);
+	else changeWindow();
 }
 
 - (void)teardown {
@@ -427,8 +464,11 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)webView:(WKWebView *)wv navigationAction:(WKNavigationAction *)a didBecomeDownload:(WKDownload *)d { d.delegate = self; }
 - (void)webView:(WKWebView *)wv navigationResponse:(WKNavigationResponse *)r didBecomeDownload:(WKDownload *)d { d.delegate = self; }
 
-- (void)webView:(WKWebView *)wv didFinishNavigation:(WKNavigation *)nav {
+- (void)webView:(WKWebView *)wv didCommitNavigation:(WKNavigation *)nav {
 	if (_tid == gActive && cinemaSite(wv.URL.host)) [_cinemaExitCover prepareForWindow:wv.window label:L(@"Augenblick")];
+}
+
+- (void)webView:(WKWebView *)wv didFinishNavigation:(WKNavigation *)nav {
 	emit(@{@"t": @"loaded", @"tab": @(_tid), @"url": nn(wv.URL.absoluteString), @"title": nn(wv.title), @"error": @(_isError)});
 	int tid = _tid;
 	[wv evaluateJavaScript:@"(function(){var l=document.querySelector('link[rel~=\"icon\"]');return l?l.href:location.origin+'/favicon.ico'})()" completionHandler:^(id r, NSError *e) {
@@ -544,20 +584,9 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	NSInteger rid = [request[@"id"] integerValue];
 	NSString *action = request[@"action"];
 	if ([action isEqual:@"ready"]) {
-		[tab restoredCinemaLayout:rid];
-	} else if ([action isEqual:@"exit"]) {
-		[tab exitCinemaForRequest:rid];
-	} else if ([action isEqual:@"enter"] && !tab.hostView.hidden && !tab.cinemaSession.active) {
-		// A user can enter again as soon as the page has exited, even while
-		// WebKit is still completing the previous transition's snapshot.
-		[tab finishCinemaExit:tab.exitTicket];
-		[tab.cinemaExitCover prepareForWindow:tab.hostView.window label:L(@"Augenblick")];
-		__weak FMTab *weakTab = tab;
-		BOOL entered = [tab.cinemaSession beginWithHost:tab.hostView player:tab.view onExit:^(BOOL interrupted) {
-			if (interrupted) [weakTab leaveCinema];
-			else [weakTab exitCinemaForRequest:0];
-		}];
-		[tab replyToCinemaRequest:rid state:entered ? @"entered" : @"denied"];
+		[tab cinemaLayoutReady:rid];
+	} else if ([action isEqual:@"exit"] || [action isEqual:@"enter"]) {
+		[tab setCinemaActive:[action isEqual:@"enter"] request:rid];
 	} else {
 		[tab replyToCinemaRequest:rid state:@"denied"];
 	}
@@ -613,8 +642,11 @@ void fmwShow(int id) {
         if (@available(macOS 15.4, *)) if (gTabs[@(id)]) [extensionController() didActivateTab:gTabs[@(id)] previousActiveTab:previous];
 		for (FMTab *t in gTabs.allValues) {
 			BOOL hidden = t.tid != gActive;
-			if (t.hostView.hidden != hidden) t.hostView.hidden = hidden;
-			if (hidden && (t.cinemaSession.active || t.exitTicket)) [t leaveCinema];
+			if (t.hostView.hidden != hidden) {
+				t.hostView.hidden = hidden;
+				if (!hidden && cinemaSite(t.view.URL.host)) [t.cinemaExitCover prepareForWindow:t.view.window label:L(@"Augenblick")];
+			}
+			if (hidden && (t.cinemaSession.active || t.transitionTicket)) [t leaveCinema];
 		}
 	});
 }

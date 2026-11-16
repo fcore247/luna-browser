@@ -95,17 +95,19 @@ static BOOL coverIsInFront(NSWindow *cover, NSWindow *player, CGRect displayBoun
            CGRectContainsRect(CGRectInset(frame, -1, -1), displayBounds);
 }
 
-@interface ExitLayoutAudit : NSObject <WKScriptMessageHandler>
+@interface CinemaLayoutAudit : NSObject <WKScriptMessageHandler>
 @property (nonatomic, weak) NSWindow *cover;
 @property (nonatomic, weak) NSWindow *player;
 @property (nonatomic) CGRect displayBounds;
+@property (nonatomic) NSTimeInterval enlargedAt;
 @property (nonatomic) NSTimeInterval restoredAt;
 @end
-@implementation ExitLayoutAudit
+@implementation CinemaLayoutAudit
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message {
-    check([message.body isEqual:@YES], @"Inline player has unexpected dimensions after exit");
-    check(coverIsInFront(_cover, _player, _displayBounds), @"Cover disappeared before inline player restoration");
-    _restoredAt = NSProcessInfo.processInfo.systemUptime;
+    check(coverIsInFront(_cover, _player, _displayBounds), @"Player exposed during its final layout change");
+    if ([message.body isEqual:@"fullscreen"]) _enlargedAt = NSProcessInfo.processInfo.systemUptime;
+    else if ([message.body isEqual:@"inline"]) _restoredAt = NSProcessInfo.processInfo.systemUptime;
+    else check(NO, @"Player did not reach the expected dimensions");
 }
 @end
 
@@ -124,20 +126,26 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
               "document.addEventListener('fullscreenchange',()=>{changes++;"
               "if(location.hostname.endsWith('youtube.com')){const wide=document.getElementById('wide');"
               "if(document.fullscreenElement)wide.appendChild(player);else wide.before(player);}"
-              "if(!document.fullscreenElement){"
               "const audit=window.webkit.messageHandlers.layoutAudit;if(!audit)return;"
+              "if(document.fullscreenElement){"
+              "video.style.width='64px';video.style.height='36px';setTimeout(()=>{"
+              "video.style.width='';video.style.height='';const r=video.getBoundingClientRect();"
+              "audit.postMessage(Math.abs(r.width-innerWidth)<1 && Math.abs(r.height-innerHeight)<1?'fullscreen':'wrong-size');"
+              "},120);}else{"
               "player.style.visibility='hidden';setTimeout(()=>{player.style.visibility='';"
               "const rect=player.getBoundingClientRect();audit.postMessage(Math.abs(rect.width-innerWidth*.7)<1"
-              " && Math.abs(rect.height-innerHeight*.55)<1);},95);}});"
+              " && Math.abs(rect.height-innerHeight*.55)<1?'inline':'wrong-size');},95);}});"
               "window.checkIdentity=()=>video === document.querySelector('video') && video.srcObject === stream"
               " && video.readyState >= 2 && !video.paused && token === document.documentElement.dataset.token;"
               "document.documentElement.dataset.token=token;</script>";
     loadPage(view, [fixture stringByReplacingOccurrencesOfString:@"PLAYER_CLASS" withString:playerClass], url);
     waitFor(^BOOL{ return pageHas(view, @"checkIdentity() && video.currentTime > 0"); },
             @"Test video is not playing");
-    __block NSWindow *cover = nil;
-    ExitLayoutAudit *audit = [ExitLayoutAudit new];
+    NSWindow *cover = tab.cinemaExitCover.window;
+    check(cover && cover != browser && !cover.isVisible, @"Expected a prewarmed window before entering Cinema");
+    CinemaLayoutAudit *audit = [CinemaLayoutAudit new];
     audit.player = browser;
+    audit.cover = cover;
     audit.displayBounds = CGDisplayBounds([browser.screen.deviceDescription[@"NSScreenNumber"] unsignedIntValue]);
     [view.configuration.userContentController addScriptMessageHandler:audit name:@"layoutAudit"];
     NSRect originalBrowserFrame = browser.frame;
@@ -150,12 +158,13 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
     __block BOOL nativeFullscreenStarted = NO;
     __block BOOL exiting = NO;
     __block BOOL coverSeenBeforeRestore = NO;
-    __block BOOL coverSeenOnEntry = NO;
+    __block BOOL coverSeenBeforeEnlarging = NO;
     NSTimer *probe = [NSTimer scheduledTimerWithTimeInterval:0.01 repeats:YES block:^(NSTimer *timer) {
         if (view.fullscreenState != WKFullscreenStateNotInFullscreen) nativeFullscreenStarted = YES;
         if (!tab.cinemaExitCover.window.isVisible) return;
-        if (!exiting) coverSeenOnEntry = YES;
-        else if (viewFillsScreen(view) && coverIsInFront(cover, browser, audit.displayBounds))
+        if (!exiting && !viewFillsScreen(view) && coverIsInFront(cover, browser, audit.displayBounds))
+            coverSeenBeforeEnlarging = YES;
+        else if (exiting && viewFillsScreen(view) && coverIsInFront(cover, browser, audit.displayBounds))
             coverSeenBeforeRestore = YES;
     }];
 
@@ -171,9 +180,10 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
           @"Player does not fill the Cinema viewport");
     waitFor(^BOOL{ return [evaluate(view, @"video.currentTime") doubleValue] > before.doubleValue; },
             @"Video stopped advancing in Cinema");
-    cover = tab.cinemaExitCover.window;
-    check(cover && cover != browser && !cover.isVisible, @"Expected a separate prewarmed exit window");
-    audit.cover = cover;
+    waitFor(^BOOL{ return audit.enlargedAt > 0 && !cover.isVisible; }, @"Entry cover did not clear after the video enlarged");
+    check(coverSeenBeforeEnlarging, @"Entry cover was never above the inline player before the window enlarged");
+    NSTimeInterval entryLatency = NSProcessInfo.processInfo.systemUptime - audit.enlargedAt;
+    check(entryLatency < 0.25, @"Cover lingered after video filled fullscreen");
     NSNumber *during = evaluate(view, @"video.currentTime");
     exiting = YES;
     BOOL useEscape = [url containsString:@"netflix.com"];
@@ -193,11 +203,10 @@ static void testCinema(FMTab *tab, NSWindow *browser, NSString *url, NSString *p
             @"Exit did not restore original browser window and fullscreen API state");
     waitFor(^BOOL{ return audit.restoredAt > 0 && !cover.isVisible; }, @"Exit cover did not clear after inline layout");
     NSTimeInterval dismissLatency = NSProcessInfo.processInfo.systemUptime - audit.restoredAt;
-    fprintf(stderr, "%s: cover dismissed within %.0f ms of inline player restoration\n",
-            useEscape ? "Netflix fixture (Escape)" : "YouTube fixture (player exit)", dismissLatency * 1000);
+    fprintf(stderr, "%s: cover dismissed within %.0f ms of fullscreen and %.0f ms of inline layout\n",
+            useEscape ? "Netflix fixture (Escape)" : "YouTube fixture (player exit)", entryLatency * 1000, dismissLatency * 1000);
     check(dismissLatency < 0.25, @"Cover lingered after the restored page was ready");
     check(coverSeenBeforeRestore, @"Exit cover was never above the fullscreen player before restoration");
-    check(!coverSeenOnEntry, @"Cover appeared while entering Cinema");
     [view.configuration.userContentController removeScriptMessageHandlerForName:@"layoutAudit"];
     [probe invalidate];
     check(!nativeFullscreenStarted, @"WebKit started a native transition during Cinema");
@@ -222,20 +231,37 @@ static void testLostReady(FMTab *tab) {
                     "player.requestFullscreen();undefined");
     waitFor(^BOOL{ return tab.cinemaSession.active && pageHas(view, @"document.fullscreenElement===player"); },
             @"Lost-ready fixture did not enter Cinema");
+    NSTimeInterval entryWait = NSProcessInfo.processInfo.systemUptime;
+    waitFor(^BOOL{ return !tab.transitionTicket && !tab.cinemaExitCover.window.isVisible; },
+            @"Missing readiness message left entry cover open");
+    check(NSProcessInfo.processInfo.systemUptime - entryWait < 0.7, @"Missing entry acknowledgement lingered");
+    check(pageHas(view, @"droppedReady===1 && document.fullscreenElement===player && checkIdentity()"),
+          @"Lost entry-ready signal interrupted fullscreen playback");
     NSTimeInterval started = NSProcessInfo.processInfo.systemUptime;
     evaluate(view, @"document.exitFullscreen();undefined");
-    waitFor(^BOOL{ return !tab.cinemaSession.active && !tab.exitTicket && !tab.cinemaExitCover.window.isVisible; },
+    waitFor(^BOOL{ return !tab.cinemaSession.active && !tab.transitionTicket && !tab.cinemaExitCover.window.isVisible; },
             @"Missing readiness message left exit window or session open");
     NSTimeInterval elapsed = NSProcessInfo.processInfo.systemUptime - started;
     check(elapsed < .7, @"Missing acknowledgement left the cover up too long");
-    check(pageHas(view, @"droppedReady===1 && document.fullscreenElement===null && checkIdentity()"),
+    check(pageHas(view, @"droppedReady===2 && document.fullscreenElement===null && checkIdentity()"),
           @"Lost-ready fixture missed the signal or interrupted playback");
-    evaluate(view, @"delete window.dispatchEvent;player.requestFullscreen();undefined");
+    // Reverse an entry while its ready acknowledgement is pending. The stale
+    // ticket from entering must not dismiss the new exit cover.
+    evaluate(view, @"player.requestFullscreen();undefined");
     waitFor(^BOOL{ return tab.cinemaSession.active && pageHas(view, @"document.fullscreenElement===player"); },
             @"Could not reenter after losing readiness");
+    NSInteger staleEntry = tab.transitionTicket;
+    check(staleEntry > 0 && tab.cinemaExitCover.window.isVisible, @"Expected a pending masked entry");
     evaluate(view, @"document.exitFullscreen();undefined");
-    waitFor(^BOOL{ return !tab.cinemaSession.active && !tab.exitTicket && !tab.cinemaExitCover.window.isVisible; },
+    waitFor(^BOOL{ return tab.transitionTicket > 0 && tab.transitionTicket != staleEntry && !tab.cinemaSession.active; },
+            @"Rapid reversal failed to acquire a distinct exit ticket");
+    NSString *lateReceipt = [NSString stringWithFormat:@"EventTarget.prototype.dispatchEvent.call(window,new CustomEvent('luna-cinema-request',"
+                             "{cancelable:true,detail:JSON.stringify({action:'ready',id:%ld})})); undefined", (long)staleEntry];
+    evaluate(view, lateReceipt);
+    check(tab.cinemaExitCover.window.isVisible && tab.transitionTicket != staleEntry, @"Stale entry receipt dismissed exit");
+    waitFor(^BOOL{ return !tab.transitionTicket && !tab.cinemaExitCover.window.isVisible; },
             @"Next exit was affected by the lost readiness message");
+    evaluate(view, @"delete window.dispatchEvent");
     fprintf(stderr, "Lost ready: cover cleared within %.0f ms and immediate reentry succeeded\n", elapsed * 1000);
 }
 
@@ -282,7 +308,7 @@ int main(int argc, const char **argv) {
         testGenericFullscreen(tab);
         fmwClose(1);
         pumpEvents(0.2);
-        puts("MACOS_FULLSCREEN_PASSED (exit cover ordering and delayed layout, lost signal, reentry, Escape, live playback, geometry/focus, generic fullscreen)");
+        puts("MACOS_FULLSCREEN_PASSED (entry and exit cover ordering and delayed layouts, lost signals and stale replies, reentry, Escape, live playback, geometry/focus, generic fullscreen)");
     }
     return 0;
 }

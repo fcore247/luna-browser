@@ -126,36 +126,65 @@
     return current;
   }
 
-  function visibleInViewport(element) {
+  function visibleRect(element) {
     if (!element.isConnected) return false;
     if (element.checkVisibility && !element.checkVisibility({checkOpacity:true, checkVisibilityCSS:true})) return false;
     const style = getComputedStyle(element);
     if (style.visibility !== 'visible' || Number(style.opacity) === 0) return false;
     const rect = element.getBoundingClientRect();
     return Math.min(innerWidth, rect.right) > Math.max(0, rect.left) &&
-           Math.min(innerHeight, rect.bottom) > Math.max(0, rect.top);
+           Math.min(innerHeight, rect.bottom) > Math.max(0, rect.top) ? rect : null;
   }
 
-  function reportRestoredLayout(ticket, previous) {
-    if (!previous || !Number.isSafeInteger(ticket) || ticket <= 0) return;
-    const { player, surface, viewport } = previous;
+  function reportLayout(ticket, stillCurrent, geometryIsReady) {
+    if (!Number.isSafeInteger(ticket) || ticket <= 0) return;
     const deadline = performance.now() + 400;
-    // A covering window can throttle rAF in WebKit. Once the site's inline
-    // layout is measurable, native code waits for WebKit's next presentation.
+    // A covering window can throttle rAF. Measure after the site's event
+    // handlers and promise reactions; native WebKit fences the actual repaint.
     function checkLayout() {
-      if (session || !player.isConnected) return;
-      const normalViewport = Math.abs(innerWidth - viewport.width) <= 1 &&
-                             Math.abs(innerHeight - viewport.height) <= 1;
-      const siteInline = !youtube || viewport.hadFullscreenClass || !player.classList.contains('ytp-fullscreen');
-      if (normalViewport && siteInline && !surface.matches(':popover-open') && visibleInViewport(player) &&
-          [...player.querySelectorAll('video')].some(visibleInViewport)) {
+      if (!stillCurrent()) return;
+      if (geometryIsReady()) {
         try { send('ready', ticket); } catch {}
       } else if (performance.now() < deadline) {
         setTimeout(checkLayout, 16);
       }
     }
-    // Site handlers and exitFullscreen().then(...) finish before measuring.
     setTimeout(checkLayout, 0);
+  }
+
+  function viewportMatches(width, height) {
+    return Math.abs(innerWidth - width) <= 1 && Math.abs(innerHeight - height) <= 1;
+  }
+
+  function reportCinemaLayout(ticket, current, width, height) {
+    const { player, surface } = current;
+    reportLayout(ticket, () => session === current && pending?.action !== 'exit', () => {
+      if (!viewportMatches(width, height) || !surface.matches(':popover-open')) return false;
+      const bounds = visibleRect(surface);
+      if (!bounds || Math.abs(bounds.width - width) > 2 || Math.abs(bounds.height - height) > 2) return false;
+      // During YouTube's player move the watch surface can already fill the
+      // screen while the decoded video still has its former inline dimensions.
+      return [...player.querySelectorAll('video')].some(video => {
+        if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) return false;
+        const rect = visibleRect(video);
+        if (!rect) return false;
+        const scale = Math.min(width / video.videoWidth, height / video.videoHeight);
+        const visibleWidth = Math.min(width, rect.right) - Math.max(0, rect.left);
+        const visibleHeight = Math.min(height, rect.bottom) - Math.max(0, rect.top);
+        return visibleWidth >= video.videoWidth * scale - 2 &&
+               visibleHeight >= video.videoHeight * scale - 2;
+      });
+    });
+  }
+
+  function reportRestoredLayout(ticket, previous) {
+    if (!previous) return;
+    const { player, surface, viewport } = previous;
+    reportLayout(ticket, () => !session && player.isConnected, () => {
+      const siteInline = !youtube || viewport.hadFullscreenClass || !player.classList.contains('ytp-fullscreen');
+      return viewportMatches(viewport.width, viewport.height) && siteInline && !surface.matches(':popover-open') &&
+             visibleRect(player) && [...player.querySelectorAll('video')].some(visibleRect);
+    });
   }
 
   function command(action, target, player) {
@@ -187,11 +216,11 @@
     return promise;
   }
 
-  Object.defineProperty(window, '__lunaCinemaReply', { value(id, state, nativeExitTicket) {
+  Object.defineProperty(window, '__lunaCinemaReply', { value(id, state, nativeTicket, width, height) {
     if (id === 0 && state === 'exited') {
       const previous = pending;
       if (previous) { clearTimeout(previous.timer); pending = null; }
-      reportRestoredLayout(nativeExitTicket, restore());
+      reportRestoredLayout(nativeTicket, restore());
       if (previous?.action === 'exit') previous.resolve();
       else if (previous) previous.reject(new TypeError('Luna Cinema was closed'));
       return;
@@ -205,8 +234,9 @@
         if (!request.player.isConnected || !request.target.isConnected) throw new TypeError('Player was removed');
         session = preparePlayer(request.target, request.player, request.viewport);
         notify('fullscreenchange', request.target);
+        reportCinemaLayout(nativeTicket, session, width, height);
       } else if (state === 'exited' && request.action === 'exit') {
-        reportRestoredLayout(nativeExitTicket || id, restore());
+        reportRestoredLayout(nativeTicket || id, restore());
       } else {
         throw new TypeError('Luna Cinema is unavailable');
       }
