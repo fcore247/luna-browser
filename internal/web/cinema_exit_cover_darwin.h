@@ -45,7 +45,10 @@
         panel.opaque = NO;
         panel.backgroundColor = NSColor.clearColor;
         panel.hasShadow = NO;
-        panel.ignoresMouseEvents = YES;
+        // A click on the hourglass outside the shrinking browser must not
+        // activate the app underneath. This panel still cannot become key.
+        panel.ignoresMouseEvents = NO;
+        panel.movable = NO;
         // Order out explicitly on deactivation. AppKit must not bring a
         // previously hidden transition panel back when Luna becomes active.
         panel.hidesOnDeactivate = NO;
@@ -153,8 +156,9 @@
 - (void)interrupt:(NSNotification *)notification {
     if (!_visibleTicket) return;
     void (^onInterrupt)(BOOL) = _onInterrupt;
-    [self dismissTicket:_visibleTicket];
+    NSInteger ticket = _visibleTicket;
     if (onInterrupt) onInterrupt(notification != nil);
+    [self dismissTicket:ticket];
 }
 
 - (void)clearTicket {

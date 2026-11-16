@@ -1,5 +1,28 @@
 #pragma once
 #import <Cocoa/Cocoa.h>
+#import <objc/runtime.h>
+
+// Wails constructs the browser NSWindow subclass. Give that class the usual
+// constrainFrameRect: override so Cinema can cover the menu-bar area. AppKit
+// also revalidates the frame later, often with nil for the suggested screen.
+static char fmCinemaFrameKey;
+static void fmExpandCinemaWindow(NSWindow *window, NSScreen *screen) {
+    Class cls = window.class;
+    if (cls != NSWindow.class && !objc_getAssociatedObject(cls, &fmCinemaFrameKey)) {
+        SEL selector = @selector(constrainFrameRect:toScreen:);
+        Method method = class_getInstanceMethod(cls, selector);
+        NSRect (*original)(id, SEL, NSRect, NSScreen *) = (void *)method_getImplementation(method);
+        IMP implementation = imp_implementationWithBlock(^NSRect(NSWindow *receiver, NSRect frame, NSScreen *suggested) {
+            NSValue *requested = objc_getAssociatedObject(receiver, &fmCinemaFrameKey);
+            if (requested && NSEqualRects(requested.rectValue, frame)) return frame;
+            return original(receiver, selector, frame, suggested);
+        });
+        class_replaceMethod(cls, selector, implementation, method_getTypeEncoding(method));
+        objc_setAssociatedObject(cls, &fmCinemaFrameKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    objc_setAssociatedObject(window, &fmCinemaFrameKey, [NSValue valueWithRect:screen.frame], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [window setFrame:screen.frame display:NO animate:NO];
+}
 
 // The selected tab already sits above Luna's Wails web view. Expanding that
 // existing host preserves the live player, its media session and its Space.
@@ -16,7 +39,7 @@
     NSRect _hostFrame;
     NSRect _screenFrame;
     NSNumber *_displayID;
-    NSWindowStyleMask _style;
+    BOOL _addedFullSizeContent;
     NSApplicationPresentationOptions _presentation;
     NSAutoresizingMaskOptions _autoresizing;
     CGFloat _cornerRadius;
@@ -44,8 +67,9 @@
     _hostFrame = host.frame;
     _screenFrame = screen.frame;
     _displayID = screen.deviceDescription[@"NSScreenNumber"];
-    _style = window.styleMask;
-    _nativeFullscreen = (_style & NSWindowStyleMaskFullScreen) != 0;
+    _nativeFullscreen = (window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+    _addedFullSizeContent = !_nativeFullscreen && (window.styleMask & NSWindowStyleMaskTitled) &&
+        !(window.styleMask & NSWindowStyleMaskFullSizeContentView);
     _cornerRadius = host.layer.cornerRadius;
     _autoresizing = host.autoresizingMask;
     _movable = window.movable;
@@ -56,25 +80,28 @@
     _transparentTitleBar = window.titlebarAppearsTransparent;
     _active = YES;
 
-    if (_nativeFullscreen) {
-        // Keep AppKit's existing Space and its original non-fullscreen frame.
-        _buttonsToRestore = [NSMutableArray array];
-        for (NSNumber *buttonType in @[@(NSWindowCloseButton), @(NSWindowMiniaturizeButton), @(NSWindowZoomButton)]) {
-            NSButton *button = [window standardWindowButton:buttonType.unsignedIntegerValue];
-            if (button && !button.hidden) {
-                [_buttonsToRestore addObject:button];
-                button.hidden = YES;
-            }
+    // Wails already draws into the title-bar area. Replacing the titled frame
+    // to hide its controls can reorder the live browser when the frame returns.
+    _buttonsToRestore = [NSMutableArray array];
+    for (NSNumber *buttonType in @[@(NSWindowCloseButton), @(NSWindowMiniaturizeButton), @(NSWindowZoomButton)]) {
+        NSButton *button = [window standardWindowButton:buttonType.unsignedIntegerValue];
+        if (button && !button.hidden) {
+            [_buttonsToRestore addObject:button];
+            button.hidden = YES;
         }
-        _toolbar.visible = NO;
-    } else {
+    }
+    _toolbar.visible = NO;
+    if (!_nativeFullscreen) {
         NSApplicationPresentationOptions options = _presentation;
-        options &= ~(NSApplicationPresentationAutoHideDock | NSApplicationPresentationAutoHideMenuBar);
-        NSApp.presentationOptions = options | NSApplicationPresentationHideDock | NSApplicationPresentationHideMenuBar;
-        window.toolbar = nil;
-        window.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
+        // Forced Dock hiding can hand activation to another application when
+        // it is released. Auto-hide leaves ownership with this browser window.
+        options &= ~(NSApplicationPresentationHideDock | NSApplicationPresentationHideMenuBar);
+        NSApp.presentationOptions = options | NSApplicationPresentationAutoHideDock | NSApplicationPresentationAutoHideMenuBar;
+        if (_addedFullSizeContent) window.styleMask |= NSWindowStyleMaskFullSizeContentView;
+        if (_titleVisibility != NSWindowTitleHidden) window.titleVisibility = NSWindowTitleHidden;
+        if (!_transparentTitleBar) window.titlebarAppearsTransparent = YES;
         window.movable = NO;
-        [window setFrame:screen.frame display:NO animate:NO];
+        fmExpandCinemaWindow(window, screen);
     }
     host.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     host.layer.cornerRadius = 0;
@@ -125,15 +152,11 @@
 
     NSWindow *window = _window;
     NSView *host = _host;
-    if (_nativeFullscreen) {
-        for (NSButton *button in _buttonsToRestore) button.hidden = NO;
-        _buttonsToRestore = nil;
-    } else {
-        NSApp.presentationOptions = _presentation;
-        window.styleMask = _style;
-        window.toolbar = _toolbar;
-        window.titleVisibility = _titleVisibility;
-        window.titlebarAppearsTransparent = _transparentTitleBar;
+    if (!_nativeFullscreen) {
+        objc_setAssociatedObject(window, &fmCinemaFrameKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (_addedFullSizeContent) window.styleMask &= ~NSWindowStyleMaskFullSizeContentView;
+        if (window.titleVisibility != _titleVisibility) window.titleVisibility = _titleVisibility;
+        if (window.titlebarAppearsTransparent != _transparentTitleBar) window.titlebarAppearsTransparent = _transparentTitleBar;
         window.movable = _movable;
         NSRect destination = _windowFrame;
         BOOL screenAvailable = NO;
@@ -143,8 +166,11 @@
         if (!screenAvailable && NSScreen.mainScreen)
             destination = [window constrainFrameRect:destination toScreen:NSScreen.mainScreen];
         [window setFrame:destination display:NO animate:NO];
+        NSApp.presentationOptions = _presentation;
     }
     if (_toolbar && _toolbar.visible != _toolbarVisible) _toolbar.visible = _toolbarVisible;
+    for (NSButton *button in _buttonsToRestore) button.hidden = NO;
+    _buttonsToRestore = nil;
     host.autoresizingMask = _autoresizing;
     host.frame = _hostFrame;
     host.layer.cornerRadius = _cornerRadius;
@@ -161,6 +187,7 @@
 @property (nonatomic, weak, readonly) NSView *originalResponder;
 - (instancetype)initWithPlayer:(NSView *)player entering:(BOOL)entering previous:(NSView *)previous;
 - (void)restoreAfterResize:(BOOL)afterResize;
+- (void)orderPlayerFrontForReveal;
 - (BOOL)playerHasKeyboardFocus;
 @end
 
@@ -200,6 +227,12 @@
         NSApp.isActive && window.isVisible && !window.isMiniaturized && window.isOnActiveSpace &&
         !window.attachedSheet && !NSApp.modalWindow && (!NSApp.keyWindow || NSApp.keyWindow == window) &&
         (!NSApp.mainWindow || NSApp.mainWindow == window);
+}
+
+- (void)orderPlayerFrontForReveal {
+    // Key status and WindowServer ordering are independent. Only a window
+    // that owned input at the start and still owns the foreground may rise.
+    if (_wasKey && [self ownsForegroundWindow]) [_window orderFront:nil];
 }
 
 - (BOOL)playerHasKeyboardFocus {

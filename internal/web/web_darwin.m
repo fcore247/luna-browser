@@ -321,10 +321,11 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 
 - (void)finishCinemaTransition:(NSInteger)ticket {
 	if (ticket <= 0 || ticket != _transitionTicket) return;
+	FMCinemaFocus *focus = _transitionFocus;
+	if (!_enteringCinema && _tid == gActive) [focus orderPlayerFrontForReveal];
 	[_cinemaExitCover dismissTicket:ticket];
 	_transitionTicket = 0;
 	_cinemaSnapshotPending = NO;
-	FMCinemaFocus *focus = _transitionFocus;
 	if (!focus || _tid != gActive) {
 		_transitionFocus = nil;
 		return;
