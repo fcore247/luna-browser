@@ -128,37 +128,57 @@ test('failed preference save keeps the old language and a usable picker', async 
   );
 });
 
-test('fullscreen duration accepts German decimals, restores saved seconds and reports failed saves', async ({
-  page,
-}) => {
-  await browserApp(page, { onboarding: false });
-  await page.locator('#url').fill('settings');
-  await page.locator('#url').press('Enter');
-  await page.getByRole('button', { name: 'Einstellungen öffnen', exact: true }).click();
-  const field = page.getByRole('spinbutton', { name: 'Vollbild-Ladebildschirm' });
-  await expect(field).toHaveValue('1');
-  await field.fill('');
-  await field.pressSequentially('2,5');
-  await field.press('Tab');
-  await expect
-    .poll(() => page.evaluate(() => sessionStorage.getItem('cover-duration')))
-    .toBe('2.5');
-  await page.locator('#luna-language').selectOption('en');
-  const englishField = page.getByRole('spinbutton', { name: 'Fullscreen loading screen' });
-  await expect(englishField).toHaveValue('2.5');
-  await englishField.fill('0');
-  await englishField.press('Tab');
-  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('cover-duration'))).toBe('0');
-  await englishField.fill('61');
-  await englishField.press('Tab');
-  await expect(englishField).toHaveValue('0');
-  await expect(page.locator('#toast')).toContainText('Enter a duration from 0 to 60 seconds');
-  await page.evaluate(() => (window.failCoverSave = true));
-  await englishField.fill('1.2');
-  await englishField.press('Tab');
-  await expect(englishField).toHaveValue('0');
-  await expect(page.locator('#toast')).toContainText('The duration could not be saved.');
-});
+for (const windows of [false, true]) {
+  test.describe(windows ? 'Windows fullscreen settings' : 'macOS fullscreen settings', () => {
+    test.use({
+      userAgent: windows
+        ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+    });
+
+    test(
+      windows
+        ? 'uses native fullscreen without a cover setting'
+        : 'accepts German decimals, restores saved seconds and reports failed saves',
+      async ({ page }) => {
+        await browserApp(page, { onboarding: false });
+        await page.locator('#url').fill('settings');
+        await page.locator('#url').press('Enter');
+        await page.getByRole('button', { name: 'Einstellungen öffnen', exact: true }).click();
+        const field = page.getByRole('spinbutton', { name: 'Vollbild-Ladebildschirm' });
+        if (windows) {
+          await expect(page.locator('#luna-language')).toBeVisible();
+          await expect(field).toHaveCount(0);
+          return;
+        }
+        await expect(field).toHaveValue('1');
+        await field.fill('');
+        await field.pressSequentially('2,5');
+        await field.press('Tab');
+        await expect
+          .poll(() => page.evaluate(() => sessionStorage.getItem('cover-duration')))
+          .toBe('2.5');
+        await page.locator('#luna-language').selectOption('en');
+        const englishField = page.getByRole('spinbutton', { name: 'Fullscreen loading screen' });
+        await expect(englishField).toHaveValue('2.5');
+        await englishField.fill('0');
+        await englishField.press('Tab');
+        await expect
+          .poll(() => page.evaluate(() => sessionStorage.getItem('cover-duration')))
+          .toBe('0');
+        await englishField.fill('61');
+        await englishField.press('Tab');
+        await expect(englishField).toHaveValue('0');
+        await expect(page.locator('#toast')).toContainText('Enter a duration from 0 to 60 seconds');
+        await page.evaluate(() => (window.failCoverSave = true));
+        await englishField.fill('1.2');
+        await englishField.press('Tab');
+        await expect(englishField).toHaveValue('0');
+        await expect(page.locator('#toast')).toContainText('The duration could not be saved.');
+      },
+    );
+  });
+}
 
 test('catalogue preserves markup, interpolated user text, escaping and locale formats', async ({
   page,
