@@ -384,7 +384,7 @@ test('auto-login waits for the page to enable its button and submits exactly onc
   await open(
     page,
     `
-    <form onsubmit="event.preventDefault();window.submissions.push(event.submitter.id)">
+    <form method="post" onsubmit="event.preventDefault();window.submissions.push(event.submitter.id)">
       <input id="u" autocomplete="username"><input id="p" type="password" autocomplete="current-password">
       <button id="sign" disabled>Sign in</button>
     </form>
@@ -407,6 +407,98 @@ test('auto-login waits for the page to enable its button and submits exactly onc
   expect(attempt).toMatchObject({ ok: true, submitted: true, stage: 'password' });
   expect(duplicate.ok).toBe(false);
   expect(await page.evaluate(() => window.submissions)).toEqual(['sign']);
+});
+
+test('password GET forms are filled but left for the user to submit', async ({ page }) => {
+  const requests = [];
+  await page.route(base + '/session**', (route) => {
+    requests.push(route.request().url());
+    return route.fulfill({ status: 204 });
+  });
+  for (const [method, override] of [
+    ['', ''],
+    ['method="get"', ''],
+    ['method="invalid"', ''],
+    ['method="post"', 'formmethod="get"'],
+    ['method="post"', 'formmethod=""'],
+  ]) {
+    await open(
+      page,
+      `<form action="/session" ${method} onsubmit="window.sent=true">
+      <input name="user" autocomplete="username">
+      <input name="secret" type="password" autocomplete="current-password">
+      <button ${override} onclick="window.activated=true">Sign in</button></form>`,
+    );
+    const token = await loginForm(page, 'password');
+    const result = await page.evaluate(
+      (token) => window.__lunaFill('example', 'synthetic-get-secret', true, token),
+      token,
+    );
+    expect(result).toMatchObject({ ok: true, password: true, submitted: false });
+    expect(await page.inputValue('[name=secret]')).toBe('synthetic-get-secret');
+    expect(await page.evaluate(() => Boolean(window.activated || window.sent))).toBe(false);
+  }
+  expect(requests).toEqual([]);
+});
+
+test('a password GET submitted by an input handler during filling cannot navigate with credentials', async ({
+  page,
+}) => {
+  const urls = [];
+  await page.route(base + '/session**', (route) => {
+    urls.push(route.request().url());
+    return route.fulfill({ status: 204 });
+  });
+  await open(
+    page,
+    `<form action="/session" method="get">
+    <input name="user" autocomplete="username"><input name="secret" type="password"
+      oninput="this.form.requestSubmit()" onchange="this.form.submit()">
+    <button>Sign in</button></form>`,
+  );
+  const token = await loginForm(page, 'password');
+  const result = await page.evaluate(
+    (token) => window.__lunaFill('example', 'synthetic-get-secret', true, token),
+    token,
+  );
+  expect(result).toMatchObject({ ok: true, password: true, submitted: false });
+  // Legacy form.submit() bypasses the submit event but still constructs form data.
+  await expect.poll(() => urls.length).toBe(1);
+  expect(new URL(urls[0]).searchParams.has('secret')).toBe(false);
+  expect(urls[0]).not.toContain('synthetic-get-secret');
+});
+
+test('POST overrides submit and method changes in site handlers cannot put passwords in a URL', async ({
+  page,
+}) => {
+  const requests = [];
+  await page.route(base + '/session**', (route) => {
+    requests.push({ method: route.request().method(), url: route.request().url() });
+    return route.fulfill({ status: 204 });
+  });
+  for (const [method, button, onsubmit, submitted] of [
+    ['get', 'formmethod="POST"', '', true],
+    ['post', 'onclick="this.form.method=\'get\'"', '', false],
+    ['post', '', "this.method='get';event.stopPropagation()", false],
+  ]) {
+    await open(
+      page,
+      `<form action="/session" method="${method}" onsubmit="${onsubmit}">
+      <input name="user" autocomplete="username"><input name="secret" type="password">
+      <button ${button}>Sign in</button></form>`,
+    );
+    const token = await loginForm(page, 'password');
+    const result = await page.evaluate(
+      (token) => window.__lunaFill('example', 'synthetic-get-secret', true, token),
+      token,
+    );
+    expect(result).toMatchObject({ ok: true, submitted });
+    if (submitted) await expect.poll(() => requests.length).toBe(1);
+    if (onsubmit) await expect.poll(() => requests.length).toBe(2);
+  }
+  expect(requests[0]).toEqual({ method: 'POST', url: base + '/session' });
+  expect(new URL(requests[1].url).searchParams.has('secret')).toBe(false);
+  expect(requests[1].url).not.toContain('synthetic-get-secret');
 });
 
 test('payment and account deletion confirmations are never filled or submitted automatically', async ({

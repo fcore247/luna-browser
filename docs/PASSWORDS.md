@@ -9,7 +9,8 @@ Seiten mit Login (zum Beispiel einem Schulportal) schnell anmelden kannst. Es gi
    Hast du für ein bekanntes Konto ein anderes Passwort eingegeben, erscheint **Aktualisieren**.
 2. Beim Speichern kannst du **Automatisch mit Touch ID anmelden** wählen. Erkennt Luna beim nächsten
    Besuch das Anmeldeformular, bestätigst du mit Touch ID oder deinem Mac-Passwort. Luna füllt das
-   Formular aus und schickt es ab. Eine anschließende Zwei-Faktor-Abfrage beantwortest du auf der Webseite.
+   Formular aus. Würde ein Formular das Passwort in der URL übertragen, überlässt Luna dir das Absenden.
+   Unterstützte Anmeldeformulare sendet Luna automatisch ab. Eine Zwei-Faktor-Abfrage beantwortest du auf der Webseite.
 3. Über den Schlüssel in der Adressleiste kannst du eine Anmeldung auch selbst starten und zwischen
    gespeicherten Konten wählen. Bei erkannten zweistufigen Anmeldungen auf derselben Website verwendet
    Luna die Bestätigung auch für den unmittelbar folgenden Passwortschritt.

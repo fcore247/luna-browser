@@ -170,6 +170,62 @@
     }
   }
 
+  function passwordPost(form, submitter) {
+    const method = submitter?.getAttribute('formmethod') ?? form.getAttribute('method');
+    return method?.toLowerCase() === 'post' && sameOriginAction(form, submitter);
+  }
+
+  function guardPasswordSubmission(login, operation, submitter = null) {
+    const { scope, password } = login;
+    if (!password || !(scope instanceof HTMLFormElement)) {
+      operation();
+      return true;
+    }
+    let submitted = true;
+    const guard = (event) => {
+      if (event.target !== scope) return;
+      submitter = event.submitter;
+      if (!passwordPost(scope, submitter)) {
+        submitted = false;
+        event.preventDefault();
+      }
+    };
+    const guardData = (event) => {
+      if (passwordPost(scope, submitter)) return;
+      // A site's submit handler can change the method and stop the event from
+      // bubbling. This is the browser's final form-data construction step.
+      submitted = false;
+      for (const key of [...event.formData.keys()]) event.formData.delete(key);
+    };
+    window.addEventListener('submit', guard, true);
+    window.addEventListener('submit', guard);
+    scope.addEventListener('formdata', guardData);
+    try {
+      operation();
+      return submitted;
+    } finally {
+      window.removeEventListener('submit', guard, true);
+      window.removeEventListener('submit', guard);
+      scope.removeEventListener('formdata', guardData);
+    }
+  }
+
+  function activateLogin(login) {
+    const { scope, button } = login;
+    // Missing and invalid methods default to GET. Filling still works, but
+    // activating the form could put the password in history and access logs.
+    if (login.password && scope instanceof HTMLFormElement && !passwordPost(scope, button))
+      return false;
+    return guardPasswordSubmission(
+      login,
+      () => {
+        if (button) button.click();
+        else HTMLFormElement.prototype.requestSubmit.call(scope);
+      },
+      button,
+    );
+  }
+
   function candidate(scope) {
     const inputs = fields(scope);
     const context = formHint(scope) + ' ' + location.pathname;
@@ -547,7 +603,7 @@
       if (document.visibilityState !== 'visible') return fail('tab');
       if (login.username && username && !login.username.value) {
         if (login.username.readOnly || !visible(login.username)) return fail('conflict');
-        assign(login.username, username);
+        guardPasswordSubmission(login, () => assign(login.username, username));
         result.username = true;
       }
       if (login.password && password && !login.password.value) {
@@ -557,7 +613,7 @@
           !sameOriginAction(login.scope, login.button)
         )
           return fail('origin');
-        assign(login.password, password);
+        guardPasswordSubmission(login, () => assign(login.password, password));
         result.password = true;
       }
       const complete = () => {
@@ -580,9 +636,8 @@
         )
           return fail('invalid');
         login.submitted = true;
-        if (login.button) login.button.click();
-        else HTMLFormElement.prototype.requestSubmit.call(login.scope);
-        result.ok = result.submitted = true;
+        result.submitted = activateLogin(login);
+        result.ok = true;
         return result;
       };
       // Some sites enable the login action after validating the edited fields.
