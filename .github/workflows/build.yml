@@ -70,7 +70,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          xcrun clang -fobjc-arc -framework Cocoa -framework WebKit -framework LocalAuthentication native/tests/extensions-macos.m -o /tmp/luna-extension-tests
+          xcrun clang -fobjc-arc -framework Cocoa -framework QuartzCore -framework WebKit -framework LocalAuthentication native/tests/extensions-macos.m -o /tmp/luna-extension-tests
           python3 -m http.server 18769 --bind 127.0.0.1 --directory native/tests/extension-fixture >/tmp/luna-extension-http.log 2>&1 &
           server=$!
           trap 'kill "$server"' EXIT
