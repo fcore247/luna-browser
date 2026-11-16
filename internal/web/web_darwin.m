@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "web_darwin.h"
+#import "fullscreen_cover_darwin.h"
 
 extern void goWebEvent(char *json);
 extern void goSnapshotDone(int req, char *b64);
@@ -47,10 +48,12 @@ static WKWebView *findWebView(NSView *root) {
  for (NSView *child in root.subviews) { WKWebView *found = findWebView(child); if (found) return found; }
  return nil;
 }
+static __weak NSWindow *gBrowserWindow;
 static NSWindow *fmWindow(void) {
+ if (gBrowserWindow) return gBrowserWindow;
  // Hilfsfenster (z.B. Bildschirmfreigabe) sind keine Browserfenster.
- for (NSWindow *w in NSApp.windows) if (w.isVisible && findWebView(w.contentView)) return w;
- for (NSWindow *w in NSApp.windows) if (findWebView(w.contentView)) return w;
+ for (NSWindow *w in NSApp.windows) if (w.isVisible && findWebView(w.contentView)) { gBrowserWindow = w; return w; }
+ for (NSWindow *w in NSApp.windows) if (findWebView(w.contentView)) { gBrowserWindow = w; return w; }
  return nil;
 }
 
@@ -171,6 +174,10 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @interface FMTab : NSObject <WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, WKWebExtensionTab>
 @property (nonatomic) int tid;
 @property (nonatomic, strong) WKWebView *view;
+@property (nonatomic, strong) NSView *hostView;
+@property (nonatomic, strong) NSWindow *fullscreenCover;
+@property (nonatomic) NSUInteger coverGeneration;
+@property (nonatomic) NSTimeInterval coverShownAt;
 @property (nonatomic) BOOL isError;
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg;
 - (void)teardown;
@@ -179,11 +186,11 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 static id extensionWindow(void) API_AVAILABLE(macos(15.4));
 
 static void layoutTab(FMTab *t) {
-	NSView *cv = fmWindow().contentView;
-	if (!cv) return;
-	CGFloat H = cv.bounds.size.height;
-	t.view.frame = NSMakeRect(gRect.origin.x, H - gRect.origin.y - gRect.size.height, gRect.size.width, gRect.size.height);
-	t.view.hidden = (t.tid != gActive);
+	NSView *parent = t.hostView.superview;
+	if (!parent) return;
+	NSRect frame = NSMakeRect(gRect.origin.x, NSMaxY(parent.bounds) - NSMaxY(gRect),
+	                          gRect.size.width, gRect.size.height);
+	if (!NSEqualRects(t.hostView.frame, frame)) t.hostView.frame = frame;
 }
 
 static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
@@ -203,17 +210,27 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg {
 	if (!(self = [super init])) return nil;
 	_tid = tid;
+	// Enable the standard Fullscreen API for every website, including popup tabs.
+	if (@available(macOS 12.3, *)) cfg.preferences.elementFullscreenEnabled = YES;
 	_view = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:cfg];
 	_view.navigationDelegate = self;
 	_view.UIDelegate = self;
 	_view.allowsBackForwardNavigationGestures = YES;
 	_view.allowsMagnification = YES;
-	_view.wantsLayer = YES;
-	_view.layer.cornerRadius = 12;
-	_view.layer.masksToBounds = YES;
-	[fmWindow().contentView addSubview:_view positioned:NSWindowAbove relativeTo:nil];
+	// WebKit swaps its own placeholder for the live page during the fullscreen
+	// zoom. Keep the destination and its rounded clipping in the browser window.
+	_hostView = [[NSView alloc] initWithFrame:NSZeroRect];
+	_hostView.wantsLayer = YES;
+	_hostView.layer.cornerRadius = 12;
+	_hostView.layer.masksToBounds = YES;
+	_hostView.hidden = (tid != gActive);
+	_view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+	[_hostView addSubview:_view];
+	[fmWindow().contentView addSubview:_hostView positioned:NSWindowAbove relativeTo:nil];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view addObserver:self forKeyPath:k options:0 context:NULL];
+	if (@available(macOS 13.0, *))
+		[_view addObserver:self forKeyPath:@"fullscreenState" options:0 context:NULL];
 	return self;
 }
 
@@ -226,7 +243,45 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); }
 - (void)reloadFromOrigin:(BOOL)origin forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view reload]; done(nil); }
 
+- (void)dismissFullscreenCover {
+	++_coverGeneration;
+	[_fullscreenCover orderOut:nil];
+	_fullscreenCover = nil;
+}
+
+- (void)fullscreenStateChanged API_AVAILABLE(macos(13.0)) {
+	WKFullscreenState state = _view.fullscreenState;
+	BOOL switching = state == WKFullscreenStateEnteringFullscreen || state == WKFullscreenStateExitingFullscreen;
+	NSUInteger generation = ++_coverGeneration;
+	if (switching) {
+		if (_tid != gActive) return;
+		NSScreen *screen = _view.window.screen ?: _hostView.window.screen;
+		if (!screen) return;
+		if (!_fullscreenCover) _fullscreenCover = newFullscreenCover(screen, L(@"Augenblick"));
+		_coverShownAt = NSProcessInfo.processInfo.systemUptime;
+		[_fullscreenCover displayIfNeeded];
+		[_fullscreenCover orderFrontRegardless];
+		// An interrupted WebKit transition must never strand the cover on screen.
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+			if (self.coverGeneration == generation) [self dismissFullscreenCover];
+		});
+		return;
+	}
+
+	if (!_fullscreenCover) return;
+	// At either terminal state WebKit has finished the native transition. Leave
+	// the cover in place through the window's next display pass, then cut to it.
+	[_view.window displayIfNeeded];
+	NSTimeInterval elapsed = NSProcessInfo.processInfo.systemUptime - _coverShownAt;
+	NSTimeInterval delay = MAX(0.04, 0.35 - elapsed);
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+		if (self.coverGeneration == generation) [self dismissFullscreenCover];
+	});
+}
+
 - (void)teardown {
+	if (@available(macOS 13.0, *)) [_view removeObserver:self forKeyPath:@"fullscreenState"];
+	[self dismissFullscreenCover];
     if (@available(macOS 15.4, *)) [extensionController() didCloseTab:self windowIsClosing:NO];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view removeObserver:self forKeyPath:k];
@@ -234,6 +289,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	_view.UIDelegate = nil;
 	[_view stopLoading];
 	[_view removeFromSuperview];
+	[_hostView removeFromSuperview];
 }
 
 - (void)push {
@@ -243,6 +299,10 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+	if (object == _view && [keyPath isEqualToString:@"fullscreenState"]) {
+		if (@available(macOS 13.0, *)) [self fullscreenStateChanged];
+		return;
+	}
 	if ([object isKindOfClass:[NSProgress class]]) {
 		NSNumber *dl = objc_getAssociatedObject(object, &kDlId);
 		if (dl) emit(@{@"t": @"dl", @"id": dl, @"state": @"progress", @"received": @(((NSProgress *)object).completedUnitCount), @"total": @(((NSProgress *)object).totalUnitCount)});
@@ -435,7 +495,11 @@ void fmwShow(int id) {
         gActive = id;
         if (id >= 0 && gTabs[@(id)]) gLastWebTab = id;
         if (@available(macOS 15.4, *)) if (gTabs[@(id)]) [extensionController() didActivateTab:gTabs[@(id)] previousActiveTab:previous];
-		for (FMTab *t in gTabs.allValues) t.view.hidden = (t.tid != gActive);
+		for (FMTab *t in gTabs.allValues) {
+			BOOL hidden = t.tid != gActive;
+			if (t.hostView.hidden != hidden) t.hostView.hidden = hidden;
+			if (hidden && t.fullscreenCover) [t dismissFullscreenCover];
+		}
 	});
 }
 void fmwClose(int id) {
@@ -689,7 +753,7 @@ char *fmwOnboardingClipboard(int tab, const char *provider, int previousCount) {
  void (^read)(void) = ^{
   FMTab *t = gTabs[@(tab)];
   NSURL *url = t.view.URL;
-  BOOL eligible = NSApp.isActive && gActive == tab && !t.view.hidden && !t.isError && !t.view.loading && setupKeyPage(url, service);
+  BOOL eligible = NSApp.isActive && gActive == tab && !t.hostView.hidden && !t.isError && !t.view.loading && setupKeyPage(url, service);
   // Read only a new copy on an active trusted key page, never the baseline clipboard.
   NSMutableDictionary *status = [@{@"count": @(NSPasteboard.generalPasteboard.changeCount), @"eligible": @(eligible), @"host": url.host ?: @"", @"loading": @(t.view.loading), @"error": @(t.isError)} mutableCopy];
   if (eligible && previousCount >= 0 && NSPasteboard.generalPasteboard.changeCount != previousCount) {
