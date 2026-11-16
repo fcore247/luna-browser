@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-async function openSearch(page, reducedMotion = 'no-preference') {
+async function openSearch(page, reducedMotion = 'no-preference', overrides = {}) {
   await page.emulateMedia({ reducedMotion });
   await page.addInitScript(() => {
     localStorage.setItem('luna-onboarding-done', '1');
@@ -29,6 +29,7 @@ async function openSearch(page, reducedMotion = 'no-preference') {
     searchImages:
       'q=>new Promise(resolve=>{window.finishImages=()=>resolve({query:q,images:[1,2].map(n=>({title:"Coast "+n,host:"example.com",url:"https://example.com/",thumb:"https://images.example/"+n+".svg",full:"https://images.example/"+n+".svg",w:400,h:300}))})})',
   };
+  Object.assign(mocks, overrides);
   await page.route('**/src/api.js*', (r) =>
     r.fulfill({
       contentType: 'text/javascript',
@@ -44,6 +45,42 @@ async function openSearch(page, reducedMotion = 'no-preference') {
   await page.goto('http://127.0.0.1:5174');
   await page.locator('#splash.gone').waitFor({ state: 'attached' });
 }
+
+test('search occupies the page from the first loading frame through the results', async ({
+  page,
+}) => {
+  await openSearch(page, 'no-preference', {
+    search: `q => {
+      window.initialSearch = window.measureSearch();
+      return new Promise(resolve => { window.finishSearch = () => resolve({
+        query:q, provider:'Brave', results:[{title:'Coast', url:'https://example.com', host:'example.com'}]
+      }); });
+    }`,
+  });
+  await page.evaluate(() => {
+    window.measureSearch = () => {
+      const bounds = (id) => {
+        const { x, y, width, height } = document.querySelector(id).getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return {
+        view: bounds('#searchView'),
+        page: bounds('#page'),
+        transition: document.documentElement.dataset.pageTo || null,
+      };
+    };
+  });
+  await page.locator('#url').fill('coast');
+  await page.locator('#url').press('Enter');
+  const first = await page.evaluate(() => window.initialSearch);
+  expect(first.page.height).toBeGreaterThan(0);
+  expect(first.view).toEqual(first.page);
+  expect(first.transition).toBeNull();
+  await expect(page.locator('#searchView .sk').first()).toBeVisible();
+  await page.evaluate(() => window.finishSearch());
+  await expect(page.locator('#searchView .sr').first()).toBeVisible();
+  expect(await page.evaluate(() => window.measureSearch())).toEqual(first);
+});
 
 test('time search runs locally and the flip disk matrix keeps ticking', async ({ page }) => {
   await openSearch(page);

@@ -1254,14 +1254,25 @@ function paintAll() {
   renderSide();
   updateFrame();
 }
-// Wechselt ein Tab zwischen Luna-Seiten (Start ↔ Luna Search ↔ Einstellungen ↔ Chat), blendet der Seitenbereich
-// weich über (alte Seite löst sich mit leichter Unschärfe, neue steigt auf) statt hart umzuspringen.
+// Andere interne Seiten können weich überblenden. Suchergebnisse belegen sofort die ganze Seitenfläche.
 const LUNA_PAGES = new Set(['start', 'search', 'settings', 'chat']);
 let lastPaint = { id: null, mode: null };
+let pageTransition = null;
 function renderAll() {
   const t = cur();
   const from = lastPaint;
   lastPaint = { id: t?.id ?? null, mode: t?.mode ?? null };
+  if (t?.mode === 'search' && t.provider !== 'spotify') {
+    if (pageTransition) {
+      const previous = pageTransition;
+      pageTransition = null;
+      previous.ready.catch(() => {}); // Skipping before the snapshots are ready aborts this promise.
+      previous.skipTransition();
+      delete document.documentElement.dataset.pageFrom;
+      delete document.documentElement.dataset.pageTo;
+    }
+    return paintAll();
+  }
   const smooth =
     !!t &&
     from.id === t.id &&
@@ -1276,8 +1287,13 @@ function renderAll() {
   root.dataset.pageFrom = from.mode;
   root.dataset.pageTo = t.mode;
   try {
-    const vt = document.startViewTransition(() => paintAll());
+    const vt = document.startViewTransition(() => {
+      if (pageTransition === vt) paintAll();
+    });
+    pageTransition = vt;
     const done = () => {
+      if (pageTransition !== vt) return;
+      pageTransition = null;
       delete root.dataset.pageFrom;
       delete root.dataset.pageTo;
     };
