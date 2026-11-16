@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "web_darwin.h"
-#import "fullscreen_cover_darwin.h"
+#import "cinema_window_darwin.h"
+#import "cinema_exit_cover_darwin.h"
 
 extern void goWebEvent(char *json);
 extern void goSnapshotDone(int req, char *b64);
@@ -92,6 +93,34 @@ static FMGestureHandler *gGestureHandler;
 
 #pragma clang diagnostic pop
 
+@interface FMCinemaHandler : NSObject <WKScriptMessageHandler>
+@end
+
+static NSString *gCinemaScript;
+static void installCinemaScripts(WKUserContentController *controller) API_AVAILABLE(macos(11.0)) {
+	if (!gCinemaScript.length) return;
+	static FMCinemaHandler *handler;
+	if (!handler) handler = [FMCinemaHandler new];
+	WKContentWorld *world = [WKContentWorld worldWithName:@"LunaCinema"];
+	[controller removeScriptMessageHandlerForName:@"lunaCinema" contentWorld:world];
+	[controller addScriptMessageHandler:handler contentWorld:world name:@"lunaCinema"];
+
+	// Only this isolated world can call the window bridge. Check WebKit's own
+	// user activation and permissions policy before honoring a site's request.
+	NSString *gate =
+		@"if(location.protocol==='https:' && ['youtube.com','www.youtube.com','m.youtube.com','netflix.com','www.netflix.com'].includes(location.hostname))"
+		 "window.addEventListener('luna-cinema-request', e=>{"
+		 "  if(typeof e.detail!=='string' || e.detail.length>256) return;"
+		 "  let r; try {r=JSON.parse(e.detail)} catch {return}"
+		 "  if(!r || !Number.isSafeInteger(r.id) || r.id<=0 || !['enter','exit','ready'].includes(r.action))return;"
+		 "  e.preventDefault();"
+		 "  const allowed=r.action!=='enter'||(navigator.userActivation?.isActive && document.fullscreenEnabled);"
+		 "  window.webkit.messageHandlers.lunaCinema.postMessage({action:allowed?r.action:'denied',id:r.id});"
+		 "},true)";
+	[controller addUserScript:[[WKUserScript alloc] initWithSource:gate injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES inContentWorld:world]];
+	[controller addUserScript:[[WKUserScript alloc] initWithSource:gCinemaScript injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
+}
+
 static void applyGesture(WKWebViewConfiguration *c) {
 	WKUserContentController *u = c.userContentController;
 	if (!gGestureHandler) gGestureHandler = [FMGestureHandler new];
@@ -103,6 +132,15 @@ static void applyGesture(WKWebViewConfiguration *c) {
 		[u addUserScript:[[WKUserScript alloc] initWithSource:src injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 	}
 	applyCredentials(c);
+	if (@available(macOS 11.0, *)) installCinemaScripts(u);
+}
+
+void fmwConfigureCinemaScript(const char *src) {
+	NSString *script = [NSString stringWithUTF8String:src];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		gCinemaScript = script;
+		if (gConfig) applyGesture(gConfig);
+	});
 }
 
 static WKWebExtensionController *extensionController(void) API_AVAILABLE(macos(15.4));
@@ -175,9 +213,11 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @property (nonatomic) int tid;
 @property (nonatomic, strong) WKWebView *view;
 @property (nonatomic, strong) NSView *hostView;
-@property (nonatomic, strong) NSWindow *fullscreenCover;
-@property (nonatomic) NSUInteger coverGeneration;
-@property (nonatomic) NSTimeInterval coverShownAt;
+@property (nonatomic, strong) FMCinemaWindowSession *cinemaSession;
+@property (nonatomic, strong) FMCinemaExitCover *cinemaExitCover;
+@property (nonatomic) NSInteger exitTicket;
+@property (nonatomic) BOOL exitSnapshotPending;
+- (void)leaveCinema;
 @property (nonatomic) BOOL isError;
 - (instancetype)initWithId:(int)tid config:(WKWebViewConfiguration *)cfg;
 - (void)teardown;
@@ -185,7 +225,15 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 
 static id extensionWindow(void) API_AVAILABLE(macos(15.4));
 
+static BOOL cinemaSite(NSString *host) {
+	static NSSet *sites;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ sites = [NSSet setWithArray:@[@"youtube.com", @"www.youtube.com", @"m.youtube.com", @"netflix.com", @"www.netflix.com"]]; });
+	return [sites containsObject:host.lowercaseString];
+}
+
 static void layoutTab(FMTab *t) {
+	if (t.cinemaSession.active) return;
 	NSView *parent = t.hostView.superview;
 	if (!parent) return;
 	NSRect frame = NSMakeRect(gRect.origin.x, NSMaxY(parent.bounds) - NSMaxY(gRect),
@@ -229,8 +277,11 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	[fmWindow().contentView addSubview:_hostView positioned:NSWindowAbove relativeTo:nil];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view addObserver:self forKeyPath:k options:0 context:NULL];
-	if (@available(macOS 13.0, *))
-		[_view addObserver:self forKeyPath:@"fullscreenState" options:0 context:NULL];
+	_cinemaSession = [FMCinemaWindowSession new];
+	// Only one tab can occupy this browser window. Share its full-display bitmap.
+	static FMCinemaExitCover *exitCover;
+	if (!exitCover) exitCover = [FMCinemaExitCover new];
+	_cinemaExitCover = exitCover;
 	return self;
 }
 
@@ -243,45 +294,81 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); }
 - (void)reloadFromOrigin:(BOOL)origin forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done API_AVAILABLE(macos(15.4)) { [_view reload]; done(nil); }
 
-- (void)dismissFullscreenCover {
-	++_coverGeneration;
-	[_fullscreenCover orderOut:nil];
-	_fullscreenCover = nil;
+- (void)replyToCinemaRequest:(NSInteger)request state:(NSString *)state {
+	NSString *reply = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@')", (long)request, state];
+	[_view evaluateJavaScript:reply completionHandler:nil];
 }
 
-- (void)fullscreenStateChanged API_AVAILABLE(macos(13.0)) {
-	WKFullscreenState state = _view.fullscreenState;
-	BOOL switching = state == WKFullscreenStateEnteringFullscreen || state == WKFullscreenStateExitingFullscreen;
-	NSUInteger generation = ++_coverGeneration;
-	if (switching) {
-		if (_tid != gActive) return;
-		NSScreen *screen = _view.window.screen ?: _hostView.window.screen;
-		if (!screen) return;
-		if (!_fullscreenCover) _fullscreenCover = newFullscreenCover(screen, L(@"Augenblick"));
-		_coverShownAt = NSProcessInfo.processInfo.systemUptime;
-		[_fullscreenCover displayIfNeeded];
-		[_fullscreenCover orderFrontRegardless];
-		// An interrupted WebKit transition must never strand the cover on screen.
-		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-			if (self.coverGeneration == generation) [self dismissFullscreenCover];
-		});
+- (void)leaveCinema {
+	if (!_cinemaSession.active && !_exitTicket) return;
+	[_cinemaExitCover dismissTicket:_exitTicket];
+	_exitTicket = 0;
+	_exitSnapshotPending = NO;
+	[_cinemaSession end];
+	[self replyToCinemaRequest:0 state:@"exited"];
+}
+
+- (void)finishCinemaExit:(NSInteger)ticket {
+	if (ticket <= 0 || ticket != _exitTicket || _cinemaSession.active) return;
+	[_cinemaExitCover dismissTicket:ticket];
+	_exitTicket = 0;
+	_exitSnapshotPending = NO;
+}
+
+- (void)restoredCinemaLayout:(NSInteger)ticket {
+	if (ticket <= 0 || ticket != _exitTicket || _cinemaSession.active || _exitSnapshotPending) return;
+	if (!_view.window || _tid != gActive || _hostView.isHiddenOrHasHiddenAncestor || NSIsEmptyRect(_view.bounds)) {
+		[self finishCinemaExit:ticket];
 		return;
 	}
+	// The page has measured the inline player in its restored viewport. Wait
+	// for WebKit to incorporate that update before exposing the window. Only
+	// a single point is requested; its image is never retained or displayed.
+	_exitSnapshotPending = YES;
+	WKSnapshotConfiguration *config = [WKSnapshotConfiguration new];
+	config.afterScreenUpdates = YES;
+	config.rect = NSMakeRect(NSMinX(_view.bounds), NSMinY(_view.bounds), 1, 1);
+	__weak FMTab *weakSelf = self;
+	[_view takeSnapshotWithConfiguration:config completionHandler:^(NSImage *image, NSError *error) {
+		if (image && !error) [weakSelf finishCinemaExit:ticket];
+	}];
+}
 
-	if (!_fullscreenCover) return;
-	// At either terminal state WebKit has finished the native transition. Leave
-	// the cover in place through the window's next display pass, then cut to it.
-	[_view.window displayIfNeeded];
-	NSTimeInterval elapsed = NSProcessInfo.processInfo.systemUptime - _coverShownAt;
-	NSTimeInterval delay = MAX(0.04, 0.35 - elapsed);
-	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-		if (self.coverGeneration == generation) [self dismissFullscreenCover];
-	});
+- (void)exitCinemaForRequest:(NSInteger)request {
+	if (_exitTicket) return;
+	if (!_cinemaSession.active) {
+		if (request) [self replyToCinemaRequest:request state:@"exited"];
+		return;
+	}
+	// Request IDs can repeat after navigation and across tabs. Every showing
+	// of the shared window gets its own ticket for all asynchronous callbacks.
+	static NSInteger nativeTicket = (1LL << 32);
+	NSInteger ticket = ++nativeTicket;
+	_exitTicket = ticket;
+	__weak FMTab *weakSelf = self;
+	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket onInterrupt:^{
+		FMTab *tab = weakSelf;
+		if (tab.exitTicket != ticket) return;
+		if (tab.cinemaSession.active) [tab leaveCinema];
+		else [tab finishCinemaExit:ticket];
+	}];
+	void (^restore)(void) = ^{
+		if (self.exitTicket != ticket) return;
+		[self.cinemaSession end];
+		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'exited',%ld)", (long)request, (long)ticket];
+		[self.view evaluateJavaScript:js completionHandler:^(id value, NSError *error) {
+			if (error) [weakSelf finishCinemaExit:ticket];
+		}];
+		if (!shown) [self finishCinemaExit:ticket];
+	};
+	// Give WindowServer a frame to present the already drawn cover before
+	// restoring the original window. The page then acknowledges its new layout.
+	if (shown) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 32 * NSEC_PER_MSEC), dispatch_get_main_queue(), restore);
+	else restore();
 }
 
 - (void)teardown {
-	if (@available(macOS 13.0, *)) [_view removeObserver:self forKeyPath:@"fullscreenState"];
-	[self dismissFullscreenCover];
+	[self leaveCinema];
     if (@available(macOS 15.4, *)) [extensionController() didCloseTab:self windowIsClosing:NO];
 	for (NSString *k in @[@"title", @"URL", @"loading", @"estimatedProgress", @"canGoBack", @"canGoForward"])
 		[_view removeObserver:self forKeyPath:k];
@@ -299,10 +386,6 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-	if (object == _view && [keyPath isEqualToString:@"fullscreenState"]) {
-		if (@available(macOS 13.0, *)) [self fullscreenStateChanged];
-		return;
-	}
 	if ([object isKindOfClass:[NSProgress class]]) {
 		NSNumber *dl = objc_getAssociatedObject(object, &kDlId);
 		if (dl) emit(@{@"t": @"dl", @"id": dl, @"state": @"progress", @"received": @(((NSProgress *)object).completedUnitCount), @"total": @(((NSProgress *)object).totalUnitCount)});
@@ -345,6 +428,7 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 - (void)webView:(WKWebView *)wv navigationResponse:(WKNavigationResponse *)r didBecomeDownload:(WKDownload *)d { d.delegate = self; }
 
 - (void)webView:(WKWebView *)wv didFinishNavigation:(WKNavigation *)nav {
+	if (_tid == gActive && cinemaSite(wv.URL.host)) [_cinemaExitCover prepareForWindow:wv.window label:L(@"Augenblick")];
 	emit(@{@"t": @"loaded", @"tab": @(_tid), @"url": nn(wv.URL.absoluteString), @"title": nn(wv.title), @"error": @(_isError)});
 	int tid = _tid;
 	[wv evaluateJavaScript:@"(function(){var l=document.querySelector('link[rel~=\"icon\"]');return l?l.href:location.origin+'/favicon.ico'})()" completionHandler:^(id r, NSError *e) {
@@ -361,7 +445,8 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 }
 - (void)webView:(WKWebView *)wv didFailProvisionalNavigation:(WKNavigation *)n withError:(NSError *)e { [self failed:wv error:e]; }
 - (void)webView:(WKWebView *)wv didFailNavigation:(WKNavigation *)n withError:(NSError *)e { [self failed:wv error:e]; }
-- (void)webViewWebContentProcessDidTerminate:(WKWebView *)wv { [wv reload]; }
+- (void)webView:(WKWebView *)wv didStartProvisionalNavigation:(WKNavigation *)navigation { [self leaveCinema]; }
+- (void)webViewWebContentProcessDidTerminate:(WKWebView *)wv { [self leaveCinema]; [wv reload]; }
 
 #pragma mark UI-Delegate
 
@@ -448,6 +533,37 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 @end
 #pragma clang diagnostic pop
 
+@implementation FMCinemaHandler
+- (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message {
+	FMTab *tab = gTabs[@(gActive)];
+	if (!tab || tab.view != message.webView || !message.frameInfo.isMainFrame) return;
+	WKSecurityOrigin *origin = message.frameInfo.securityOrigin;
+	if (![origin.protocol isEqual:@"https"] || !cinemaSite(origin.host)) return;
+	NSDictionary *request = [message.body isKindOfClass:NSDictionary.class] ? message.body : nil;
+	if (![request[@"id"] isKindOfClass:NSNumber.class]) return;
+	NSInteger rid = [request[@"id"] integerValue];
+	NSString *action = request[@"action"];
+	if ([action isEqual:@"ready"]) {
+		[tab restoredCinemaLayout:rid];
+	} else if ([action isEqual:@"exit"]) {
+		[tab exitCinemaForRequest:rid];
+	} else if ([action isEqual:@"enter"] && !tab.hostView.hidden && !tab.cinemaSession.active) {
+		// A user can enter again as soon as the page has exited, even while
+		// WebKit is still completing the previous transition's snapshot.
+		[tab finishCinemaExit:tab.exitTicket];
+		[tab.cinemaExitCover prepareForWindow:tab.hostView.window label:L(@"Augenblick")];
+		__weak FMTab *weakTab = tab;
+		BOOL entered = [tab.cinemaSession beginWithHost:tab.hostView player:tab.view onExit:^(BOOL interrupted) {
+			if (interrupted) [weakTab leaveCinema];
+			else [weakTab exitCinemaForRequest:0];
+		}];
+		[tab replyToCinemaRequest:rid state:entered ? @"entered" : @"denied"];
+	} else {
+		[tab replyToCinemaRequest:rid state:@"denied"];
+	}
+}
+@end
+
 @implementation FMGestureHandler
 - (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
 	if (![msg.name isEqualToString:@"fmGesture"]) return;
@@ -498,7 +614,7 @@ void fmwShow(int id) {
 		for (FMTab *t in gTabs.allValues) {
 			BOOL hidden = t.tid != gActive;
 			if (t.hostView.hidden != hidden) t.hostView.hidden = hidden;
-			if (hidden && t.fullscreenCover) [t dismissFullscreenCover];
+			if (hidden && (t.cinemaSession.active || t.exitTicket)) [t leaveCinema];
 		}
 	});
 }

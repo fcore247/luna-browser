@@ -11,6 +11,7 @@ package web
 import "C"
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"sync"
@@ -25,8 +26,16 @@ var (
 	snapID int
 )
 
+//go:embed cinema_darwin.js
+var cinemaScript string
+
 // SetEmitter legt fest, wohin Ereignisse der Tabs (JSON) gehen.
-func SetEmitter(f func(string)) { emitFn = f }
+func SetEmitter(f func(string)) {
+	emitFn = f
+	src := C.CString(cinemaScript)
+	defer C.free(unsafe.Pointer(src))
+	C.fmwConfigureCinemaScript(src)
+}
 
 //export goWebEvent
 func goWebEvent(j *C.char) {

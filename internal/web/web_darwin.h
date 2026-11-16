@@ -3,6 +3,7 @@
 
 // Native Browser-Tabs (WKWebView) als Unteransichten des Fensters.
 // Alle Funktionen sind thread-sicher (sie wechseln selbst auf den Main-Thread).
+void fmwConfigureCinemaScript(const char *src);
 void fmwLoad(int id, const char *url);
 void fmwHistory(int id, int action); // 0 zurück, 1 vor, 2 neu laden, 3 stopp
 void fmwSetFrame(double x, double y, double w, double h);
