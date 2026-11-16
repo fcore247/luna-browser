@@ -215,6 +215,8 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @property (nonatomic, strong) NSView *hostView;
 @property (nonatomic, strong) FMCinemaWindowSession *cinemaSession;
 @property (nonatomic, strong) FMCinemaExitCover *cinemaExitCover;
+@property (nonatomic, strong) FMCinemaFocus *transitionFocus;
+@property (nonatomic, weak) NSView *preCinemaResponder;
 @property (nonatomic) NSInteger transitionTicket;
 @property (nonatomic) BOOL enteringCinema;
 @property (nonatomic) BOOL cinemaSnapshotPending;
@@ -305,9 +307,30 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	[_cinemaExitCover dismissTicket:ticket];
 	_transitionTicket = 0;
 	_cinemaSnapshotPending = NO;
+	FMCinemaFocus *focus = _transitionFocus;
+	if (!focus || _tid != gActive) {
+		_transitionFocus = nil;
+		return;
+	}
+	[focus restoreAfterResize:NO];
+	// WindowServer and AppKit can finish changing the key window after
+	// orderOut returns. Skip the follow-up if another transition has begun.
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (self.transitionFocus != focus) return;
+		if (self.tid == gActive) {
+			[focus restoreAfterResize:NO];
+			if (focus.playerHasKeyboardFocus) {
+				NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaRestoreFocus?.(%ld)", (long)ticket];
+				[self.view evaluateJavaScript:js completionHandler:nil];
+			}
+		}
+		self.transitionFocus = nil;
+	});
 }
 
 - (void)leaveCinema {
+	_transitionFocus = nil;
+	_preCinemaResponder = nil;
 	if (!_cinemaSession.active && !_transitionTicket) return;
 	[self finishCinemaTransition:_transitionTicket];
 	[_cinemaSession end];
@@ -329,7 +352,8 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	config.rect = NSMakeRect(NSMinX(_view.bounds), NSMinY(_view.bounds), 1, 1);
 	__weak FMTab *weakSelf = self;
 	[_view takeSnapshotWithConfiguration:config completionHandler:^(NSImage *image, NSError *error) {
-		if (image && !error) [weakSelf finishCinemaTransition:ticket];
+		FMTab *tab = weakSelf;
+		if (image && !error && [tab.cinemaExitCover canRevealTicket:ticket]) [tab finishCinemaTransition:ticket];
 	}];
 }
 
@@ -340,11 +364,17 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	}
 	if (_cinemaSession.active == entering) {
 		// Escape can arrive in the frame before the window expands.
-		if (!entering && _transitionTicket) [self leaveCinema];
+		if (!entering && _transitionTicket) {
+			FMCinemaFocus *focus = _transitionFocus;
+			[self leaveCinema];
+			if (_tid == gActive) [focus restoreAfterResize:NO];
+		}
 		if (request) [self replyToCinemaRequest:request state:entering ? @"denied" : @"exited"];
 		return;
 	}
-	if (entering && (!NSApp.isActive || !_hostView.window.isOnActiveSpace ||
+	NSWindow *window = _hostView.window;
+	if (entering && (!NSApp.isActive || !window.isOnActiveSpace || window.attachedSheet || NSApp.modalWindow ||
+	                 (NSApp.keyWindow && NSApp.keyWindow != window) ||
 	                 _hostView.isHiddenOrHasHiddenAncestor || !_hostView.window.isVisible)) {
 		[self replyToCinemaRequest:request state:@"denied"];
 		return;
@@ -358,15 +388,18 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 	_transitionTicket = ticket;
 	_enteringCinema = entering;
 	_cinemaSnapshotPending = NO;
+	_transitionFocus = [[FMCinemaFocus alloc] initWithPlayer:_view entering:entering previous:_preCinemaResponder];
+	if (entering) _preCinemaResponder = _transitionFocus.originalResponder;
 	__weak FMTab *weakSelf = self;
 	void (^escape)(void) = ^{
 		FMTab *tab = weakSelf;
 		if (tab.transitionTicket == ticket) [tab setCinemaActive:NO request:0];
 	};
 	BOOL shown = [_cinemaExitCover showAboveWindow:_hostView.window ticket:ticket
-		onEscape:entering ? escape : nil onInterrupt:^{
+		onEscape:entering ? escape : nil onInterrupt:^(BOOL cancelled) {
 			FMTab *tab = weakSelf;
 			if (tab.transitionTicket != ticket) return;
+			if (cancelled) tab.transitionFocus = nil;
 			if (tab.cinemaSession.active == entering) [tab finishCinemaTransition:ticket];
 			else [tab leaveCinema];
 		}];
@@ -386,7 +419,9 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 			}
 		} else {
 			[tab.cinemaSession end];
+			tab.preCinemaResponder = nil;
 		}
+		if (tab.tid == gActive) [tab.transitionFocus restoreAfterResize:YES];
 		NSSize viewport = tab.view.bounds.size;
 		CGFloat zoom = tab.view.pageZoom;
 		NSString *js = [NSString stringWithFormat:@"window.__lunaCinemaReply?.(%ld,'%@',%ld,%.4f,%.4f)",

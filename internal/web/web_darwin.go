@@ -4,7 +4,7 @@ package web
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
-#cgo LDFLAGS: -framework Cocoa -framework WebKit -framework LocalAuthentication
+#cgo LDFLAGS: -framework Cocoa -framework WebKit -framework LocalAuthentication -framework QuartzCore
 #include <stdlib.h>
 #include "web_darwin.h"
 */

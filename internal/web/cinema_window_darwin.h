@@ -12,7 +12,6 @@
 @implementation FMCinemaWindowSession {
     __weak NSWindow *_window;
     __weak NSView *_host;
-    __weak NSResponder *_previousResponder;
     NSRect _windowFrame;
     NSRect _hostFrame;
     NSRect _screenFrame;
@@ -45,7 +44,6 @@
     _hostFrame = host.frame;
     _screenFrame = screen.frame;
     _displayID = screen.deviceDescription[@"NSScreenNumber"];
-    _previousResponder = window.firstResponder;
     _style = window.styleMask;
     _nativeFullscreen = (_style & NSWindowStyleMaskFullScreen) != 0;
     _cornerRadius = host.layer.cornerRadius;
@@ -81,7 +79,6 @@
     host.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     host.layer.cornerRadius = 0;
     host.frame = host.superview.bounds;
-    [window makeFirstResponder:player];
     [window displayIfNeeded];
 
     // A local monitor keeps Escape available even if the page captures keys.
@@ -151,11 +148,81 @@
     host.autoresizingMask = _autoresizing;
     host.frame = _hostFrame;
     host.layer.cornerRadius = _cornerRadius;
-    if (_previousResponder) [window makeFirstResponder:_previousResponder];
     [window displayIfNeeded];
     _toolbar = nil;
     _window = nil;
     _host = nil;
-    _previousResponder = nil;
+}
+@end
+
+// AppKit can reset the key window or its first responder independently while
+// replacing the titlebar or ordering out a panel. Capture both before either.
+@interface FMCinemaFocus : NSObject
+@property (nonatomic, weak, readonly) NSView *originalResponder;
+- (instancetype)initWithPlayer:(NSView *)player entering:(BOOL)entering previous:(NSView *)previous;
+- (void)restoreAfterResize:(BOOL)afterResize;
+- (BOOL)playerHasKeyboardFocus;
+@end
+
+@implementation FMCinemaFocus {
+    __weak NSWindow *_window;
+    __weak NSView *_player;
+    __weak NSView *_destination;
+    BOOL _wasKey;
+    BOOL _wasMain;
+}
+
+- (instancetype)initWithPlayer:(NSView *)player entering:(BOOL)entering previous:(NSView *)previous {
+    if (!(self = [super init])) return nil;
+    NSWindow *window = player.window;
+    if (!window || !NSApp.isActive || window.attachedSheet || NSApp.modalWindow ||
+        (NSApp.keyWindow && NSApp.keyWindow != window) ||
+        (NSApp.mainWindow && NSApp.mainWindow != window)) return nil;
+    _wasMain = window.isMainWindow;
+    _wasKey = window.isKeyWindow || (!NSApp.keyWindow && _wasMain);
+    if (!_wasKey && !_wasMain) return nil;
+    _window = window;
+    _player = player;
+    NSResponder *first = window.firstResponder;
+    NSView *view = [first isKindOfClass:NSView.class] ? (NSView *)first : nil;
+    _originalResponder = view;
+    BOOL pageFocused = view == player || [view isDescendantOf:player];
+    if (entering) _destination = pageFocused ? view : player;
+    else if (view && view != window.contentView) _destination = view;
+    else _destination = (previous == player || [previous isDescendantOf:player]) ? previous : player;
+    return self;
+}
+
+- (BOOL)ownsForegroundWindow {
+    NSWindow *window = _window;
+    NSView *player = _player;
+    return window && player.window == window && !player.isHiddenOrHasHiddenAncestor &&
+        NSApp.isActive && window.isVisible && !window.isMiniaturized && window.isOnActiveSpace &&
+        !window.attachedSheet && !NSApp.modalWindow && (!NSApp.keyWindow || NSApp.keyWindow == window) &&
+        (!NSApp.mainWindow || NSApp.mainWindow == window);
+}
+
+- (BOOL)playerHasKeyboardFocus {
+    NSWindow *window = _window;
+    if (![self ownsForegroundWindow] || !window.isKeyWindow) return NO;
+    NSResponder *first = window.firstResponder;
+    return first == _player || ([first isKindOfClass:NSView.class] && [(NSView *)first isDescendantOf:_player]);
+}
+
+- (void)restoreAfterResize:(BOOL)afterResize {
+    if (![self ownsForegroundWindow]) return;
+    NSWindow *window = _window;
+    NSView *player = _player;
+    NSResponder *current = window.firstResponder;
+    BOOL lostFocus = !current || current == window || current == window.contentView;
+    if (_wasMain && !window.isMainWindow && window.canBecomeMainWindow) [window makeMainWindow];
+    if (_wasKey && !window.isKeyWindow && window.canBecomeKeyWindow) [window makeKeyWindow];
+    if (!window.isKeyWindow) return;
+    // Once the resize has completed, only repair genuinely lost focus. A
+    // click or Tab to a different control during the transition takes priority.
+    if (!lostFocus && !(afterResize && current == _originalResponder)) return;
+    NSView *target = _destination;
+    if (target.window != window || target.isHiddenOrHasHiddenAncestor || !target.acceptsFirstResponder) target = player;
+    if (target != window.firstResponder && target.acceptsFirstResponder) [window makeFirstResponder:target];
 }
 @end

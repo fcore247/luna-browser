@@ -63,6 +63,73 @@
     receiver.dispatchEvent(new Event('webkit' + type, { bubbles:true, composed:true }));
   }
 
+  // A site's fullscreenchange handler can detach and reinsert the very control
+  // that invoked it. Only repair that loss if focus fell back to the document.
+  let focusRevision = 0;
+  let lastControl = null;
+  let windowBlurRevision = 0;
+  let focusRepair = null;
+  const focusChanged = () => { focusRevision++; };
+  document.addEventListener('pointerdown', focusChanged, true);
+  document.addEventListener('keydown', event => { if (event.key === 'Tab') focusChanged(); }, true);
+  document.addEventListener('visibilitychange', focusChanged, true);
+  window.addEventListener('blur', () => { windowBlurRevision++; });
+  document.addEventListener('focusin', event => {
+    if (event.target === document.body || event.target === document.documentElement) return;
+    if (event.target !== lastControl) focusChanged();
+    lastControl = event.target;
+  }, true);
+
+  function playerControl(player, element) {
+    return element instanceof HTMLElement && player.contains(element) && !element.isContentEditable &&
+      !element.closest('input, textarea, select, [role="textbox"], [inert]') &&
+      !element.matches(':disabled, [aria-disabled="true"]') &&
+      element.matches('button, a[href], video[controls], [tabindex]');
+  }
+
+  function rememberControl(player) {
+    const element = document.activeElement;
+    if (document.visibilityState !== 'visible' || !document.hasFocus() || !playerControl(player, element)) return null;
+    lastControl = element;
+    return { element, player, revision:focusRevision, blurRevision:windowBlurRevision };
+  }
+
+  function restoreControl(bookmark, nativeOwnsFocus = false) {
+    if (!bookmark || bookmark.revision !== focusRevision ||
+        (!nativeOwnsFocus && bookmark.blurRevision !== windowBlurRevision) || document.visibilityState !== 'visible' ||
+        !document.hasFocus() || (document.activeElement !== document.body &&
+        document.activeElement !== document.documentElement)) return;
+    const { element, player } = bookmark;
+    // If the site replaced its control, use its existing focusable player.
+    // Never add a tab stop or choose an unrelated button or editor.
+    const destination = element.isConnected ? element : player;
+    if (playerControl(player, destination) && visibleRect(destination)) destination.focus({ preventScroll:true });
+  }
+
+  // Losing AppKit's first responder during resize temporarily blurs this
+  // document. Native sends this ticket only after the same tab owns keyboard
+  // focus again. A pointer, Tab, focus selection or visibility change wins.
+  Object.defineProperty(window, '__lunaCinemaRestoreFocus', { value(ticket) {
+    const repair = focusRepair;
+    if (!repair || repair.ticket !== ticket) return;
+    const blur = windowBlurRevision;
+    const deadline = performance.now() + 200;
+    // WebKit's focus notification can follow the native responder callback.
+    // Allow that handoff one short window, scoped to the original ticket.
+    function finish() {
+      window.removeEventListener('focus', onFocus);
+      if (focusRepair !== repair) return;
+      focusRepair = null;
+      if (windowBlurRevision === blur && performance.now() <= deadline) restoreControl(repair.bookmark, true);
+    }
+    function onFocus() { setTimeout(finish, 0); }
+    if (document.hasFocus()) finish();
+    else {
+      window.addEventListener('focus', onFocus, { once:true });
+      setTimeout(finish, 200);
+    }
+  } });
+
   function clearPlayer(current) {
     current.observer.disconnect();
     const { surface } = current;
@@ -136,14 +203,16 @@
            Math.min(innerHeight, rect.bottom) > Math.max(0, rect.top) ? rect : null;
   }
 
-  function reportLayout(ticket, stillCurrent, geometryIsReady) {
+  function reportLayout(ticket, stillCurrent, geometryIsReady, focus) {
     if (!Number.isSafeInteger(ticket) || ticket <= 0) return;
-    const deadline = performance.now() + 400;
+    focusRepair = focus ? { ticket, bookmark:focus } : null;
+    const deadline = performance.now() + 3000;
     // A covering window can throttle rAF. Measure after the site's event
     // handlers and promise reactions; native WebKit fences the actual repaint.
     function checkLayout() {
       if (!stillCurrent()) return;
       if (geometryIsReady()) {
+        restoreControl(focus);
         try { send('ready', ticket); } catch {}
       } else if (performance.now() < deadline) {
         setTimeout(checkLayout, 16);
@@ -156,7 +225,7 @@
     return Math.abs(innerWidth - width) <= 1 && Math.abs(innerHeight - height) <= 1;
   }
 
-  function reportCinemaLayout(ticket, current, width, height) {
+  function reportCinemaLayout(ticket, current, width, height, focus) {
     const { player, surface } = current;
     reportLayout(ticket, () => session === current && pending?.action !== 'exit', () => {
       if (!viewportMatches(width, height) || !surface.matches(':popover-open')) return false;
@@ -174,17 +243,17 @@
         return visibleWidth >= video.videoWidth * scale - 2 &&
                visibleHeight >= video.videoHeight * scale - 2;
       });
-    });
+    }, focus);
   }
 
-  function reportRestoredLayout(ticket, previous) {
+  function reportRestoredLayout(ticket, previous, focus) {
     if (!previous) return;
     const { player, surface, viewport } = previous;
     reportLayout(ticket, () => !session && player.isConnected, () => {
       const siteInline = !youtube || viewport.hadFullscreenClass || !player.classList.contains('ytp-fullscreen');
       return viewportMatches(viewport.width, viewport.height) && siteInline && !surface.matches(':popover-open') &&
              visibleRect(player) && [...player.querySelectorAll('video')].some(visibleRect);
-    });
+    }, focus);
   }
 
   function command(action, target, player) {
@@ -199,10 +268,11 @@
         notify('fullscreenerror', target);
         reject(new TypeError('Luna Cinema timed out'));
       }, 8000);
+      focusRepair = null;
       const viewport = action === 'enter' ? {
         width:innerWidth, height:innerHeight, hadFullscreenClass:player.classList.contains('ytp-fullscreen')
       } : null;
-      pending = { action, id, target, player, viewport, timer, resolve, reject };
+      pending = { action, id, target, player, viewport, focus:rememberControl(player), timer, resolve, reject };
       try { send(action, id); }
       catch (error) { clearTimeout(timer); pending = null; reject(error); }
     });
@@ -218,9 +288,11 @@
 
   Object.defineProperty(window, '__lunaCinemaReply', { value(id, state, nativeTicket, width, height) {
     if (id === 0 && state === 'exited') {
+      focusRepair = null;
       const previous = pending;
       if (previous) { clearTimeout(previous.timer); pending = null; }
-      reportRestoredLayout(nativeTicket, restore());
+      const focus = previous?.focus || (session && rememberControl(session.player));
+      reportRestoredLayout(nativeTicket, restore(), focus);
       if (previous?.action === 'exit') previous.resolve();
       else if (previous) previous.reject(new TypeError('Luna Cinema was closed'));
       return;
@@ -234,9 +306,9 @@
         if (!request.player.isConnected || !request.target.isConnected) throw new TypeError('Player was removed');
         session = preparePlayer(request.target, request.player, request.viewport);
         notify('fullscreenchange', request.target);
-        reportCinemaLayout(nativeTicket, session, width, height);
+        reportCinemaLayout(nativeTicket, session, width, height, request.focus);
       } else if (state === 'exited' && request.action === 'exit') {
-        reportRestoredLayout(nativeTicket || id, restore());
+        reportRestoredLayout(nativeTicket || id, restore(), request.focus);
       } else {
         throw new TypeError('Luna Cinema is unavailable');
       }
@@ -301,6 +373,8 @@
     }
   }, true);
   window.addEventListener('pagehide', () => {
+    focusRepair = null;
+    lastControl = null;
     if (!pending && !session) return;
     if (pending) {
       clearTimeout(pending.timer);

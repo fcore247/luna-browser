@@ -1,101 +1,5 @@
 #pragma once
-#import <Cocoa/Cocoa.h>
-
-// A static vector illustration keeps the cover crisp on Retina screens and
-// leaves the compositor free to run the fullscreen transition underneath it.
-@interface FMCinemaArtworkView : NSView
-@property (nonatomic, copy) NSString *label;
-@end
-
-@implementation FMCinemaArtworkView
-- (BOOL)isOpaque { return YES; }
-- (BOOL)isFlipped { return YES; }
-- (NSView *)hitTest:(NSPoint)point { return nil; }
-
-static NSColor *fmCoverColor(CGFloat r, CGFloat g, CGFloat b) {
-    return [NSColor colorWithSRGBRed:r / 255 green:g / 255 blue:b / 255 alpha:1];
-}
-
-static void fmDrawHourglass(void) {
-    // Draw in a 92 × 120 point artboard. Deliberately unequal curves give the
-    // glass and the woodcut-like cap strokes a hand-drawn silhouette.
-    NSColor *ink = fmCoverColor(243, 214, 232);
-    NSColor *rose = fmCoverColor(216, 137, 184);
-    NSBezierPath *glass = [NSBezierPath bezierPath];
-    [glass moveToPoint:NSMakePoint(16, 15)];
-    [glass curveToPoint:NSMakePoint(37, 53) controlPoint1:NSMakePoint(16, 33) controlPoint2:NSMakePoint(23, 43)];
-    [glass curveToPoint:NSMakePoint(39, 64) controlPoint1:NSMakePoint(44, 58) controlPoint2:NSMakePoint(44, 60)];
-    [glass curveToPoint:NSMakePoint(15, 105) controlPoint1:NSMakePoint(20, 76) controlPoint2:NSMakePoint(15, 87)];
-    [glass lineToPoint:NSMakePoint(77, 105)];
-    [glass curveToPoint:NSMakePoint(53, 65) controlPoint1:NSMakePoint(75, 88) controlPoint2:NSMakePoint(69, 76)];
-    [glass curveToPoint:NSMakePoint(54, 53) controlPoint1:NSMakePoint(47, 61) controlPoint2:NSMakePoint(46, 59)];
-    [glass curveToPoint:NSMakePoint(76, 15) controlPoint1:NSMakePoint(70, 42) controlPoint2:NSMakePoint(77, 30)];
-    [glass closePath];
-    [[fmCoverColor(78, 49, 68) colorWithAlphaComponent:.5] setFill]; [glass fill];
-    glass.lineWidth = 1.8; glass.lineJoinStyle = NSLineJoinStyleRound;
-    [ink setStroke]; [glass stroke];
-
-    NSBezierPath *sand = [NSBezierPath bezierPath];
-    [sand moveToPoint:NSMakePoint(27, 37)];
-    [sand curveToPoint:NSMakePoint(65, 36) controlPoint1:NSMakePoint(40, 39) controlPoint2:NSMakePoint(57, 33)];
-    [sand curveToPoint:NSMakePoint(46, 57) controlPoint1:NSMakePoint(62, 44) controlPoint2:NSMakePoint(50, 51)];
-    [sand curveToPoint:NSMakePoint(27, 37) controlPoint1:NSMakePoint(42, 51) controlPoint2:NSMakePoint(30, 45)];
-    [sand closePath];
-    [sand moveToPoint:NSMakePoint(19, 101)];
-    [sand curveToPoint:NSMakePoint(45, 85) controlPoint1:NSMakePoint(32, 98) controlPoint2:NSMakePoint(38, 89)];
-    [sand curveToPoint:NSMakePoint(72, 101) controlPoint1:NSMakePoint(51, 86) controlPoint2:NSMakePoint(58, 97)];
-    [sand closePath]; [rose setFill]; [sand fill];
-
-    NSBezierPath *details = [NSBezierPath bezierPath];
-    [details moveToPoint:NSMakePoint(22, 20)];
-    [details curveToPoint:NSMakePoint(25, 32) controlPoint1:NSMakePoint(22, 24) controlPoint2:NSMakePoint(23, 29)];
-    [details moveToPoint:NSMakePoint(69, 94)];
-    [details curveToPoint:NSMakePoint(62, 81) controlPoint1:NSMakePoint(68, 89) controlPoint2:NSMakePoint(65, 84)];
-    details.lineWidth = 1.2; details.lineCapStyle = NSLineCapStyleRound;
-    [[ink colorWithAlphaComponent:.65] setStroke]; [details stroke];
-    [rose setFill];
-    for (int i = 0; i < 4; i++) {
-        CGFloat radius = 1.1 - .12 * i;
-        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(46 - radius, 62 + i * 5.3, 2 * radius, 2 * radius)] fill];
-    }
-
-    NSBezierPath *caps = [NSBezierPath bezierPath];
-    for (int i = 0; i < 2; i++) {
-        CGFloat y = i ? 106 : 10;
-        [caps moveToPoint:NSMakePoint(11, y + .5)];
-        [caps curveToPoint:NSMakePoint(81, y) controlPoint1:NSMakePoint(34, y - .8) controlPoint2:NSMakePoint(58, y + 1)];
-        [caps lineToPoint:NSMakePoint(80, y + 4.5)];
-        [caps lineToPoint:NSMakePoint(12, y + 4.8)]; [caps closePath];
-    }
-    caps.lineJoinStyle = NSLineJoinStyleRound; caps.lineWidth = 1.8;
-    [fmCoverColor(55, 36, 49) setFill]; [caps fill]; [ink setStroke]; [caps stroke];
-}
-
-- (void)drawRect:(NSRect)dirtyRect {
-    NSRect bounds = self.bounds;
-    NSGradient *background = [[NSGradient alloc] initWithStartingColor:fmCoverColor(52, 32, 46)
-                                                            endingColor:fmCoverColor(28, 17, 25)];
-    [background drawInRect:bounds angle:24];
-
-    NSFont *font = [NSFont systemFontOfSize:54 weight:NSFontWeightMedium];
-    NSFontDescriptor *rounded = [font.fontDescriptor fontDescriptorWithDesign:NSFontDescriptorSystemDesignRounded];
-    if (rounded) font = [NSFont fontWithDescriptor:rounded size:54] ?: font;
-    NSDictionary *attributes = @{ NSFontAttributeName:font,
-                                   NSForegroundColorAttributeName:fmCoverColor(251, 238, 246),
-                                   NSKernAttributeName:@(-1.6) };
-    NSString *label = self.label ?: @"Augenblick";
-    NSSize word = [label sizeWithAttributes:attributes];
-    CGFloat width = 92 + 24 + word.width;
-    CGFloat scale = MAX(.01, MIN(1.25, MIN(NSWidth(bounds) * .76 / width, NSHeight(bounds) * .23 / 120)));
-    [NSGraphicsContext saveGraphicsState];
-    NSAffineTransform *transform = [NSAffineTransform transform];
-    [transform translateXBy:NSMidX(bounds) - width * scale / 2 yBy:NSMidY(bounds) - 60 * scale];
-    [transform scaleBy:scale]; [transform concat];
-    fmDrawHourglass();
-    [label drawAtPoint:NSMakePoint(116, (120 - word.height) / 2) withAttributes:attributes];
-    [NSGraphicsContext restoreGraphicsState];
-}
-@end
+#import "cinema_artwork_darwin.h"
 
 // The player and the web page keep keyboard focus in both directions.
 @interface FMCinemaExitPanel : NSPanel
@@ -110,7 +14,8 @@ static void fmDrawHourglass(void) {
 @property (nonatomic, strong, readonly) NSWindow *window;
 - (BOOL)prepareForWindow:(NSWindow *)player label:(NSString *)label;
 - (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket
-              onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(void))onInterrupt;
+              onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(BOOL cancelled))onInterrupt;
+- (BOOL)canRevealTicket:(NSInteger)ticket;
 - (void)dismissTicket:(NSInteger)ticket;
 @end
 
@@ -120,7 +25,8 @@ static void fmDrawHourglass(void) {
     NSString *_imageLabel;
     __weak NSWindow *_player;
     NSInteger _visibleTicket;
-    void (^_onInterrupt)(void);
+    NSTimeInterval _revealAt;
+    void (^_onInterrupt)(BOOL cancelled);
     id _keyMonitor;
 }
 
@@ -171,9 +77,10 @@ static void fmDrawHourglass(void) {
     [art cacheDisplayInRect:bounds toBitmapImageRep:bitmap];
     NSImage *image = [[NSImage alloc] initWithSize:bounds.size];
     [image addRepresentation:bitmap];
-    NSImageView *surface = [[NSImageView alloc] initWithFrame:bounds];
+    FMCinemaSurface *surface = [[FMCinemaSurface alloc] initWithFrame:bounds];
     surface.imageScaling = NSImageScaleAxesIndependently;
     surface.image = image;
+    [surface prepareSandForLabel:label];
     [surface setAccessibilityLabel:label];
     _window.contentView = surface;
     [_window display];
@@ -184,7 +91,7 @@ static void fmDrawHourglass(void) {
 }
 
 - (BOOL)showAboveWindow:(NSWindow *)player ticket:(NSInteger)ticket
-              onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(void))onInterrupt {
+              onEscape:(void (^)(void))onEscape onInterrupt:(void (^)(BOOL cancelled))onInterrupt {
     if (player != _player || !_imageLabel || !NSApp.isActive ||
         !player.isVisible || !player.isOnActiveSpace || !NSEqualRects(_window.frame, player.screen.frame))
         return NO;
@@ -195,9 +102,9 @@ static void fmDrawHourglass(void) {
     if (_visibleTicket) {
         // A quick reversal reuses the visible surface. Retire the previous
         // owner's callbacks without flashing the intermediate browser frame.
-        void (^previousInterrupt)(void) = _onInterrupt;
+        void (^previousInterrupt)(BOOL) = _onInterrupt;
         [self clearTicket];
-        if (previousInterrupt) previousInterrupt();
+        if (previousInterrupt) previousInterrupt(YES);
     }
     _visibleTicket = ticket;
     _onInterrupt = [onInterrupt copy];
@@ -216,25 +123,40 @@ static void fmDrawHourglass(void) {
     [center addObserver:self selector:@selector(interrupt:) name:NSApplicationWillHideNotification object:NSApp];
     [center addObserver:self selector:@selector(interrupt:) name:NSWindowWillCloseNotification object:player];
     [center addObserver:self selector:@selector(interrupt:) name:NSWindowWillMiniaturizeNotification object:player];
+    [center addObserver:self selector:@selector(interrupt:) name:NSWindowWillBeginSheetNotification object:player];
+    [center addObserver:self selector:@selector(keyWindowChanged:) name:NSWindowDidBecomeKeyNotification object:nil];
     [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(interrupt:)
         name:NSWorkspaceActiveSpaceDidChangeNotification object:nil];
-    // This deadline belongs to the visible window, including time spent before
-    // the browser has restored its frame or WebKit has accepted any script.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 400 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        if (self->_visibleTicket == ticket) [self interrupt:nil];
-    });
     _window.level = MAX(NSPopUpMenuWindowLevel, player.level + 1);
     [_window orderFront:nil];
-    if (_window.isVisible) return YES;
-    [self dismissTicket:ticket];
-    return NO;
+    if (!_window.isVisible) {
+        [self dismissTicket:ticket];
+        return NO;
+    }
+    // The same three seconds cover the resize and WebKit's work, even when
+    // a site never acknowledges the new layout. A reversal gets a fresh clock.
+    NSTimeInterval duration = FMCinemaCoverDuration;
+    _revealAt = NSProcessInfo.processInfo.systemUptime + duration;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (self->_visibleTicket == ticket) [self interrupt:nil];
+    });
+    [(FMCinemaSurface *)_window.contentView startSand];
+    return YES;
+}
+
+- (BOOL)canRevealTicket:(NSInteger)ticket {
+    return _visibleTicket != ticket || NSProcessInfo.processInfo.systemUptime >= _revealAt;
+}
+
+- (void)keyWindowChanged:(NSNotification *)notification {
+    if (notification.object != _player) [self interrupt:notification];
 }
 
 - (void)interrupt:(NSNotification *)notification {
     if (!_visibleTicket) return;
-    void (^onInterrupt)(void) = _onInterrupt;
+    void (^onInterrupt)(BOOL) = _onInterrupt;
     [self dismissTicket:_visibleTicket];
-    if (onInterrupt) onInterrupt();
+    if (onInterrupt) onInterrupt(notification != nil);
 }
 
 - (void)clearTicket {
@@ -250,5 +172,6 @@ static void fmDrawHourglass(void) {
     if (!ticket || ticket != _visibleTicket) return;
     [self clearTicket];
     [_window orderOut:nil];
+    if ([_window.contentView isKindOfClass:FMCinemaSurface.class]) [(FMCinemaSurface *)_window.contentView stopSand];
 }
 @end
