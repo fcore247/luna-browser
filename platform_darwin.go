@@ -1,6 +1,7 @@
 package main
 
 import (
+	"browser-mac/internal/buildinfo"
 	"context"
 	"os"
 	"os/exec"
@@ -20,6 +21,9 @@ func closePlatform()                {}
 func handlePlatformCommand() bool { return false }
 
 func platformTitle() string {
+	if buildinfo.TestMode == "opennava" {
+		return "Luna Browser · OpenNava"
+	}
 	if os.Getenv("LUNA_TEST_MODE") == "1" {
 		return "Luna Browser · Erweiterungen testen"
 	}

@@ -5,6 +5,7 @@ import {chat} from '../models';
 import {extensions} from '../models';
 import {main} from '../models';
 import {browsermcp} from '../models';
+import {opennava} from '../models';
 import {pagemonitor} from '../models';
 import {personalpages} from '../models';
 import {search} from '../models';
@@ -110,6 +111,22 @@ export function OnboardingClipboard(arg1:number,arg2:string,arg3:number):Promise
 export function OnboardingSpotifyConnect(arg1:number):Promise<void>;
 
 export function OpenFile(arg1:string,arg2:boolean):Promise<void>;
+
+export function OpenNavaConnect(arg1:string):Promise<void>;
+
+export function OpenNavaDevices():Promise<Array<opennava.Device>>;
+
+export function OpenNavaForget():Promise<void>;
+
+export function OpenNavaPair(arg1:string):Promise<void>;
+
+export function OpenNavaRemove(arg1:string):Promise<void>;
+
+export function OpenNavaRetry():Promise<void>;
+
+export function OpenNavaSave(arg1:string,arg2:string):Promise<void>;
+
+export function OpenNavaStatus():Promise<opennava.Status>;
 
 export function PageMonitorAction(arg1:string,arg2:string):Promise<Array<pagemonitor.Watch>>;
 

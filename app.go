@@ -15,6 +15,7 @@ import (
 	"browser-mac/internal/chat"
 	"browser-mac/internal/extensions"
 	"browser-mac/internal/musicqueue"
+	"browser-mac/internal/opennava"
 	"browser-mac/internal/pagemonitor"
 	"browser-mac/internal/personalpages"
 	"browser-mac/internal/search"
@@ -29,6 +30,8 @@ import (
 
 // App bündelt alle Methoden, die das Frontend aufrufen darf (nur über frontend/src/api.js).
 type App struct {
+	openNava         *opennava.Manager
+	stopOpenNava     context.CancelFunc
 	pageMonitors     *pagemonitor.Manager
 	stopPageMonitors context.CancelFunc
 	personalized     *personalpages.Manager
@@ -109,6 +112,10 @@ func (a *App) startup(ctx context.Context) {
 
 	// Eigene Suchmaschine (Brave-API); der Schlüssel wird bei jeder Anfrage frisch aus der geschützten Datei gelesen.
 	a.secrets = secret.New(dir)
+	a.openNava = opennava.New(a.secrets)
+	openNavaContext, cancelOpenNava := context.WithCancel(ctx)
+	a.stopOpenNava = cancelOpenNava
+	go a.openNava.Run(openNavaContext)
 	a.chat = chat.New(dir, a.secrets, func(c chat.Conversation) { b, _ := json.Marshal(c); a.emit("chat-update", string(b)) })
 	a.spotifyAPI = spotifyapi.New(a.secrets)
 	configurePlatform(a)
@@ -374,6 +381,9 @@ func (a *App) SonosConfigure(enabled bool, selected []string) (sonos.Status, err
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.stopOpenNava != nil {
+		a.stopOpenNava()
+	}
 	if a.stopPageMonitors != nil {
 		a.stopPageMonitors()
 	}

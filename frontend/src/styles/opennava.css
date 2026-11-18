@@ -1,0 +1,84 @@
+#nava-dialog {
+  width: min(480px, 90vw);
+  max-height: 85vh;
+  padding: 0;
+  border: 1px solid var(--line3);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 22px 80px #0003;
+}
+#nava-dialog::backdrop {
+  background: #10182059;
+}
+#nava-dialog form {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+#nava-dialog header,
+#nava-dialog li,
+.nava-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+#nava-dialog header b {
+  font-size: 20px;
+}
+#nava-dialog p,
+#nava-dialog ul {
+  margin: 0;
+}
+#nava-dialog p {
+  color: var(--mute2);
+  font-size: 13px;
+}
+#nava-dialog .err {
+  color: var(--err);
+}
+#nava-dialog [hidden] {
+  display: none !important;
+}
+#nava-devices,
+#nava-queue {
+  display: grid;
+  gap: 8px;
+}
+#nava-items {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+}
+#nava-items span {
+  overflow-wrap: anywhere;
+}
+#nava-device {
+  font-size: 13px;
+}
+#nava-message:empty,
+#nava-queue-issue:empty {
+  display: none;
+}
+#bNava[hidden] {
+  display: none;
+}
+
+.nava-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+#nava-device {
+  overflow-wrap: anywhere;
+}
+
+#nava-manual summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink);
+}
+#nava-manual label {
+  margin: 10px 0;
+}

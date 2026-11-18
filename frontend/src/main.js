@@ -27,6 +27,7 @@ import { initGestures, loadGestures, gestureState } from './gestures.js';
 import { initTabGroups } from './tab-groups.js';
 import { createSettings } from './settings.js';
 import { createExtensionsMenu } from './extensions-menu.js';
+import { createOpenNava, programmePage } from './opennava.js';
 import { createStoreInstall } from './store-install.js';
 import { createPersonalizedPages, pageMatches } from './personalized-pages.js';
 import { createVault } from './vault-ui.js';
@@ -892,6 +893,7 @@ function renderToolbar() {
   personalizedPages?.update(t);
   if (!t) return;
   vaultUI?.update(t);
+  $('#bNava').hidden = t.mode !== 'web' || !programmePage(t.url);
   monitorUI?.updateToolbar();
   const lunaView = $('#bLunaView');
   // One switch for the whole domain: off hides every Luna view of it, on brings all of them back.
@@ -1416,6 +1418,7 @@ async function pollUpdate() {
 setTimeout(pollUpdate, 5000);
 setInterval(pollUpdate, 10 * 60 * 1000);
 window.addEventListener('focus', () => setTimeout(pollUpdate, 500));
+const openNava = createOpenNava(cover);
 let cmdUI = null;
 function closeOverlays() {
   storeInstall?.close();
@@ -1465,6 +1468,7 @@ function openMenu() {
     [l10n('Verkleinern'), shortcut('⌘−'), 'zoom-out'],
     [l10n('Tatsächliche Größe (') + z + ' %)', shortcut('⌘0'), 'zoom-reset'],
     '-',
+    [l10n(programmePage(t?.url) ? 'Für OpenNava vormerken' : 'OpenNava-Merkliste'), '', 'opennava'],
     [l10n('Seitenüberwachung'), 'watch', 'monitors'],
     [l10n('Einstellungen …'), shortcut('⌘,'), 'settings'],
     [isDark() ? l10n('Heller Modus') : l10n('Dunkelmodus'), shortcut('⇧⌘D'), 'toggle-theme'],
@@ -2467,6 +2471,10 @@ async function runCmd(c) {
   if (onboarding?.active) return;
   const t = cur();
   switch (c) {
+    case 'opennava':
+      closeOverlays();
+      await openNava.open(t);
+      break;
     case 'new-tab':
       newTab();
       break;
@@ -2594,6 +2602,9 @@ document.addEventListener('click', async (ev) => {
   const t = cur(),
     d = a.dataset;
   switch (d.act) {
+    case 'opennava':
+      await runCmd('opennava');
+      break;
     case 'monitor-quick':
       closeSugg();
       cmdUI.openDrop('monitors');
@@ -3132,7 +3143,7 @@ document.addEventListener('mousedown', (ev) => {
   if (menuOpen && !ev.target.closest('#menu, #bMenu')) closeMenu();
 });
 document.addEventListener('keydown', (ev) => {
-  if (onboarding?.active) return;
+  if (onboarding?.active || $('#nava-dialog').open) return;
   const command = WINDOWS && !ev.defaultPrevented && windowsCommand(ev);
   if (command) {
     ev.preventDefault();

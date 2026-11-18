@@ -198,6 +198,38 @@ export function OpenFile(arg1, arg2) {
   return window['go']['main']['App']['OpenFile'](arg1, arg2);
 }
 
+export function OpenNavaConnect(arg1) {
+  return window['go']['main']['App']['OpenNavaConnect'](arg1);
+}
+
+export function OpenNavaDevices() {
+  return window['go']['main']['App']['OpenNavaDevices']();
+}
+
+export function OpenNavaForget() {
+  return window['go']['main']['App']['OpenNavaForget']();
+}
+
+export function OpenNavaPair(arg1) {
+  return window['go']['main']['App']['OpenNavaPair'](arg1);
+}
+
+export function OpenNavaRemove(arg1) {
+  return window['go']['main']['App']['OpenNavaRemove'](arg1);
+}
+
+export function OpenNavaRetry() {
+  return window['go']['main']['App']['OpenNavaRetry']();
+}
+
+export function OpenNavaSave(arg1, arg2) {
+  return window['go']['main']['App']['OpenNavaSave'](arg1, arg2);
+}
+
+export function OpenNavaStatus() {
+  return window['go']['main']['App']['OpenNavaStatus']();
+}
+
 export function PageMonitorAction(arg1, arg2) {
   return window['go']['main']['App']['PageMonitorAction'](arg1, arg2);
 }

@@ -242,3 +242,12 @@ export const onVaultOffer = (cb) => EventsOn('vault-offer', (j) => cb(JSON.parse
 // Öffnet eine Zeile der Luna-Ansicht auf der echten Seite (nur Zeilen, nie Schaltflächen).
 export const personalizedClick = (tab, selector, index, sig, target = '') =>
   window.go.main.App.PersonalizedClick(tab, selector, index, sig, target);
+
+export const openNavaDevices = () => App.OpenNavaDevices();
+export const openNavaPair = (serial) => App.OpenNavaPair(serial);
+export const openNavaStatus = () => App.OpenNavaStatus();
+export const openNavaSave = (url, title) => App.OpenNavaSave(url, title);
+export const openNavaRemove = (url) => App.OpenNavaRemove(url);
+export const openNavaForget = () => App.OpenNavaForget();
+export const openNavaRetry = () => App.OpenNavaRetry();
+export const openNavaConnect = (address) => App.OpenNavaConnect(address);
