@@ -70,6 +70,12 @@ func Evaluate(id int, script string) (string, error) {
 	return s, e
 }
 
+// Frames und EvaluateInFrame sind unter Windows noch nicht verfügbar (experimentell).
+func Frames(id int) (string, error) { return "[]", nil }
+func EvaluateInFrame(id, frame int, script string) (string, error) {
+	return "", errors.New("Iframe-Zugriff ist unter Windows noch nicht verfügbar.")
+}
+
 var ErrAuthUnavailable = errors.New("Windows Hello ist nicht eingerichtet. Richte unter Einstellungen → Konten → Anmeldeoptionen eine PIN oder Biometrie ein.")
 
 func Authenticate(reason string) (bool, error) {

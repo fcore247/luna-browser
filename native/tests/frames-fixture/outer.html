@@ -1,0 +1,7 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Outer page</title>
+<h1>Outer page</h1>
+<!-- Different port = different origin: the outer page cannot touch the inner DOM. -->
+<iframe id="lesson" width="400" height="300" src="http://localhost:18772/inner.html"></iframe>
+<iframe id="tracker" width="0" height="0" src="http://localhost:18772/tracker.html"></iframe>

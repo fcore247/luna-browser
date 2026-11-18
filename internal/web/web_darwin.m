@@ -135,6 +135,26 @@ static void installCinemaScripts(WKUserContentController *controller) API_AVAILA
 	[controller addUserScript:[[WKUserScript alloc] initWithSource:gCinemaScript injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 }
 
+// Frame-Registry: Unterframes melden sich aus einer isolierten JavaScript-Welt. So kann Luna Skripte gezielt
+// in Iframes ausführen, auch bei fremden Ursprüngen, ohne dass die Seite etwas davon sieht oder fälschen kann.
+@interface FMFrameHandler : NSObject <WKScriptMessageHandler>
+@end
+static FMFrameHandler *gFrameHandler;
+static WKContentWorld *frameWorld(void) {
+	static WKContentWorld *world;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ world = [WKContentWorld worldWithName:@"LunaPageControl"]; });
+	return world;
+}
+static NSString *const kFrameSrc = @"(function(){if(window===window.top)return;try{var t=window.__lunaToken||(window.__lunaToken=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()));window.webkit.messageHandlers.lunaFrames.postMessage({token:t});}catch(e){}})();";
+static void applyFrameRegistry(WKWebViewConfiguration *c) {
+	WKUserContentController *u = c.userContentController;
+	if (!gFrameHandler) gFrameHandler = [FMFrameHandler new];
+	@try { [u removeScriptMessageHandlerForName:@"lunaFrames" contentWorld:frameWorld()]; } @catch (id x) {}
+	[u addScriptMessageHandler:gFrameHandler contentWorld:frameWorld() name:@"lunaFrames"];
+	[u addUserScript:[[WKUserScript alloc] initWithSource:kFrameSrc injectionTime:WKUserScriptInjectionTimeAtDocumentEnd forMainFrameOnly:NO inContentWorld:frameWorld()]];
+}
+
 static void applyGesture(WKWebViewConfiguration *c) {
 	WKUserContentController *u = c.userContentController;
 	if (!gGestureHandler) gGestureHandler = [FMGestureHandler new];
@@ -146,6 +166,7 @@ static void applyGesture(WKWebViewConfiguration *c) {
 		[u addUserScript:[[WKUserScript alloc] initWithSource:src injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 	}
 	applyCredentials(c);
+	applyFrameRegistry(c);
 	if (@available(macOS 11.0, *)) installCinemaScripts(u);
 }
 
@@ -236,6 +257,8 @@ static NSString *errorHTML(NSError *e, NSURL *u) {
 @property (nonatomic) BOOL cinemaSnapshotPending;
 - (void)leaveCinema;
 @property (nonatomic) BOOL isError;
+@property (nonatomic, strong) NSMutableArray<NSDictionary *> *frameEntries;
+@property (nonatomic, copy) NSArray<WKFrameInfo *> *frameList;
 @property (nonatomic, copy) NSString *credentialStepOrigin;
 @property (nonatomic, copy) NSString *credentialStepUser;
 @property (nonatomic) NSTimeInterval credentialStepTime;
@@ -710,6 +733,24 @@ static FMTab *tabFor(int tid, WKWebViewConfiguration *cfg) {
 }
 @end
 
+@implementation FMFrameHandler
+- (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)msg {
+	if (![msg.name isEqualToString:@"lunaFrames"] || msg.frameInfo.isMainFrame) return;
+	NSDictionary *b = [msg.body isKindOfClass:NSDictionary.class] ? msg.body : nil;
+	NSString *token = b[@"token"];
+	if (![token isKindOfClass:NSString.class] || !token.length || token.length > 128) return;
+	FMTab *tab = nil;
+	for (FMTab *t in gTabs.allValues) if (t.view == msg.webView) { tab = t; break; }
+	if (!tab) return;
+	if (!tab.frameEntries) tab.frameEntries = [NSMutableArray new];
+	for (NSUInteger i = 0; i < tab.frameEntries.count; i++)
+		if ([tab.frameEntries[i][@"token"] isEqualToString:token]) [tab.frameEntries removeObjectAtIndex:i--];
+	[tab.frameEntries addObject:@{@"token": token, @"info": msg.frameInfo}];
+	while (tab.frameEntries.count > 64) [tab.frameEntries removeObjectAtIndex:0];
+}
+@end
+
+
 #pragma mark C-API
 
 void fmwLoad(int id, const char *url) {
@@ -951,6 +992,79 @@ void fmwEvaluate(int tabID, const char *script, int req) {
   }];
  });
 }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+static void frameReply(int req, id object) {
+	NSData *data = [NSJSONSerialization dataWithJSONObject:object options:0 error:nil];
+	NSString *text = data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"[]";
+	char *out = strdup(text.UTF8String); goSnapshotDone(req, out); free(out);
+}
+
+// Listet die erreichbaren Unterframes (auch fremde Ursprünge). frame_id ist die Position in dieser Liste (ab 1).
+void fmwFrames(int tabID, int req) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		FMTab *t = gTabs[@(tabID)];
+		NSArray<NSDictionary *> *entries = [t.frameEntries copy];
+		if (!t || !entries.count) { if (t) t.frameList = @[]; frameReply(req, @[]); return; }
+		NSMutableArray *found = [NSMutableArray arrayWithCapacity:entries.count];
+		for (NSUInteger i = 0; i < entries.count; i++) [found addObject:[NSNull null]];
+		dispatch_group_t group = dispatch_group_create();
+		for (NSUInteger i = 0; i < entries.count; i++) {
+			dispatch_group_enter(group);
+			__block BOOL left = NO;
+			void (^leave)(void) = ^{ if (!left) { left = YES; dispatch_group_leave(group); } };
+			[t.view evaluateJavaScript:@"JSON.stringify({token:window.__lunaToken||'',url:location.href,title:document.title,width:innerWidth,height:innerHeight})"
+			                   inFrame:entries[i][@"info"] inContentWorld:frameWorld()
+			         completionHandler:^(id result, NSError *error) {
+				NSData *data = [result isKindOfClass:NSString.class] ? [(NSString *)result dataUsingEncoding:NSUTF8StringEncoding] : nil;
+				id parsed = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+				if (!error && [parsed isKindOfClass:NSDictionary.class]) found[i] = parsed;
+				leave();
+			}];
+			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), leave);
+		}
+		dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+			NSMutableArray *list = [NSMutableArray new], *infos = [NSMutableArray new], *alive = [NSMutableArray new];
+			NSMutableSet *seen = [NSMutableSet new];
+			for (NSUInteger i = 0; i < entries.count; i++) {
+				NSDictionary *d = [found[i] isKindOfClass:NSDictionary.class] ? found[i] : nil;
+				NSString *token = d[@"token"];
+				if (!d || ![token isKindOfClass:NSString.class] || !token.length || [seen containsObject:token]) continue;
+				[seen addObject:token];
+				[alive addObject:@{@"token": token, @"info": entries[i][@"info"]}];
+				double w = [d[@"width"] doubleValue], h = [d[@"height"] doubleValue];
+				if (w < 1 || h < 1) continue; // unsichtbare Tracking-Frames auslassen
+				[infos addObject:entries[i][@"info"]];
+				NSString *url = [d[@"url"] isKindOfClass:NSString.class] ? d[@"url"] : @"";
+				NSString *title = [d[@"title"] isKindOfClass:NSString.class] ? d[@"title"] : @"";
+				[list addObject:@{@"id": @(infos.count), @"url": url, @"title": title, @"width": @((int)w), @"height": @((int)h)}];
+			}
+			t.frameEntries = alive;
+			t.frameList = infos;
+			frameReply(req, list);
+		});
+	});
+}
+
+// Führt dasselbe begrenzte Seitenskript in einem Unterframe aus (frame_id aus fmwFrames).
+void fmwEvaluateInFrame(int tabID, int frameID, const char *script, int req) {
+	NSString *source = [NSString stringWithUTF8String:script];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		FMTab *t = gTabs[@(tabID)];
+		if (!t || frameID < 1 || (NSUInteger)frameID > t.frameList.count) {
+			char *out = strdup("{\"error\":\"Unbekannte frame_id. Zuerst read ausführen und eine frame_id aus frames wählen.\"}");
+			goSnapshotDone(req, out); free(out); return;
+		}
+		[t.view evaluateJavaScript:source inFrame:t.frameList[frameID - 1] inContentWorld:WKContentWorld.pageWorld
+		         completionHandler:^(id result, NSError *error) {
+			NSString *value = [result isKindOfClass:NSString.class] ? result : @"";
+			if (error) value = @"{\"error\":\"Aktion im Frame nicht möglich. Selektor und Ladezustand prüfen.\"}";
+			char *out = strdup(value.UTF8String); goSnapshotDone(req, out); free(out);
+		}];
+	});
+}
+#pragma clang diagnostic pop
 
 int fmwSetDockIcon(const void *bytes, int length) {
  NSData *data = [NSData dataWithBytes:bytes length:length];

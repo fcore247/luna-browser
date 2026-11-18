@@ -76,6 +76,18 @@ jobs:
           trap 'kill "$server"' EXIT
           for attempt in 1 2 3 4 5; do curl -fsS http://127.0.0.1:18769/ >/dev/null && break || sleep 1; done
           /tmp/luna-extension-tests "$PWD/native/tests/extension-fixture" http://127.0.0.1:18769/
+      - name: Native macOS iframe tests
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          xcrun clang -fobjc-arc -framework Cocoa -framework QuartzCore -framework WebKit -framework LocalAuthentication native/tests/frames-macos.m -o /tmp/luna-frames-tests
+          python3 -m http.server 18771 --bind 127.0.0.1 --directory native/tests/frames-fixture >/tmp/luna-frames-outer.log 2>&1 &
+          outer=$!
+          python3 -m http.server 18772 --bind 127.0.0.1 --directory native/tests/frames-fixture >/tmp/luna-frames-inner.log 2>&1 &
+          inner=$!
+          trap 'kill "$outer" "$inner"' EXIT
+          for attempt in 1 2 3 4 5; do curl -fsS http://127.0.0.1:18771/ >/dev/null && curl -fsS http://localhost:18772/ >/dev/null && break || sleep 1; done
+          /tmp/luna-frames-tests http://127.0.0.1:18771/outer.html
       - name: Build macOS
         if: runner.os == 'macOS'
         shell: bash
