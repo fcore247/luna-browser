@@ -16,6 +16,10 @@ Der private Schlüssel verbleibt im Schlüsselbund dieses Macs. CI erhält keine
 privaten Schlüssel. Während der Testphase werden nur CI-Artefakte erzeugt; ein Push
 allein veröffentlicht weiterhin **kein** Update.
 
+## Unveröffentlicht
+
+- Die KI-Schnittstelle (MCP) kann jetzt in eingebettete Iframes sehen und sie bedienen, auch bei fremden Ursprüngen. `browser_page` `read` listet die Frames unter `frames`; mit `frame_id` lassen sich lesen, klicken, ausfüllen, auswählen und scrollen im jeweiligen Frame. Das hilft zum Beispiel bei Lernplattformen, die ihre Inhalte in einem Iframe laden. Passwortfelder bleiben wie bisher gesperrt. Unter Windows (experimentell) ist das noch nicht verfügbar.
+
 ## Version 1.3.6 · 16. November 2026
 
 - Auf dem Mac können Webseiten Videos und andere Elemente über die Vollbild-API öffnen. Der YouTube-Player bleibt beim Wechsel im Luna-Fenster. Beim Verlassen stellt Luna die Fenstergröße und den Tastaturfokus wieder her.

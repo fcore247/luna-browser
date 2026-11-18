@@ -25,6 +25,8 @@ void fmwConfigureGesture(const char *src, int on); // Mausgeste: Skript für jed
 
 #endif
 void fmwEvaluate(int id, const char *script, int req);
+void fmwFrames(int id, int req);
+void fmwEvaluateInFrame(int id, int frame, const char *script, int req);
 
 int fmwSetDockIcon(const void *bytes, int length);
 

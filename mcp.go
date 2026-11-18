@@ -226,9 +226,28 @@ func (a *App) MCPPage(tab int, params string) (any, error) {
 	default:
 		return nil, errors.New("Ungültige Aktion")
 	}
+	frame := 0
+	if raw, ok := args["frame_id"]; ok && raw != nil {
+		value, ok := raw.(float64)
+		if !ok || value < 1 || value > 64 || value != float64(int(value)) {
+			return nil, errors.New("frame_id muss eine Zahl aus der Liste frames sein")
+		}
+		frame = int(value)
+	}
+	delete(args, "frame_id")
 	payload, _ := json.Marshal(args)
 	script := strings.Replace(pageControl, "export function", "function", 1) + "\nJSON.stringify(lunaPageAction(" + string(payload) + "));"
-	result, err := web.Evaluate(tab, script)
+	var result string
+	var err error
+	if frame > 0 {
+		// Liste erneuern, damit frame_id zur aktuellen Seite passt.
+		if _, err = web.Frames(tab); err != nil {
+			return nil, err
+		}
+		result, err = web.EvaluateInFrame(tab, frame, script)
+	} else {
+		result, err = web.Evaluate(tab, script)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +257,15 @@ func (a *App) MCPPage(tab int, params string) (any, error) {
 	}
 	if message, ok := out["error"].(string); ok {
 		return nil, errors.New(message)
+	}
+	if action == "read" && frame == 0 {
+		// Unterframes (z. B. eingebettete Lerninhalte) stehen separat; mit frame_id lassen sie sich lesen und bedienen.
+		if raw, err := web.Frames(tab); err == nil {
+			var frames []map[string]any
+			if json.Unmarshal([]byte(raw), &frames) == nil && len(frames) > 0 {
+				out["frames"] = frames
+			}
+		}
 	}
 	return out, nil
 }

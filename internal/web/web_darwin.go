@@ -195,6 +195,18 @@ func Evaluate(id int, script string) (string, error) {
 	return snapshotVia(func(req C.int) { C.fmwEvaluate(C.int(id), source, req) })
 }
 
+// Frames listet die erreichbaren Unterframes der Seite als JSON-Array (auch fremde Ursprünge).
+func Frames(id int) (string, error) {
+	return snapshotVia(func(req C.int) { C.fmwFrames(C.int(id), req) })
+}
+
+// EvaluateInFrame führt das generierte MCP-Skript in einem Unterframe aus (frame aus Frames).
+func EvaluateInFrame(id, frame int, script string) (string, error) {
+	source := C.CString(script)
+	defer C.free(unsafe.Pointer(source))
+	return snapshotVia(func(req C.int) { C.fmwEvaluateInFrame(C.int(id), C.int(frame), source, req) })
+}
+
 func SetDockIcon(data []byte) bool {
 	if len(data) == 0 {
 		return false
