@@ -21,6 +21,7 @@ func TestBrowserAndBridgeProfile(t *testing.T) {
 		// client does not inherit LUNA_TEST_MODE (or explicitly clears it).
 		{"1", "", filepath.Join(root, "Luna Extension Test", "browser-mac")},
 		{"1", "0", filepath.Join(root, "Luna Extension Test", "browser-mac")},
+		{"opennava", "", filepath.Join(root, "Luna OpenNava Preview", "browser-mac")},
 	} {
 		buildinfo.TestMode = test.build
 		t.Setenv("LUNA_TEST_MODE", test.mode)

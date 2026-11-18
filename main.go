@@ -108,7 +108,7 @@ func buildMenu(app *App) *menu.Menu {
 }
 
 func main() {
-	if buildinfo.TestMode == "1" {
+	if buildinfo.TestMode == "1" || buildinfo.TestMode == "opennava" {
 		os.Setenv("LUNA_TEST_MODE", "1")
 	}
 	if handlePlatformCommand() {
